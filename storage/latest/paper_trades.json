@@ -1,0 +1,33 @@
+[
+  {
+    "trade_id": "paper_2026-06-23T10:12:48+00:00_LONG",
+    "status": "CLOSED",
+    "direction": "LONG",
+    "entry_time": "2026-06-23T10:12:48+00:00",
+    "entry_price": 100.0,
+    "stop_loss": 97.5,
+    "take_profit": 105.0,
+    "risk": 2.5,
+    "risk_per_trade": 0.01,
+    "quantity": 1.0,
+    "notional_usdt": 100.0,
+    "position_sizing_reason": "position_size_by_risk_with_notional_cap",
+    "atr_info": {
+      "atr": 360.77999999999986,
+      "raw_stop_distance_bps": 54117.0,
+      "final_stop_distance_bps": 250.0,
+      "min_stop_loss_bps": 35.0,
+      "max_stop_loss_bps": 250.0
+    },
+    "entry_reason": "unit_test",
+    "exit_reason": "stop_loss_pessimistic_first",
+    "holding_candles": 1,
+    "max_favorable_excursion": 2.4,
+    "max_adverse_excursion": 1.4,
+    "intrabar_policy": "pessimistic_sl_first",
+    "exit_time": "2026-06-23T10:12:48+00:00",
+    "exit_price": 97.5,
+    "result": "LOSS",
+    "pnl_r": -1.0
+  }
+]

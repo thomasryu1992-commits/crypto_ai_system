@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from execution.order_executor import execute_order_with_risk_check
+from execution.order_executor import place_order
 
 
-def main() -> None:
-    result = execute_order_with_risk_check("BTCUSDT", "BUY", 0.00005, price=107500, current_price=107500, storage_dir="storage", metadata={"source": "test_order_executor"})
-    print("[ORDER EXECUTOR TEST]")
-    print(f"Status: {result.get('status')}")
-    print(f"Executed: {result.get('executed')}")
-    risk = result.get("risk_result") or {}
-    print(f"Risk Status: {risk.get('status')}")
-    print(f"Approved: {risk.get('approved')}")
+def test_live_order_blocked() -> None:
+    result = place_order({"symbol": "BTCUSDT", "side": "BUY"})
+    assert result["status"] == "BLOCKED_STEP80"
 
 
 if __name__ == "__main__":
-    main()
+    test_live_order_blocked()
+    print("PASSED")

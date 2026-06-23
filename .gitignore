@@ -3,7 +3,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+secrets/*
+!secrets/.gitkeep
 storage/*.json
-storage/**/*.json
-knowledge_base/.raw/**/*.json
-knowledge_base/lint/*.json
+storage/*.csv
+storage/logs/*
+!storage/.gitkeep
+!storage/logs/.gitkeep
+reports/*.json
+reports/*.csv

@@ -1,0 +1,28 @@
+{
+  "created_at": "2026-06-23T10:12:48+00:00",
+  "state": "REJECTED",
+  "status": "NO_ORDER",
+  "mode": "SKIPPED",
+  "intent": {
+    "created_at": "2026-06-23T10:12:48+00:00",
+    "state": "REJECTED",
+    "status": "NO_ORDER_INTENT",
+    "reason": "BLOCK_DATA_HEALTH"
+  },
+  "readiness": {
+    "created_at": "2026-06-23T10:12:48+00:00",
+    "ready": false,
+    "blockers": [
+      "TRADING_MODE_not_live",
+      "LIVE_TRADING_ENABLED_false",
+      "ALLOW_LIVE_TRADING_false",
+      "EXCHANGE_ORDER_ENABLED_false",
+      "ENABLE_REAL_ORDERS_false",
+      "LIVE_TRADING_CONFIRMATION_mismatch",
+      "missing_exchange_api_credentials"
+    ],
+    "testnet_orders_enabled": false,
+    "max_live_position_usdt": 20.0,
+    "max_order_notional_usdt": 20.0
+  }
+}

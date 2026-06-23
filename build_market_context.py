@@ -1,15 +1,13 @@
+from __future__ import annotations
+
+from builders.market_context import build_market_context
 from core.console import configure_utf8_console, safe_print
-from builders.market_context_builder import build_market_context
-
-configure_utf8_console()
 
 
-def main() -> dict:
+def main() -> None:
+    configure_utf8_console()
     result = build_market_context()
-    safe_print("[MARKET CONTEXT BUILDER]")
-    safe_print(f"Status: {result.get('status')}")
-    safe_print(f"Market Bias: {result.get('market_bias')}")
-    return result
+    safe_print("Market context:", result.get("summary"))
 
 
 if __name__ == "__main__":

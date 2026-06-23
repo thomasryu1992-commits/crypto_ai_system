@@ -1,0 +1,5 @@
+row_id,created_at,event_time,symbol,event_type,schema_version,signal,confidence,reasons,entry_candidate_price,source_snapshot_time
+06_Trading_Signal_BTCUSDT_TRADING_SIGNAL_0a711aaa7daa104d,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,TRADING_SIGNAL,v3,NONE,0,"[""synthetic_or_fallback_data_no_signal""]",101232.36,2026-06-23T09:00:00+00:00
+06_Trading_Signal_BTCUSDT_TRADING_SIGNAL_0a711aaa7daa104d,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,TRADING_SIGNAL,v3,NONE,0,"[""synthetic_or_fallback_data_no_signal""]",101232.36,2026-06-23T09:00:00+00:00
+06_Trading_Signal_BTCUSDT_TRADING_SIGNAL_0a711aaa7daa104d,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,TRADING_SIGNAL,v3,NONE,0,"[""synthetic_or_fallback_data_no_signal""]",101232.36,2026-06-23T09:00:00+00:00
+06_Trading_Signal_BTCUSDT_TRADING_SIGNAL_0a711aaa7daa104d,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,TRADING_SIGNAL,v3,NONE,0,"[""synthetic_or_fallback_data_no_signal""]",101232.36,2026-06-23T09:00:00+00:00

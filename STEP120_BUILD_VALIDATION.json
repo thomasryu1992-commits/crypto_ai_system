@@ -1,0 +1,67 @@
+{
+  "schema_version": "step120.build_validation.v1",
+  "status": "PASSED",
+  "verified_scope": "compile + dry-run + paper/shadow validation; no real exchange orders executed",
+  "results": [
+    {
+      "command": "/opt/pyvenv/bin/python -m compileall .",
+      "returncode": 0,
+      "stdout_tail": "Listing '.'...\nListing './analysis'...\nListing './bridge'...\nListing './builders'...\nListing './collectors'...\nListing './config'...\nListing './core'...\nListing './data'...\nListing './data_collector_bot'...\nListing './data_health'...\nListing './execution'...\nListing './integrations'...\nListing './knowledge_base'...\nListing './knowledge_engine'...\nListing './notify'...\nListing './reports'...\nListing './research'...\nListing './research_bot'...\nListing './risk'...\nListing './scripts'...\nListing './secrets'...\nListing './storage'...\nListing './storage/logs'...\nListing './system_guard'...\nListing './trading'...\nListing './trading_bot'...\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_operational_dry_run.py",
+      "returncode": 0,
+      "stdout_tail": "Operational Dry Run: {'schema_version': 'step120.operational_dry_run.v1', 'generated_at': '2026-06-23T09:42:43+00:00', 'status': 'PASSED', 'errors': [], 'full_cycle_generated': True, 'spreadsheet_result': {'status': 'EXPORTED', 'generated_at': '2026-06-23T09:42:43+00:00', 'local_csv': {'status': 'EXPORTED_LOCAL_CSV', 'generated_at': '2026-06-23T09:42:43+00:00', 'path': '/mnt/data/build_step120_work/crypto_ai_system/storage/spreadsheet_sync_result.csv', 'rows': 8, 'spreadsheet_enabled': False, 'spreadsheet_provider': 'local_csv'}, 'google_sheets': {'status': 'SKIPPED', 'reason': 'SPREADSHEET_ENABLED=false', 'generated_at': '2026-06-23T09:42:43+00:00'}}}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python check_scheduler_health.py",
+      "returncode": 0,
+      "stdout_tail": "Scheduler health: {'schema_version': 'step80.scheduler_health.v1', 'generated_at': '2026-06-23T09:42:45+00:00', 'status': 'HEALTHY', 'error_failures': 0, 'warning_failures': 0, 'checks': [{'file': 'coinalyze_market_data.json', 'status': 'OK'}, {'file': 'market_snapshot.json', 'status': 'OK'}, {'file': 'market_context.json', 'status': 'OK'}, {'file': 'dynamic_setup_result.json', 'status': 'OK'}, {'file': 'research_cycle_result.json', 'status': 'OK'}, {'file': 'research_decision_result.json', 'status': 'OK'}, {'file': 'trading_cycle_result.json', 'status': 'OK'}, {'file': 'telegram_alert_result.json', 'status': 'OK'}, {'file': 'operational_dry_run_result.json', 'status': 'OK'}]}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_data_health_check.py",
+      "returncode": 0,
+      "stdout_tail": "Data Health: {'schema_version': 'step120.data_health.v1', 'generated_at': '2026-06-23T09:42:47+00:00', 'status': 'HEALTHY', 'allow_trading': True, 'checks': {'candle_count': 120, 'source': 'fallback_synthetic_step80', 'market_data_age_minutes': 0.07231485, 'snapshot_age_minutes': 0.07231516666666667}, 'problems': [], 'notes': ['fallback_or_synthetic_data_source_used']}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_research_trading_bridge.py",
+      "returncode": 0,
+      "stdout_tail": "Trade Decision: {'schema_version': 'step120.trade_decision.v1', 'generated_at': '2026-06-23T09:42:49+00:00', 'research_scenario': 'Bullish', 'signal_quality': 'B', 'signal_timing': 'Confirmed', 'research_decision': 'ALLOW_LONG_BIAS', 'trading_signal': 'LONG', 'data_health_status': 'HEALTHY', 'risk_status': 'NORMAL', 'final_decision': 'ALLOW_PAPER_LONG', 'reasons': ['Research and trading are aligned for long bias.']}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_live_readiness_check.py",
+      "returncode": 0,
+      "stdout_tail": "Live Readiness: {'ready': False, 'mode': 'paper', 'problems': ['LIVE_TRADING_ENABLED=false', 'ALLOW_LIVE_TRADING=false', 'EXCHANGE_ORDER_ENABLED=false', 'ENABLE_REAL_ORDERS=false', 'LIVE_TRADING_CONFIRMATION mismatch', 'missing_exchange_api_credentials'], 'limits': {'max_live_position_usdt': 20.0, 'max_order_notional_usdt': 20.0, 'max_daily_loss_usdt': 10.0, 'max_weekly_loss_usdt': 30.0, 'max_live_trades_per_day': 3}}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_live_shadow_report.py",
+      "returncode": 0,
+      "stdout_tail": "Live Shadow Report: {'schema_version': 'step120.live_shadow_report.v1', 'generated_at': '2026-06-23T09:42:53+00:00', 'mode': 'live_shadow', 'decision': 'ALLOW_PAPER_LONG', 'order_status': 'SHADOW_ONLY', 'paper_active_position': True, 'assumptions': {'slippage_assumption_bps': 8.0, 'fee_assumption_bps': 4.0, 'latency_assumption_ms': 750, 'estimated_roundtrip_cost_bps': 24.0}, 'notes': ['This is not proof of profitable live trading.', 'Use this report for Step115-120 shadow comparison before enabling real orders.']}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_step120_dry_run.py",
+      "returncode": 0,
+      "stdout_tail": "Step120 Dry Run: {'schema_version': 'step120.dry_run.v1', 'generated_at': '2026-06-23T09:42:55+00:00', 'status': 'PASSED', 'errors': [], 'full_cycle_generated': True, 'live_readiness': {'ready': False, 'mode': 'paper', 'problems': ['LIVE_TRADING_ENABLED=false', 'ALLOW_LIVE_TRADING=false', 'EXCHANGE_ORDER_ENABLED=false', 'ENABLE_REAL_ORDERS=false', 'LIVE_TRADING_CONFIRMATION mismatch', 'missing_exchange_api_credentials'], 'limits': {'max_live_position_usdt': 20.0, 'max_order_notional_usdt': 20.0, 'max_daily_loss_usdt': 10.0, 'max_weekly_loss_usdt': 30.0, 'max_live_trades_per_day': 3}}, 'live_shadow_generated': True, 'spreadsheet_result': {'status': 'EXPORTED', 'generated_at': '2026-06-23T09:42:55+00:00', 'local_csv': {'status': 'EXPORTED_LOCAL_CSV', 'generated_at': '2026-06-23T09:42:55+00:00', 'path': '/mnt/data/build_step120_work/crypto_ai_system/storage/spreadsheet_sync_result.csv', 'rows': 8, 'spreadsheet_enabled': False, 'spreadsheet_provider': 'local_csv'}, 'google_sheets': {'status': 'SKIPPED', 'reason': 'SPREADSHEET_ENABLED=false', 'generated_at': '2026-06-23T09:42:55+00:00'}}}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python run_spreadsheet_sync.py",
+      "returncode": 0,
+      "stdout_tail": "Spreadsheet sync: {'status': 'EXPORTED', 'generated_at': '2026-06-23T09:42:57+00:00', 'local_csv': {'status': 'EXPORTED_LOCAL_CSV', 'generated_at': '2026-06-23T09:42:57+00:00', 'path': '/mnt/data/build_step120_work/crypto_ai_system/storage/spreadsheet_sync_result.csv', 'rows': 8, 'spreadsheet_enabled': False, 'spreadsheet_provider': 'local_csv'}, 'google_sheets': {'status': 'SKIPPED', 'reason': 'SPREADSHEET_ENABLED=false', 'generated_at': '2026-06-23T09:42:57+00:00'}}\n",
+      "stderr_tail": ""
+    },
+    {
+      "command": "/opt/pyvenv/bin/python test_spreadsheet_exporter.py",
+      "returncode": 0,
+      "stdout_tail": "PASSED\n",
+      "stderr_tail": ""
+    }
+  ]
+}

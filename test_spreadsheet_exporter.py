@@ -1,49 +1,21 @@
 from __future__ import annotations
 
-import sys
-
-from integrations.spreadsheet_exporter import build_spreadsheet_tables, run_spreadsheet_sync
+from integrations.spreadsheet_exporter import export_latest_results, export_latest_results_to_csv
 
 
-def main() -> None:
-    tables = build_spreadsheet_tables()
-    required_tables = {
-        "dashboard_summary",
-        "market_snapshot",
-        "research_decision",
-        "trading_cycle",
-        "paper_trade_history",
-        "paper_performance",
-        "setup_performance",
-        "setup_weight",
-        "risk_check",
-        "order_execution",
-        "execution_reconciliation",
-        "kb_lint",
-    }
+def test_export_latest_results_to_csv() -> None:
+    result = export_latest_results_to_csv()
+    assert result["status"] == "EXPORTED_LOCAL_CSV"
 
-    missing = required_tables - set(tables.keys())
 
-    print("=" * 80)
-    print("[SPREADSHEET EXPORTER TEST]")
-    print("=" * 80)
-    print(f"Table Count: {len(tables)}")
-    print(f"Missing Tables: {sorted(missing)}")
-
-    for name, rows in tables.items():
-        print(f"- {name}: {len(rows)} rows")
-
-    if missing:
-        sys.exit(1)
-
-    result = run_spreadsheet_sync()
-    print("-" * 80)
-    print(f"Sync Status: {result.get('status')}")
-    print(f"Summary: {result.get('summary')}")
-
-    if result.get("status") == "SYNC_COMPLETED_WITH_ERRORS":
-        sys.exit(1)
+def test_export_latest_results() -> None:
+    result = export_latest_results()
+    assert result["status"] == "EXPORTED"
+    assert "local_csv" in result
+    assert "google_sheets" in result
 
 
 if __name__ == "__main__":
-    main()
+    test_export_latest_results_to_csv()
+    test_export_latest_results()
+    print("PASSED")

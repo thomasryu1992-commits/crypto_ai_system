@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from knowledge_engine.kb_linter import run_kb_lint
+from pathlib import Path
 
 
-def main() -> None:
-    result = run_kb_lint()
-    print("[KB LINTER TEST]")
-    print(f"Status: {result.get('status')}")
-    print(f"Errors: {result.get('error_count')}")
-    print(f"Warnings: {result.get('warning_count')}")
+def test_knowledge_base_exists() -> None:
+    assert Path("knowledge_base").exists()
 
 
 if __name__ == "__main__":
-    main()
+    test_knowledge_base_exists()
+    print("PASSED")

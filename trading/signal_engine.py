@@ -1,25 +1,35 @@
 from __future__ import annotations
 
+from config.settings import MARKET_SNAPSHOT_PATH, RESEARCH_RESULT_PATH
+from core.json_io import read_json
 
-def build_signal(context: dict, decision: dict) -> dict:
-    bias = context.get("market_bias", "neutral")
-    action = decision.get("action", "WATCH")
 
-    if action == "WATCH":
-        side = "WATCH"
-        confidence = 0.52
-    elif bias == "bullish":
-        side = "LONG_PAPER"
-        confidence = 0.61
-    elif bias == "bearish":
-        side = "SHORT_PAPER"
-        confidence = 0.59
-    else:
-        side = "WATCH"
-        confidence = 0.5
+def generate_trading_signal() -> dict:
+    snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+    research = read_json(RESEARCH_RESULT_PATH, {})
 
-    return {
-        "side": side,
-        "confidence": confidence,
-        "reason": "Research decision requires conditional confirmation." if side == "WATCH" else "Directional paper signal generated.",
-    }
+    signal = "NONE"
+    confidence = 0
+    reasons = []
+
+    trend = snapshot.get("trend_bias")
+    scenario = research.get("scenario")
+    timing = research.get("signal_timing")
+
+    if snapshot.get("is_synthetic") or snapshot.get("is_fallback"):
+        return {
+            "signal": "NONE",
+            "confidence": 0,
+            "reasons": ["synthetic_or_fallback_data_no_signal"],
+        }
+
+    if trend == "bullish" and scenario in {"Bullish", "Constructive"} and timing in {"Early", "Confirmed"}:
+        signal = "LONG"
+        confidence = 65
+        reasons.append("trend_and_research_aligned_long")
+    elif trend == "bearish" and scenario == "Bearish":
+        signal = "SHORT"
+        confidence = 60
+        reasons.append("trend_and_research_aligned_short")
+
+    return {"signal": signal, "confidence": confidence, "reasons": reasons}

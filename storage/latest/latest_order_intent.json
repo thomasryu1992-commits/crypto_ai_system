@@ -1,0 +1,6 @@
+{
+  "created_at": "2026-06-23T10:12:48+00:00",
+  "state": "REJECTED",
+  "status": "NO_ORDER_INTENT",
+  "reason": "BLOCK_DATA_HEALTH"
+}

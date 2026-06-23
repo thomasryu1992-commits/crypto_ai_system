@@ -1,66 +1,93 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-from config.settings import env_str
-from execution.exchange_router import route_order
-from execution.order_models import create_order_request
-from risk.risk_manager import run_order_risk_check
-from scripts.json_utils import append_json_log, now_utc_iso, save_json
+from config.settings import MAX_ORDER_NOTIONAL_USDT, ORDER_INTENT_PATH, ORDER_RESULT_PATH, TRADE_DECISION_PATH
+from core.json_io import atomic_write_json, read_json
+from core.time_utils import utc_now_iso
+from core.event_log import log_event
+from execution.idempotency import enrich_order_identity
+from execution.live_guard import run_live_readiness_check
 
 
-def execute_order_with_risk_check(
-    symbol: str,
-    side: str,
-    quantity: float,
-    price: Optional[float] = None,
-    current_price: Optional[float] = None,
-    storage_dir: str | Path = "storage",
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    storage_path = Path(storage_dir)
-    order_request = create_order_request(
-        symbol=symbol,
-        side=side,
-        quantity=quantity,
-        order_type="MARKET",
-        price=price,
-        reduce_only=False,
-        mode=env_str("BOT_MODE", "PAPER_ONLY"),
-        metadata=metadata or {},
-    )
-    risk_result = run_order_risk_check(order_request, storage_dir=storage_path, current_price=current_price)
-    if not risk_result.get("approved"):
+def build_order_intent(trade_decision: dict) -> dict:
+    if not trade_decision.get("allow_order_intent", False):
+        return {
+            "created_at": utc_now_iso(),
+            "state": "REJECTED",
+            "status": "NO_ORDER_INTENT",
+            "reason": trade_decision.get("final_decision"),
+        }
+
+    direction = trade_decision.get("direction")
+    side = "BUY" if direction == "LONG" else "SELL"
+    intent = {
+        "created_at": utc_now_iso(),
+        "state": "CREATED",
+        "status": "ORDER_INTENT_CREATED",
+        "symbol": trade_decision.get("research", {}).get("symbol", "BTCUSDT"),
+        "direction": direction,
+        "side": side,
+        "order_type": "MARKET_SHADOW",
+        "notional_usdt": MAX_ORDER_NOTIONAL_USDT,
+        "source_decision": trade_decision.get("final_decision"),
+        "confidence": trade_decision.get("confidence", 0),
+        "strategy_id": "research_bridge_v2",
+        "signal_id": trade_decision.get("final_decision", "unknown_signal"),
+        "candle_time": trade_decision.get("data_health", {}).get("latest_candle_time") or trade_decision.get("created_at"),
+    }
+    return enrich_order_identity(intent)
+
+
+def execute_order_intent(intent: dict) -> dict:
+    readiness = run_live_readiness_check()
+
+    if intent.get("status") != "ORDER_INTENT_CREATED":
         result = {
-            "status": "REJECTED_BY_RISK_MANAGER",
-            "timestamp_utc": now_utc_iso(),
-            "executed": False,
-            "order_request": order_request,
-            "risk_result": risk_result,
-            "exchange_result": None,
-            "safety": {"live_order_executed": False},
+            "created_at": utc_now_iso(),
+            "state": "REJECTED",
+            "status": "NO_ORDER",
+            "mode": "SKIPPED",
+            "intent": intent,
+            "readiness": readiness,
+        }
+    elif not readiness.get("ready", False):
+        result = {
+            "created_at": utc_now_iso(),
+            "state": "VALIDATED",
+            "status": "SHADOW_ONLY",
+            "mode": "LIVE_BLOCKED_SHADOW_EXECUTION",
+            "intent": intent,
+            "readiness": readiness,
+            "exchange_order_id": None,
+            "filled": False,
         }
     else:
-        exchange_result = route_order(order_request, current_price=current_price, storage_dir=storage_path)
-        executed = exchange_result.get("status") == "ROUTED_TO_MOCK"
         result = {
-            "status": "MOCK_ORDER_ACCEPTED" if executed else "EXCHANGE_ROUTER_REJECTED",
-            "timestamp_utc": now_utc_iso(),
-            "executed": executed,
-            "order_request": order_request,
-            "risk_result": risk_result,
-            "exchange_result": exchange_result,
-            "safety": {"live_order_executed": False},
+            "created_at": utc_now_iso(),
+            "state": "UNKNOWN",
+            "status": "TESTNET_REQUIRED_BEFORE_LIVE",
+            "mode": "GUARDED_BLOCK",
+            "intent": intent,
+            "readiness": readiness,
+            "exchange_order_id": None,
+            "filled": False,
         }
-    save_json(storage_path / "order_execution_result.json", result)
-    append_json_log(storage_path / "order_execution_log.json", result)
+
+    atomic_write_json(ORDER_RESULT_PATH, result)
+    log_event("order_execution_attempted", {"status": result["status"], "state": result["state"], "client_order_id": intent.get("client_order_id")})
     return result
 
 
-def execute_market_buy_with_risk_check(symbol: str, quantity: float, current_price: float, storage_dir: str | Path = "storage") -> Dict[str, Any]:
-    return execute_order_with_risk_check(symbol, "BUY", quantity, price=current_price, current_price=current_price, storage_dir=storage_dir)
+def run_order_executor() -> dict:
+    decision = read_json(TRADE_DECISION_PATH, {})
+    intent = build_order_intent(decision)
+    atomic_write_json(ORDER_INTENT_PATH, intent)
+    return execute_order_intent(intent)
 
 
-def execute_market_sell_with_risk_check(symbol: str, quantity: float, current_price: float, storage_dir: str | Path = "storage") -> Dict[str, Any]:
-    return execute_order_with_risk_check(symbol, "SELL", quantity, price=current_price, current_price=current_price, storage_dir=storage_dir)
+def main() -> None:
+    result = run_order_executor()
+    print(f"Order executor: {result['status']} state={result['state']}")
+
+
+if __name__ == "__main__":
+    main()

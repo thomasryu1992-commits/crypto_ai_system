@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from execution.execution_reconciler import run_execution_reconciliation
+from execution.reconciler import reconcile_execution_state
 
 
-def main() -> None:
-    result = run_execution_reconciliation("storage")
-    print("[EXECUTION RECONCILIATION TEST]")
-    print(f"Status: {result.get('status')}")
-    print(f"Reconciled: {result.get('reconciled')}")
-    print("[CHECKS]")
-    for check in result.get("checks", []):
-        print(f"- {check.get('name')}: {check.get('passed')} / {check.get('message')}")
+def test_reconcile_execution_state() -> None:
+    assert reconcile_execution_state()["status"] == "NO_LIVE_EXECUTION"
 
 
 if __name__ == "__main__":
-    main()
+    test_reconcile_execution_state()
+    print("PASSED")

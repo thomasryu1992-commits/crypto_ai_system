@@ -1,88 +1,67 @@
-# crypto_ai_system - Step 66 Full Package
+# Crypto AI System - Step150 Spreadsheet-First Guarded Package
 
-This package includes the Step 66 fix for Windows `cp949` console encoding errors.
+This package is a guarded crypto research + paper trading + live-shadow system.
 
-## What was fixed
+## Current Status
 
-`run_trading_cycle.py` previously failed on Windows when printing Telegram alert text containing emoji such as `🤖`.
+This is **not** a live trading bot.
 
-The fix adds UTF-8 stdout/stderr reconfiguration and `safe_print()` handling through:
+It is a Step150 package with:
 
-```python
-from core.console import configure_utf8_console, safe_print
-configure_utf8_console()
-```
+- Spreadsheet-first operational storage
+- Latest JSON cache
+- Local CSV backup
+- Spreadsheet retry queue
+- Synthetic/fallback data trading block
+- Data health checks
+- Research scoring and decision engine
+- Trading signal engine
+- ATR stop loss with min/max BPS guard
+- Position sizing by risk
+- Conservative paper engine
+- Time-based risk guard
+- Research-trading bridge policy v2
+- Order state machine
+- Idempotency key and client order ID
+- Retry/reconciliation policy scaffold
+- Shadow-only order executor
+- Testnet executor skeleton
+- Live executor intentionally disabled
+- Limited live readiness report
+- Safety test suite
+- Paper forward test runner
 
-The problematic print logic is now:
-
-```python
-safe_print(result.get("telegram_alert"))
-```
-
-## Quick start
+## Quick Start
 
 ```powershell
-cd C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system
 copy .env.example .env
-python run_trading_cycle.py
+python -m pip install -r requirements.txt
+python run_step150_validation.py
+```
+
+## Main Commands
+
+```powershell
+python run_full_cycle.py
 python run_operational_dry_run.py
-python check_scheduler_health.py
+python run_spreadsheet_sync.py
+python run_limited_live_readiness_report.py
+python run_step150_safety_tests.py
+python run_step150_forward_test.py --iterations 7
+python run_step150_validation.py
 ```
 
-Expected final health result:
+## Storage Policy
 
 ```text
-Status: HEALTHY
-Operational Dry Run: PASSED
-Error Failures: 0
-Warning Failures: 0
+Spreadsheet / local CSV = operational history
+storage/latest/*.json = latest state cache
+storage/backup/spreadsheet/*.csv = local backup
+storage/queue/spreadsheet_retry_queue.jsonl = retry queue
+storage/logs/event_log.jsonl = event log
 ```
 
-## File structure
+## Safety
 
-```text
-crypto_ai_system/
-  run_real_market_data_collector.py
-  build_market_snapshot.py
-  build_market_context.py
-  run_dynamic_setup.py
-  run_research_cycle.py
-  run_research_decision.py
-  run_trading_cycle.py
-  run_operational_dry_run.py
-  check_scheduler_health.py
-  reset_storage.py
-  config/
-  core/
-  collectors/
-  builders/
-  research/
-  trading/
-  notify/
-  integrations/
-  storage/
-```
-
-## Important outputs
-
-```text
-storage/coinalyze_market_data.json
-storage/market_snapshot.json
-storage/market_context.json
-storage/dynamic_setup_result.json
-storage/research_cycle_result.json
-storage/research_decision_result.json
-storage/trading_cycle_result.json
-storage/telegram_alert_result.json
-storage/spreadsheet_sync_result.json
-storage/operational_dry_run_result.json
-storage/scheduler_health_result.json
-storage/scheduler_logs/daily_operational_dry_run.log
-```
-
-## Notes
-
-- The default mode is `paper`.
-- This package does not send real exchange orders.
-- If Telegram credentials are empty, the Telegram module records a dry-run `SENT` result so the operational pipeline can still pass.
-- If Coinalyze is disabled or the API key is missing, the collector generates a stable fallback market data snapshot.
+Real exchange orders are blocked by default. The live executor raises `NotImplementedError`.
+Testnet execution is also guarded until `ENABLE_TESTNET_ORDERS=true` and signed order logic is explicitly implemented.

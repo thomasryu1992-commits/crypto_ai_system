@@ -1,0 +1,41 @@
+{
+  "symbol": "BTCUSDT",
+  "current_price": 64159.9,
+  "price": 64159.9,
+  "timestamp_utc": "2026-06-22T10:28:11.665259+00:00",
+  "source": "market_snapshot_builder",
+  "market_data": {
+    "price": {
+      "current": 64159.9,
+      "change_lookback_pct": 0.799041,
+      "signal": "mild_up"
+    },
+    "open_interest": {
+      "value": 6390699578.9378,
+      "change_lookback_pct": 2.311385,
+      "signal": "rising"
+    },
+    "funding_rate": {
+      "value": 0.001514,
+      "predicted_value": 0.004216,
+      "signal": "overheated_positive"
+    },
+    "long_short_ratio": {
+      "value": 1.6638,
+      "long": 62.46,
+      "short": 37.54,
+      "signal": "long_crowded"
+    },
+    "liquidation": {
+      "long_liquidation": 13118944.7187,
+      "short_liquidation": 23268588.1144,
+      "total_liquidation": 36387532.8331,
+      "dominant_side": "short_liquidation_dominant",
+      "signal": "short_liquidation_dominant"
+    }
+  },
+  "raw_source": {
+    "coinalyze_market_data": "C:\\Users\\thomas\\Desktop\\코딩공부\\crypto_AI_Agent\\crypto_ai_system\\storage\\coinalyze_market_data.json",
+    "raw_path": "C:\\Users\\thomas\\Desktop\\코딩공부\\crypto_AI_Agent\\crypto_ai_system\\knowledge_base\\.raw\\derivatives\\2026-06-22_BTCUSDT_PERP.A_coinalyze.json"
+  }
+}

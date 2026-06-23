@@ -1,0 +1,13 @@
+{
+  "created_at": "2026-06-23T10:12:48+00:00",
+  "status": "BLOCK_NEW_POSITION",
+  "allow_new_position": false,
+  "daily_pnl_r": -1.0,
+  "weekly_pnl_r": -1.0,
+  "consecutive_losses": 1,
+  "drawdown_r": -1.0,
+  "problems": [
+    "max_drawdown_proxy_breached"
+  ],
+  "calculation_mode": "time_based_exit_time"
+}

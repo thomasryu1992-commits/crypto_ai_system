@@ -1,35 +1,22 @@
+from __future__ import annotations
+
 import sys
 from typing import Any
 
 
 def configure_utf8_console() -> None:
-    """
-    Prevent Windows cp949 console crashes when printing emoji or non-ASCII text.
-    Safe to call on non-Windows platforms as well.
-    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
+
+
+def safe_print(*values: Any, sep: str = " ", end: str = "\n") -> None:
+    text = sep.join(str(v) for v in values)
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-
-    try:
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-
-
-def safe_print(value: Any = "") -> None:
-    """
-    Print text without allowing UnicodeEncodeError to terminate the program.
-    """
-    text = "" if value is None else str(value)
-
-    try:
-        print(text)
+        print(text, end=end)
     except UnicodeEncodeError:
-        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
-        safe_text = text.encode(encoding, errors="backslashreplace").decode(
-            encoding,
-            errors="replace",
-        )
-        print(safe_text)
+        print(text.encode("utf-8", errors="replace").decode("utf-8"), end=end)

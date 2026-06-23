@@ -1,0 +1,14 @@
+{
+  "created_at": "2026-06-23T10:12:48+00:00",
+  "research_bias": "ALLOW_SHORT_OR_RISK_OFF",
+  "scenario": "Cautious",
+  "signal_quality": "D",
+  "signal_timing": "Data-Blocked",
+  "final_score": 35.0,
+  "allow_long": false,
+  "allow_short": false,
+  "reasons": [
+    "positive_24h_momentum",
+    "synthetic_or_fallback_data_source"
+  ]
+}
