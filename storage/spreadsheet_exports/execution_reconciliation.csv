@@ -1,0 +1,35 @@
+﻿key,value
+step,STEP_49_EXECUTION_RECONCILIATION_MANAGER
+timestamp_utc,2026-06-23T02:11:52.031603+00:00
+status,NO_EXECUTION_FOUND
+reconciled,False
+context.paper_position_count,0
+context.open_position_count,0
+context.position_id_from_paper,
+context.position_id_from_order,
+context.execution_map_entry,
+context.execution_map_size,0
+context.order_execution_status,
+context.mock_order_status,
+context.exchange_router_status,
+context.risk_status,
+context.risk_approved,
+context.exchange,
+context.order_side,
+context.paper_direction,
+context.expected_side,
+context.filled_price,
+context.filled_quantity,
+context.paper_entry_price,
+context.price_diff_pct,
+context.live_order_executed,False
+context.order_request.request_id,
+context.order_request.symbol,
+context.order_request.side,
+context.order_request.quantity,
+context.order_request.price,
+checks,"[{""name"": ""EXECUTION_EXISTS"", ""passed"": false, ""message"": ""No execution result found.""}, {""name"": ""LIVE_ORDER_NOT_EXECUTED"", ""passed"": true, ""message"": ""live_order_executed=false confirmed.""}, {""name"": ""POSITION_ID_EXISTS"", ""passed"": false, ""message"": ""Missing paper or order position ID.""}, {""name"": ""POSITION_ID_MATCH"", ""passed"": false, ""message"": ""Position ID mismatch.""}, {""name"": ""EXECUTION_MAP_EXISTS"", ""passed"": false, ""message"": ""Execution map entry missing.""}, {""name"": ""EXECUTION_STATUS_VALID"", ""passed"": false, ""message"": ""Execution status invalid.""}, {""name"": ""RISK_APPROVED"", ""passed"": false, ""message"": ""Risk did not approve.""}, {""name"": ""ORDER_SIDE_MATCH"", ""passed"": false, ""message"": ""Order side mismatch.""}, {""name"": ""FILLED_PRICE_EXISTS"", ""passed"": false, ""message"": ""Filled price missing.""}, {""name"": ""FILLED_QUANTITY_EXISTS"", ""passed"": false, ""message"": ""Filled quantity missing.""}, {""name"": ""PRICE_DIFF_REASONABLE"", ""passed"": false, ""message"": ""Price difference exceeds tolerance or missing.""}, {""name"": ""DUPLICATE_EXECUTION_NOT_FOUND"", ""passed"": true, ""message"": ""No obvious duplicate execution found.""}]"
+failed_checks,"[{""name"": ""EXECUTION_EXISTS"", ""passed"": false, ""message"": ""No execution result found.""}, {""name"": ""POSITION_ID_EXISTS"", ""passed"": false, ""message"": ""Missing paper or order position ID.""}, {""name"": ""POSITION_ID_MATCH"", ""passed"": false, ""message"": ""Position ID mismatch.""}, {""name"": ""EXECUTION_MAP_EXISTS"", ""passed"": false, ""message"": ""Execution map entry missing.""}, {""name"": ""EXECUTION_STATUS_VALID"", ""passed"": false, ""message"": ""Execution status invalid.""}, {""name"": ""RISK_APPROVED"", ""passed"": false, ""message"": ""Risk did not approve.""}, {""name"": ""ORDER_SIDE_MATCH"", ""passed"": false, ""message"": ""Order side mismatch.""}, {""name"": ""FILLED_PRICE_EXISTS"", ""passed"": false, ""message"": ""Filled price missing.""}, {""name"": ""FILLED_QUANTITY_EXISTS"", ""passed"": false, ""message"": ""Filled quantity missing.""}, {""name"": ""PRICE_DIFF_REASONABLE"", ""passed"": false, ""message"": ""Price difference exceeds tolerance or missing.""}]"
+safety.live_order_executed,False
+safety.exchange,
+safety.execution_status,

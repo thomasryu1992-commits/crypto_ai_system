@@ -1,0 +1,33 @@
+================================================================================
+[SCHEDULER HEALTH CHECK]
+================================================================================
+Status: HEALTHY
+Operational Dry Run: PASSED
+Current Price: 64118.6
+Dynamic Setup: DYNAMIC_SETUP_CREATED
+Research Decision Type: CONDITIONAL_WATCH
+Research Decision Source: dynamic_setup_generator
+Has Conditional Setup: True
+Trading Cycle: CYCLE_COMPLETED
+Trading Bot: PAPER_WATCH_FINALIZED
+Spreadsheet: SYNC_COMPLETED
+Telegram: SENT
+Total Checks: 30
+Error Failures: 0
+Warning Failures: 0
+--------------------------------------------------------------------------------
+[FILES]
+scheduler_health_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\scheduler_health_result.json
+scheduler_health_log: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\scheduler_health_log.json
+operational_dry_run_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\operational_dry_run_result.json
+runtime_guard_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\runtime_guard_result.json
+coinalyze_market_data: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\coinalyze_market_data.json
+market_snapshot: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\market_snapshot.json
+market_context: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\market_context.json
+research_cycle_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\research_cycle_result.json
+dynamic_setup_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\dynamic_setup_result.json
+research_decision: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\research_decision_result.json
+trading_cycle_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\trading_cycle_result.json
+telegram_alert_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\telegram_alert_result.json
+spreadsheet_sync_result: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\spreadsheet_sync_result.json
+scheduler_log: C:\Users\thomas\Desktop\Coding\crypto_AI_Agent\crypto_ai_system\storage\scheduler_logs\daily_operational_dry_run.log
