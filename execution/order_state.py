@@ -1,21 +1,7 @@
-from __future__ import annotations
+"""Step255 thin compatibility wrapper for `execution.order_state`.
 
-ORDER_STATES = [
-    "CREATED",
-    "VALIDATED",
-    "SUBMITTED",
-    "ACKNOWLEDGED",
-    "PARTIALLY_FILLED",
-    "FILLED",
-    "CANCEL_REQUESTED",
-    "CANCELLED",
-    "REJECTED",
-    "UNKNOWN",
-    "RECONCILED",
-]
+Canonical implementation lives in `crypto_ai_system.execution.order_state`.
+"""
 
-
-def transition(current: str, target: str) -> str:
-    if target not in ORDER_STATES:
-        raise ValueError(f"Unknown order state: {target}")
-    return target
+# Step255 thin wrapper: keep legacy imports working while implementation lives under src/crypto_ai_system.
+from crypto_ai_system.execution.order_state import *  # noqa: F401,F403

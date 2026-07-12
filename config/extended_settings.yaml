@@ -1,0 +1,139 @@
+project:
+  name: crypto_ai_system
+  version: step157e
+
+safety:
+  live_trading_enabled: false
+  testnet_signed_order_enabled: false
+
+data:
+  exchange: extended
+  canonical_symbol: BTC-PERP
+  exchange_market: BTC-USD
+  base_asset: BTC
+  quote_asset: USD
+  settlement_asset: USDC
+  contract_type: PERPETUAL
+  timeframe: PT1H
+  limit: 500
+  allow_sample_fallback: true
+  extended_candle_type: trades
+  collect_mark_index_candles: true
+  use_coinalyze_enrichment: true
+  source_priority:
+    - extended
+    - coinalyze
+    - sample
+
+extended:
+  environment: mainnet
+  mainnet_base_url: https://api.starknet.extended.exchange/api/v1
+  testnet_base_url: https://api.starknet.sepolia.extended.exchange/api/v1
+  timeout_seconds: 10
+  user_agent: crypto_ai_system_step157e/0.1
+  funding_lookback_hours: 500
+  oi_lookback_hours: 300
+  orderbook_spread_guard_bps: 10
+
+coinalyze:
+  enabled: true
+  symbol: BTCUSDT_PERP.A
+  interval: 1hour
+
+storage:
+  root_dir: storage
+  latest_dir: storage/latest
+  backup_dir: storage/backup/spreadsheet
+  queue_dir: storage/queue
+  log_dir: storage/logs
+  backtest_dir: storage/backtest
+
+features:
+  ma_fast: 20
+  ma_slow: 50
+  ema_fast: 20
+  ema_slow: 50
+  atr_period: 14
+  rsi_period: 14
+  adx_period: 14
+  atr_percentile_window: 100
+  funding_z_window: 100
+  oi_change_1h_window: 1
+  oi_change_4h_window: 4
+
+entry_policy:
+  bullish_threshold: 0.58
+  bearish_threshold: -0.58
+  adx_trend_threshold: 20
+  rsi_range_long: 35
+  rsi_range_short: 65
+  allow_trend_entry: true
+  allow_range_entry: true
+  allow_liquidation_reversal: false
+  funding_abs_block: 0.0008
+  oi_change_abs_block: 0.08
+  spread_bps_block: 10
+
+exit_policy:
+  atr_multiplier: 1.5
+  min_stop_bps: 30
+  max_stop_bps: 250
+  tp1_r: 1.5
+  tp1_size_pct: 0.5
+  tp2_r: 3.0
+  breakeven_enabled: true
+  breakeven_after_tp1: true
+  breakeven_fee_buffer_bps: 5
+  trailing_enabled: true
+  trailing_only_after_tp1: true
+  trailing_only_in_trend: true
+  trailing_atr_multiplier: 2.0
+  time_stop_enabled: true
+  time_stop_candles: 24
+  time_stop_min_mfe_r: 0.5
+
+backtest:
+  exchange: extended
+  initial_equity: 10000
+  risk_per_trade_pct: 0.01
+  maker_fee_bps: 0
+  taker_fee_bps: 2.5
+  slippage_bps: 3
+  use_funding_payment: true
+  funding_interval_hours: 1
+  entry_price_type: next_candle_open
+  liquidation_check_price_type: mark_price
+
+parameter_sweep:
+  atr_multipliers: [1.2, 1.5, 2.0]
+  tp1_r_values: [1.0, 1.2, 1.5, 2.0]
+  tp1_size_values: [0.3, 0.5, 0.7]
+  trailing_atr_multipliers: [1.5, 2.0, 2.5]
+  time_stop_candles: [12, 24, 36]
+  funding_filter_modes: ["off", "normal", "strict"]
+  oi_filter_modes: ["off", "normal", "strict"]
+  spread_filter_bps: [0, 5, 10]
+
+research:
+  enabled: true
+  score_weights:
+    structure: 0.25
+    momentum: 0.25
+    derivatives: 0.25
+    risk: 0.15
+    onchain: 0.10
+  report_cadence:
+    daily: true
+    weekly: true
+    monthly: true
+
+trading:
+  mode: paper
+  allow_live_orders: false
+  max_position_usdc: 1000
+  max_daily_loss_usdc: 100
+  max_consecutive_losses: 3
+
+telegram:
+  enabled: false
+  dry_run: true

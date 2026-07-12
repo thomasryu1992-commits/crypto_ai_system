@@ -1,0 +1,25 @@
+{
+  "step": "Step303",
+  "title": "Real Testnet Read-only Adapter",
+  "compileall": "PASSED",
+  "status_consistency_checker": "PASSED",
+  "tests": {
+    "step303_plus_step282": "13 passed",
+    "step294_to_step303": "71 passed",
+    "step281_step282_step288_to_step293_step299_to_step303": "86 passed",
+    "step258_to_step272": "85 passed",
+    "step273_to_step280": "53 passed"
+  },
+  "operational_dry_run": "PASSED",
+  "full_cycle": "BLOCK_DATA_HEALTH / NO_ORDER",
+  "safety_flags": {
+    "live_trading_enabled": false,
+    "testnet_signed_order_enabled": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "external_order_submission_performed": false,
+    "place_order_enabled": false,
+    "cancel_order_enabled": false,
+    "signed_order_executor_enabled": false
+  }
+}

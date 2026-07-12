@@ -1,0 +1,63 @@
+{
+  "agent_output": {
+    "agent_id": "signed_testnet_evidence_intake_agent",
+    "agent_version": "1.0.0",
+    "run_id": "eval_valid_signed_testnet_evidence_intake_agent",
+    "created_at_utc": "2026-01-01T00:00:00Z",
+    "input_refs": {
+      "phase9_2_runtime_submit_action_boundary_report": "fixture",
+      "phase9_2_manual_final_confirmation_report": "fixture",
+      "phase9_2_final_approval_package_report": "fixture",
+      "phase9_2_submit_guard_recheck_report": "fixture"
+    },
+    "output_refs": {
+      "phase9_2_execution_evidence_template": "fixture",
+      "phase9_3_status_cancel_evidence_template": "fixture",
+      "phase9_4_reconciliation_evidence_template": "fixture",
+      "phase10_session_validation_evidence_template": "fixture"
+    },
+    "passed": true,
+    "blocked": false,
+    "fail_closed": false,
+    "findings": [
+      "Phase 9-10 signed testnet evidence intake templates were recorded while still disabled."
+    ],
+    "warnings": [
+      "No order was submitted by the evidence intake package; real evidence must be supplied after separate runtime approval."
+    ],
+    "block_reasons": [],
+    "evidence": [
+      "actual_order_submission_performed=false",
+      "order_endpoint_called=false",
+      "order_status_endpoint_called=false",
+      "cancel_endpoint_called=false",
+      "signature_created=false",
+      "http_request_sent=false"
+    ],
+    "evidence_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "canonical_id_chain": {
+      "data_snapshot_id": "data_snapshot_valid_001",
+      "feature_snapshot_id": "feature_snapshot_valid_001",
+      "research_signal_id": "research_signal_valid_001",
+      "profile_id": "profile_valid_001",
+      "approval_packet_id": "approval_packet_valid_001",
+      "approval_intake_id": "approval_intake_valid_001",
+      "decision_id": "decision_valid_001",
+      "risk_gate_id": "risk_gate_valid_001",
+      "order_intent_id": "order_intent_valid_001",
+      "execution_id": "execution_disabled_valid_001",
+      "reconciliation_id": "reconciliation_disabled_valid_001",
+      "outcome_id": "outcome_disabled_valid_001",
+      "feedback_cycle_id": "feedback_cycle_valid_001"
+    },
+    "recommended_next_action": "only_fill_evidence_templates_after_separately_approved_real_phase9_2_single_testnet_submit",
+    "runtime_mutation_performed": false,
+    "order_submission_performed": false
+  },
+  "category": "valid_input",
+  "eval_case_id": "valid_signed_testnet_evidence_intake_agent",
+  "expected_passed": true,
+  "expected_blocked": false,
+  "expected_fail_closed": false,
+  "expected_block_reason_contains": ""
+}

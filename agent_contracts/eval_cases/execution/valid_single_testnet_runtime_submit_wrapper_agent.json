@@ -1,0 +1,63 @@
+{
+  "agent_output": {
+    "agent_id": "single_testnet_runtime_submit_wrapper_agent",
+    "agent_version": "1.0.0",
+    "run_id": "eval_valid_single_testnet_runtime_submit_wrapper_agent",
+    "created_at_utc": "2026-01-01T00:00:00Z",
+    "input_refs": {
+      "phase9_2_runtime_submit_action_boundary_report": "fixture",
+      "phase9_2_manual_final_confirmation_report": "fixture",
+      "phase9_2_final_approval_package_report": "fixture",
+      "phase9_10_signed_testnet_evidence_intake_report": "fixture"
+    },
+    "output_refs": {
+      "phase9_2_single_testnet_runtime_submit_wrapper_report": "fixture",
+      "phase9_2_single_testnet_runtime_submit_wrapper_validation_report": "fixture",
+      "phase9_2_single_testnet_runtime_submit_negative_fixture_results": "fixture"
+    },
+    "passed": true,
+    "blocked": false,
+    "fail_closed": false,
+    "findings": [
+      "Phase 9.2 one-order runtime submit wrapper was created as mocked-by-default review-only evidence."
+    ],
+    "warnings": [
+      "No real testnet endpoint was called; real submit remains a separate explicit runtime action."
+    ],
+    "block_reasons": [],
+    "evidence": [
+      "mocked_by_default=true",
+      "real_exchange_endpoint_call_performed=false",
+      "actual_order_submission_performed=false",
+      "order_endpoint_called=false",
+      "http_request_sent=false",
+      "signature_created=false",
+      "signed_request_created=false"
+    ],
+    "evidence_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "canonical_id_chain": {
+      "data_snapshot_id": "data_snapshot_valid_001",
+      "feature_snapshot_id": "feature_snapshot_valid_001",
+      "research_signal_id": "research_signal_valid_001",
+      "profile_id": "profile_valid_001",
+      "approval_packet_id": "approval_packet_valid_001",
+      "approval_intake_id": "approval_intake_valid_001",
+      "decision_id": "decision_valid_001",
+      "risk_gate_id": "risk_gate_valid_001",
+      "order_intent_id": "order_intent_valid_001",
+      "execution_id": "execution_disabled_valid_001",
+      "reconciliation_id": "reconciliation_disabled_valid_001",
+      "outcome_id": "outcome_disabled_valid_001",
+      "feedback_cycle_id": "feedback_cycle_valid_001"
+    },
+    "recommended_next_action": "use_mock_submit_evidence_to verify controls before any separately approved real testnet endpoint adapter is introduced",
+    "runtime_mutation_performed": false,
+    "order_submission_performed": false
+  },
+  "category": "valid_input",
+  "eval_case_id": "valid_single_testnet_runtime_submit_wrapper_agent",
+  "expected_passed": true,
+  "expected_blocked": false,
+  "expected_fail_closed": false,
+  "expected_block_reason_contains": ""
+}

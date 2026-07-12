@@ -1,0 +1,13 @@
+{
+  "step": "Step163",
+  "name": "Trading Bot Permission Gate",
+  "status": "passed",
+  "pytest": "42 passed",
+  "runners": {
+    "run_step162_feature_research_validation.py": "ok",
+    "run_step161_extra_data_validation.py": "ok",
+    "run_additional_data_collector.py": "ok",
+    "run_trading_cycle.py": "ok_blocked_by_permission_gate_expected_local_mode"
+  },
+  "created_at_utc": "2026-06-25T02:22:30.940005Z"
+}

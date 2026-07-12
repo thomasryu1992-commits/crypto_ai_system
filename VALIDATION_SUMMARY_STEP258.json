@@ -1,0 +1,62 @@
+{
+  "step": 258,
+  "status": "validated",
+  "scope": "feature_store_researchsignal_v2_permission_gate_connection",
+  "feature_store_version": "step258_feature_store_permission_matrix",
+  "research_signal_version": "research_signal_v2_step258_feature_store_permission_gate",
+  "changes": [
+    "Connected additional BTC feature groups into timestamp-safe live/backtest research feature matrices.",
+    "Locked ResearchSignal v2 scoring and permission gate version for Step258.",
+    "Verified Trading Bot consumes ResearchSignal v2 trade_permission before paper trade plan creation.",
+    "Maintained missing optional data as neutral scoring instead of hard failure.",
+    "Preserved Step257 disabled live/testnet execution compatibility boundary."
+  ],
+  "safety": {
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "root_package_deletion_performed": false,
+    "root_package_deletion_deferred": true,
+    "missing_canonical_module_count": 2,
+    "live_trading_allowed": false,
+    "order_routing_enabled": false,
+    "external_order_submission_performed": false
+  },
+  "test_results": [
+    {
+      "name": "Step258 focused + Step162/163 regressions",
+      "command": "pytest -q tests/test_step258_feature_store_researchsignal_permission_gate.py tests/test_step162_feature_store_signal.py tests/test_step163_trading_permission_gate.py",
+      "result": "14 passed"
+    },
+    {
+      "name": "Step161~164 extra data/research/trading regression",
+      "command": "pytest -q tests/test_step161_extra_data.py tests/test_step162_feature_store_signal.py tests/test_step163_trading_permission_gate.py tests/test_step164_permission_audit_telegram_report.py",
+      "result": "20 passed"
+    },
+    {
+      "name": "Step252~258 regression",
+      "command": "pytest -q tests/test_step252_thin_wrapper_conversion_plan.py tests/test_step253_thin_wrapper_batch1.py tests/test_step254_missing_canonical_disposition_plan.py tests/test_step255_execution_support_port.py tests/test_step256_paper_research_v1_port.py tests/test_step257_deferred_execution_stub_policy.py tests/test_step258_feature_store_researchsignal_permission_gate.py",
+      "result": "27 passed"
+    },
+    {
+      "name": "Step240~251 canonical/compat regression",
+      "command": "pytest -q tests/test_step240_legacy_root_import_retirement_plan.py ... tests/test_step251_trading_cycle_port.py",
+      "result": "30 passed"
+    },
+    {
+      "name": "Step209~237 review chain regression",
+      "command": "pytest -q tests/test_step209_237_v5_chain_bootstrap.py ... tests/test_step237_v5_enablement_submit_dry_run_review.py",
+      "result": "96 passed"
+    },
+    {
+      "name": "Step130~164 base regression",
+      "command": "pytest -q tests/test_step130_safety.py ... tests/test_step164_permission_audit_telegram_report.py",
+      "result": "40 passed"
+    },
+    {
+      "name": "Plain checkout disabled execution import",
+      "command": "env -u PYTHONPATH python -c 'import execution.testnet_executor; import execution.live_executor'",
+      "result": "passed"
+    }
+  ],
+  "full_pytest_note": "A full monolithic pytest -q run was attempted twice but exceeded the tool timeout after reaching 73%; the suite was then validated in focused regression batches covering all test files."
+}

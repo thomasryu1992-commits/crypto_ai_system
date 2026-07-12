@@ -1,0 +1,20 @@
+{
+  "step": "Step316",
+  "title": "Monitoring / Alerting",
+  "compileall": "PASSED",
+  "status_consistency_checker": "PASSED",
+  "step316_step282_tests": "7 passed",
+  "step303_step316_tests": "97 passed",
+  "step294_step316_tests": "160 passed",
+  "step281_282_288_293_299_316_tests": "175 passed",
+  "step258_step265_tests": "42 passed",
+  "step266_step272_tests": "43 passed",
+  "step273_step280_tests": "53 passed",
+  "run_full_cycle": "BLOCK_DATA_HEALTH / NO_ORDER / MONITORING_ALERTING_REVIEW_ONLY_RECORDED",
+  "run_operational_dry_run": "PASSED",
+  "monitoring_alerting_status": "MONITORING_ALERTING_REVIEW_ONLY_RECORDED",
+  "alert_count": 7,
+  "critical_alert_count": 2,
+  "telegram_message_sent": false,
+  "external_notification_sent": false
+}

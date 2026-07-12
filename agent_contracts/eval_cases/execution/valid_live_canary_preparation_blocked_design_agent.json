@@ -1,0 +1,59 @@
+{
+  "agent_output": {
+    "agent_id": "live_canary_preparation_blocked_design_agent",
+    "agent_version": "1.0.0",
+    "run_id": "eval_valid_live_canary_preparation_blocked_design_agent",
+    "created_at_utc": "2026-01-01T00:00:00Z",
+    "input_refs": {
+      "phase10_signed_testnet_session_validation_report": "fixture",
+      "phase10_signed_testnet_session_validation_design": "fixture",
+      "phase10_signed_testnet_session_validation_validation_report": "fixture"
+    },
+    "output_refs": {
+      "phase11_live_canary_preparation_design": "fixture",
+      "phase11_live_canary_preparation_report": "fixture"
+    },
+    "passed": true,
+    "blocked": false,
+    "fail_closed": false,
+    "findings": [
+      "Phase 11 live canary preparation design was recorded while still disabled."
+    ],
+    "warnings": [
+      "No multiple clean Phase 10 signed testnet sessions exist, so live canary preparation must remain blocked."
+    ],
+    "block_reasons": [],
+    "evidence": [
+      "live_canary_preparation_may_begin=false",
+      "live_read_only_probe_performed=false",
+      "live_key_scope_validation_performed=false",
+      "live_canary_execution_enabled=false",
+      "actual_order_submission_performed=false"
+    ],
+    "evidence_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "canonical_id_chain": {
+      "data_snapshot_id": "data_snapshot_valid_001",
+      "feature_snapshot_id": "feature_snapshot_valid_001",
+      "research_signal_id": "research_signal_valid_001",
+      "profile_id": "profile_valid_001",
+      "approval_packet_id": "approval_packet_valid_001",
+      "approval_intake_id": "approval_intake_valid_001",
+      "decision_id": "decision_valid_001",
+      "risk_gate_id": "risk_gate_valid_001",
+      "order_intent_id": "order_intent_valid_001",
+      "execution_id": "execution_disabled_valid_001",
+      "reconciliation_id": "reconciliation_disabled_valid_001",
+      "outcome_id": "outcome_disabled_valid_001",
+      "feedback_cycle_id": "feedback_cycle_valid_001"
+    },
+    "recommended_next_action": "only_prepare_live_canary_after_multiple_clean_phase10_signed_testnet_sessions_and_separate_live_read_only_probe_approval",
+    "runtime_mutation_performed": false,
+    "order_submission_performed": false
+  },
+  "category": "valid_input",
+  "eval_case_id": "valid_live_canary_preparation_blocked_design_agent",
+  "expected_passed": true,
+  "expected_blocked": false,
+  "expected_fail_closed": false,
+  "expected_block_reason_contains": ""
+}

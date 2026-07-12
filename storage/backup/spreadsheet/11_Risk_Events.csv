@@ -1,5 +1,0 @@
-row_id,created_at,event_time,symbol,event_type,schema_version,status,allow_new_position,daily_pnl_r,weekly_pnl_r,consecutive_losses,drawdown_r,problems
-11_Risk_Events_BTCUSDT_RISK_EVENT_bbf43f1de6e2a11f,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,RISK_EVENT,v3,NORMAL,True,0.0,0.0,0,0.0,[]
-11_Risk_Events_BTCUSDT_RISK_EVENT_bbf43f1de6e2a11f,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,RISK_EVENT,v3,NORMAL,True,0.0,0.0,0,0.0,[]
-11_Risk_Events_BTCUSDT_RISK_EVENT_8fd15f84ec29f332,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,RISK_EVENT,v3,BLOCK_NEW_POSITION,False,-1.0,-1.0,1,-1.0,"[""max_drawdown_proxy_breached""]"
-11_Risk_Events_BTCUSDT_RISK_EVENT_8fd15f84ec29f332,2026-06-23T10:12:48+00:00,2026-06-23T10:12:48+00:00,BTCUSDT,RISK_EVENT,v3,BLOCK_NEW_POSITION,False,-1.0,-1.0,1,-1.0,"[""max_drawdown_proxy_breached""]"

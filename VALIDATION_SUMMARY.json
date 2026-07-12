@@ -1,0 +1,51 @@
+{
+  "base_zip": "/mnt/data/crypto_ai_system_step237_full_integrated_chain_validated.zip",
+  "bootstrap": {
+    "command": "python run_step209_237_v5_chain_bootstrap.py",
+    "markdown_report_path": "/mnt/data/step237_work/crypto_ai_system_step237_full/reports/step209_237_chain_bootstrap_report.md",
+    "pass": true,
+    "result_path": "/mnt/data/step237_work/crypto_ai_system_step237_full/storage/latest/step209_237_chain_bootstrap_latest.json",
+    "runner_count_executed": 29,
+    "runner_count_expected": 29,
+    "runner_count_failed": 0,
+    "runner_count_passed": 29
+  },
+  "changes_applied": [
+    "Added Step209~Step237 chain bootstrap runner",
+    "Added explicit pytest dependency to requirements.txt",
+    "Rewrote README execution commands for Step237 package scope",
+    "Changed validation wording to chain/artifact-generation validation",
+    "Separated ZIP packaging criteria into ZIP_PACKAGING_CRITERIA_STEP237.md"
+  ],
+  "compileall_src": {
+    "command": "python -m compileall -q src",
+    "pass": true
+  },
+  "external_api_call_required_for_step209_237_bootstrap": false,
+  "live_trading_allowed": false,
+  "operating_validation_passed": false,
+  "output_zip": "/mnt/data/crypto_ai_system_step237_chain_artifact_validated.zip",
+  "production_live_trading_validation_performed": false,
+  "pytest": {
+    "command": "python -m pytest -q tests",
+    "pass": true,
+    "result": "131 passed in 2.57s"
+  },
+  "required_files_added": [
+    "run_step209_237_v5_chain_bootstrap.py",
+    "src/crypto_ai_system/runner/step209_237_chain_bootstrap.py",
+    "tests/test_step209_237_v5_chain_bootstrap.py",
+    "ZIP_PACKAGING_CRITERIA_STEP237.md"
+  ],
+  "safety_note": {
+    "adapter_routing_enabled": false,
+    "live_trading_allowed": false,
+    "paper_execution_enabled": false,
+    "paper_order_execution_enabled": false,
+    "shadow_execution_enabled": false,
+    "telegram_real_send": false
+  },
+  "timestamp_utc": "2026-06-29T03:48:20Z",
+  "validation_label_ko": "체인/산출물 생성 검증 통과",
+  "validation_scope": "Step209~Step237 chain/artifact-generation validation; not production/live trading validation"
+}

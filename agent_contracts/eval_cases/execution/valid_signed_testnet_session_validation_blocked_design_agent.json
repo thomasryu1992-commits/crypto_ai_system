@@ -1,0 +1,58 @@
+{
+  "agent_output": {
+    "agent_id": "signed_testnet_session_validation_blocked_design_agent",
+    "agent_version": "1.0.0",
+    "run_id": "eval_valid_signed_testnet_session_validation_blocked_design_agent",
+    "created_at_utc": "2026-01-01T00:00:00Z",
+    "input_refs": {
+      "phase9_3_9_4_blocked_design_hardening_report": "fixture",
+      "phase9_4_testnet_reconciliation_design": "fixture",
+      "phase9_4_testnet_reconciliation_validation_report": "fixture"
+    },
+    "output_refs": {
+      "phase10_signed_testnet_session_validation_design": "fixture",
+      "phase10_signed_testnet_session_validation_report": "fixture"
+    },
+    "passed": true,
+    "blocked": false,
+    "fail_closed": false,
+    "findings": [
+      "Phase 10 signed testnet session validation design was recorded while still disabled."
+    ],
+    "warnings": [
+      "No real Phase 9.2 order id or Phase 9.4 reconciliation evidence exists, so Phase 10 must remain blocked."
+    ],
+    "block_reasons": [],
+    "evidence": [
+      "phase10_signed_testnet_session_validation_may_begin=false",
+      "phase10_session_validation_started=false",
+      "live_canary_preparation_may_begin=false",
+      "actual_order_submission_performed=false"
+    ],
+    "evidence_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "canonical_id_chain": {
+      "data_snapshot_id": "data_snapshot_valid_001",
+      "feature_snapshot_id": "feature_snapshot_valid_001",
+      "research_signal_id": "research_signal_valid_001",
+      "profile_id": "profile_valid_001",
+      "approval_packet_id": "approval_packet_valid_001",
+      "approval_intake_id": "approval_intake_valid_001",
+      "decision_id": "decision_valid_001",
+      "risk_gate_id": "risk_gate_valid_001",
+      "order_intent_id": "order_intent_valid_001",
+      "execution_id": "execution_disabled_valid_001",
+      "reconciliation_id": "reconciliation_disabled_valid_001",
+      "outcome_id": "outcome_disabled_valid_001",
+      "feedback_cycle_id": "feedback_cycle_valid_001"
+    },
+    "recommended_next_action": "only_start_phase10_after_real_phase9_2_order_phase9_3_final_status_and_phase9_4_reconciliation_evidence_exist",
+    "runtime_mutation_performed": false,
+    "order_submission_performed": false
+  },
+  "category": "valid_input",
+  "eval_case_id": "valid_signed_testnet_session_validation_blocked_design_agent",
+  "expected_passed": true,
+  "expected_blocked": false,
+  "expected_fail_closed": false,
+  "expected_block_reason_contains": ""
+}

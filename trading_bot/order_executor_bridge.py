@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from config.settings import env_bool, env_float
-from execution.order_executor import execute_order_with_risk_check
+from crypto_ai_system.execution.order_executor import execute_order_with_risk_check
 from scripts.json_utils import load_json, now_utc_iso, save_json
 
 

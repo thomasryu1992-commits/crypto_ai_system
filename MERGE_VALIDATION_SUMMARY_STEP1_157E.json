@@ -1,0 +1,563 @@
+{
+  "step150_validation_ran": true,
+  "step157e_full_validation_ran": true,
+  "legacy_missing_after_merge": 0,
+  "new_extra_files_vs_legacy": 113,
+  "old_logical_file_count_excluding_sensitive": 347,
+  "merged_logical_file_count_excluding_sensitive": 460,
+  "step157e_result": {
+    "ok": true,
+    "package": "crypto_ai_system_step157e_full",
+    "source": "sample_extended",
+    "raw_rows": 500,
+    "features_rows": 500,
+    "backtest_trades": 34,
+    "sweep_candidates": 240,
+    "research_condition": {
+      "timestamp": "2026-06-24 02:00:00+00:00",
+      "symbol": "BTC-PERP",
+      "regime": "HIGH_VOLATILITY",
+      "score_bias": "BEARISH",
+      "total_score": -0.4219205669104792,
+      "volatility_state": "NORMAL_VOLATILITY",
+      "derivatives_state": "NORMAL_DERIVATIVES",
+      "liquidity_state": "NORMAL_LIQUIDITY",
+      "final_condition": "NEUTRAL_WAIT"
+    },
+    "trading_decision_status": "NO_TRADE",
+    "dry_order_payload_created": false,
+    "missing_required_files": [],
+    "preserved_features": {
+      "extended_data_main_flow": true,
+      "spreadsheet_first_writer": true,
+      "coinalyze_enrichment_seam": true,
+      "research_bot": true,
+      "raw_data_store": true,
+      "score_engine": true,
+      "market_condition_analysis": true,
+      "entry_exit_policy": true,
+      "backtest_and_parameter_sweep": true,
+      "paper_trading_scaffold": true,
+      "telegram_dry_run_scaffold": true,
+      "testnet_order_payload_dry_run_only": true,
+      "binance_main_flow_removed": true
+    },
+    "safety": {
+      "live_trading_enabled": false,
+      "testnet_signed_order_enabled": false
+    }
+  },
+  "step150_result": {
+    "created_at": "2026-06-24T02:21:02+00:00",
+    "status": "PASSED",
+    "passed": 11,
+    "total": 11,
+    "verified_scope": "Step131-150 spreadsheet-first guarded dry-run/paper/live-shadow/testnet-skeleton validation. No real exchange orders executed.",
+    "results": [
+      {
+        "name": "compileall",
+        "status": "PASSED",
+        "result": {
+          "ok": true
+        }
+      },
+      {
+        "name": "full_cycle",
+        "status": "PASSED",
+        "result": {
+          "research": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "scenario": "Cautious",
+            "signal_quality": "D",
+            "signal_timing": "Data-Blocked",
+            "scores": {
+              "final_score": 35.0,
+              "market_structure_score": 50,
+              "momentum_score": 65,
+              "derivatives_score": 55,
+              "data_quality_penalty": 20,
+              "positives": [
+                "positive_24h_momentum"
+              ],
+              "risks": [
+                "synthetic_or_fallback_data_source"
+              ]
+            },
+            "context_summary": "Cautious",
+            "allow_research_bias": false
+          },
+          "research_decision": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "research_bias": "ALLOW_SHORT_OR_RISK_OFF",
+            "scenario": "Cautious",
+            "signal_quality": "D",
+            "signal_timing": "Data-Blocked",
+            "final_score": 35.0,
+            "allow_long": false,
+            "allow_short": false,
+            "reasons": [
+              "positive_24h_momentum",
+              "synthetic_or_fallback_data_source"
+            ]
+          },
+          "data_health": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "UNHEALTHY",
+            "allow_trading": false,
+            "problems": [
+              "fallback_data_source_blocks_trading",
+              "synthetic_data_source_blocks_trading"
+            ],
+            "warnings": [],
+            "source_type": "synthetic_fallback",
+            "data_quality": "synthetic",
+            "is_synthetic": true,
+            "is_fallback": true,
+            "candle_count": 120,
+            "latest_candle_time": "2026-06-24T01:00:00+00:00"
+          },
+          "risk": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "BLOCK_NEW_POSITION",
+            "allow_new_position": false,
+            "daily_pnl_r": 0.0,
+            "weekly_pnl_r": -1.0,
+            "consecutive_losses": 1,
+            "drawdown_r": -1.0,
+            "problems": [
+              "max_drawdown_proxy_breached"
+            ],
+            "calculation_mode": "time_based_exit_time"
+          },
+          "trading": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "symbol": "BTC-PERP",
+            "trading_signal": {
+              "signal": "NONE",
+              "confidence": 0,
+              "reasons": [
+                "synthetic_or_fallback_data_no_signal"
+              ]
+            },
+            "paper_result": {
+              "status": "BLOCKED_BY_GUARD",
+              "active_position": null
+            }
+          },
+          "trade_decision": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "research": {
+              "created_at": "2026-06-24T02:21:02+00:00",
+              "research_bias": "ALLOW_SHORT_OR_RISK_OFF",
+              "scenario": "Cautious",
+              "signal_quality": "D",
+              "signal_timing": "Data-Blocked",
+              "final_score": 35.0,
+              "allow_long": false,
+              "allow_short": false,
+              "reasons": [
+                "positive_24h_momentum",
+                "synthetic_or_fallback_data_source"
+              ]
+            },
+            "trading_signal": {
+              "signal": "NONE",
+              "confidence": 0,
+              "reasons": [
+                "synthetic_or_fallback_data_no_signal"
+              ]
+            },
+            "data_health": {
+              "created_at": "2026-06-24T02:21:02+00:00",
+              "status": "UNHEALTHY",
+              "allow_trading": false,
+              "problems": [
+                "fallback_data_source_blocks_trading",
+                "synthetic_data_source_blocks_trading"
+              ],
+              "warnings": [],
+              "source_type": "synthetic_fallback",
+              "data_quality": "synthetic",
+              "is_synthetic": true,
+              "is_fallback": true,
+              "candle_count": 120,
+              "latest_candle_time": "2026-06-24T01:00:00+00:00"
+            },
+            "risk": {
+              "created_at": "2026-06-24T02:21:02+00:00",
+              "status": "BLOCK_NEW_POSITION",
+              "allow_new_position": false,
+              "daily_pnl_r": 0.0,
+              "weekly_pnl_r": -1.0,
+              "consecutive_losses": 1,
+              "drawdown_r": -1.0,
+              "problems": [
+                "max_drawdown_proxy_breached"
+              ],
+              "calculation_mode": "time_based_exit_time"
+            },
+            "final_decision": "BLOCK_DATA_HEALTH",
+            "allow_order_intent": false,
+            "direction": "NONE",
+            "confidence": 0,
+            "reasons": [
+              "data_health_disallows_trading",
+              "fallback_data_source_blocks_trading",
+              "synthetic_data_source_blocks_trading"
+            ]
+          },
+          "order": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "state": "REJECTED",
+            "status": "NO_ORDER",
+            "mode": "SKIPPED",
+            "intent": {
+              "created_at": "2026-06-24T02:21:02+00:00",
+              "state": "REJECTED",
+              "status": "NO_ORDER_INTENT",
+              "reason": "BLOCK_DATA_HEALTH"
+            },
+            "readiness": {
+              "created_at": "2026-06-24T02:21:02+00:00",
+              "ready": false,
+              "blockers": [
+                "TRADING_MODE_not_live",
+                "LIVE_TRADING_ENABLED_false",
+                "ALLOW_LIVE_TRADING_false",
+                "EXCHANGE_ORDER_ENABLED_false",
+                "ENABLE_REAL_ORDERS_false",
+                "LIVE_TRADING_CONFIRMATION_mismatch",
+                "missing_exchange_api_credentials"
+              ],
+              "testnet_orders_enabled": false,
+              "max_live_position_usdt": 20.0,
+              "max_order_notional_usdt": 20.0
+            }
+          },
+          "reconciliation": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "RECONCILED",
+            "order_status": "NO_ORDER",
+            "paper_active": false,
+            "notes": []
+          },
+          "shadow": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "mode": "LIVE_SHADOW",
+            "decision": "BLOCK_DATA_HEALTH",
+            "order_status": "NO_ORDER",
+            "estimated_roundtrip_cost_bps": 24.0,
+            "slippage_assumption_bps": 8.0,
+            "fee_assumption_bps": 4.0,
+            "latency_assumption_ms": 750,
+            "live_ready": false,
+            "notes": [
+              "This is a shadow report only.",
+              "No real exchange orders are placed by the guarded Step130 package."
+            ]
+          },
+          "limited_live": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "readiness_status": "NOT_READY_FOR_LIMITED_LIVE",
+            "checks": {
+              "data_health_healthy": false,
+              "risk_normal": false,
+              "spreadsheet_sync_available": true,
+              "step150_validation_passed": true,
+              "live_readiness_currently_blocked": true
+            },
+            "checks_passed": [
+              "spreadsheet_sync_available",
+              "step150_validation_passed",
+              "live_readiness_currently_blocked"
+            ],
+            "checks_failed": [
+              "data_health_healthy",
+              "risk_normal"
+            ],
+            "max_live_position_usdt": 20.0,
+            "max_order_notional_usdt": 20.0,
+            "required_next_steps": [
+              "Connect real market data",
+              "Run at least 7 wall-clock days of paper forward test",
+              "Implement Binance testnet signed order flow",
+              "Run at least 2 weeks of testnet execution",
+              "Manually review live unlock checklist"
+            ]
+          },
+          "spreadsheet": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "EXPORTED_LOCAL_BACKUP",
+            "provider_result": {
+              "status": "LOCAL_CSV_ONLY",
+              "provider": "local_csv",
+              "rows_requested": 12
+            },
+            "tabs": [
+              "02_Market_Snapshot",
+              "03_Data_Health",
+              "04_Research_Score",
+              "05_Research_Decision",
+              "06_Trading_Signal",
+              "07_Trade_Decision",
+              "08_Order_Intent",
+              "09_Order_Result",
+              "11_Risk_Events",
+              "12_Live_Shadow",
+              "13_System_Health",
+              "17_Limited_Live_Readiness"
+            ],
+            "rows": 12,
+            "local_backup_paths": [
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/02_Market_Snapshot.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/03_Data_Health.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/04_Research_Score.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/05_Research_Decision.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/06_Trading_Signal.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/07_Trade_Decision.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/08_Order_Intent.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/09_Order_Result.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/11_Risk_Events.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/12_Live_Shadow.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/13_System_Health.csv",
+              "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/17_Limited_Live_Readiness.csv"
+            ]
+          }
+        }
+      },
+      {
+        "name": "scheduler_health",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "status": "HEALTHY",
+          "missing_outputs": [],
+          "data_health_status": "UNHEALTHY",
+          "allow_trading": false
+        }
+      },
+      {
+        "name": "data_health_check",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "status": "UNHEALTHY",
+          "allow_trading": false,
+          "problems": [
+            "fallback_data_source_blocks_trading",
+            "synthetic_data_source_blocks_trading"
+          ],
+          "warnings": [],
+          "source_type": "synthetic_fallback",
+          "data_quality": "synthetic",
+          "is_synthetic": true,
+          "is_fallback": true,
+          "candle_count": 120,
+          "latest_candle_time": "2026-06-24T01:00:00+00:00"
+        }
+      },
+      {
+        "name": "research_trading_bridge",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "research": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "research_bias": "ALLOW_SHORT_OR_RISK_OFF",
+            "scenario": "Cautious",
+            "signal_quality": "D",
+            "signal_timing": "Data-Blocked",
+            "final_score": 35.0,
+            "allow_long": false,
+            "allow_short": false,
+            "reasons": [
+              "positive_24h_momentum",
+              "synthetic_or_fallback_data_source"
+            ]
+          },
+          "trading_signal": {
+            "signal": "NONE",
+            "confidence": 0,
+            "reasons": [
+              "synthetic_or_fallback_data_no_signal"
+            ]
+          },
+          "data_health": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "UNHEALTHY",
+            "allow_trading": false,
+            "problems": [
+              "fallback_data_source_blocks_trading",
+              "synthetic_data_source_blocks_trading"
+            ],
+            "warnings": [],
+            "source_type": "synthetic_fallback",
+            "data_quality": "synthetic",
+            "is_synthetic": true,
+            "is_fallback": true,
+            "candle_count": 120,
+            "latest_candle_time": "2026-06-24T01:00:00+00:00"
+          },
+          "risk": {
+            "created_at": "2026-06-24T02:21:02+00:00",
+            "status": "BLOCK_NEW_POSITION",
+            "allow_new_position": false,
+            "daily_pnl_r": 0.0,
+            "weekly_pnl_r": -1.0,
+            "consecutive_losses": 1,
+            "drawdown_r": -1.0,
+            "problems": [
+              "max_drawdown_proxy_breached"
+            ],
+            "calculation_mode": "time_based_exit_time"
+          },
+          "final_decision": "BLOCK_DATA_HEALTH",
+          "allow_order_intent": false,
+          "direction": "NONE",
+          "confidence": 0,
+          "reasons": [
+            "data_health_disallows_trading",
+            "fallback_data_source_blocks_trading",
+            "synthetic_data_source_blocks_trading"
+          ]
+        }
+      },
+      {
+        "name": "live_readiness_check",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "ready": false,
+          "blockers": [
+            "TRADING_MODE_not_live",
+            "LIVE_TRADING_ENABLED_false",
+            "ALLOW_LIVE_TRADING_false",
+            "EXCHANGE_ORDER_ENABLED_false",
+            "ENABLE_REAL_ORDERS_false",
+            "LIVE_TRADING_CONFIRMATION_mismatch",
+            "missing_exchange_api_credentials"
+          ],
+          "testnet_orders_enabled": false,
+          "max_live_position_usdt": 20.0,
+          "max_order_notional_usdt": 20.0
+        }
+      },
+      {
+        "name": "live_shadow_report",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "mode": "LIVE_SHADOW",
+          "decision": "BLOCK_DATA_HEALTH",
+          "order_status": "NO_ORDER",
+          "estimated_roundtrip_cost_bps": 24.0,
+          "slippage_assumption_bps": 8.0,
+          "fee_assumption_bps": 4.0,
+          "latency_assumption_ms": 750,
+          "live_ready": false,
+          "notes": [
+            "This is a shadow report only.",
+            "No real exchange orders are placed by the guarded Step130 package."
+          ]
+        }
+      },
+      {
+        "name": "spreadsheet_schema_v3_export",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "status": "EXPORTED_LOCAL_BACKUP",
+          "provider_result": {
+            "status": "LOCAL_CSV_ONLY",
+            "provider": "local_csv",
+            "rows_requested": 12
+          },
+          "tabs": [
+            "02_Market_Snapshot",
+            "03_Data_Health",
+            "04_Research_Score",
+            "05_Research_Decision",
+            "06_Trading_Signal",
+            "07_Trade_Decision",
+            "08_Order_Intent",
+            "09_Order_Result",
+            "11_Risk_Events",
+            "12_Live_Shadow",
+            "13_System_Health",
+            "17_Limited_Live_Readiness"
+          ],
+          "rows": 12,
+          "local_backup_paths": [
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/02_Market_Snapshot.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/03_Data_Health.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/04_Research_Score.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/05_Research_Decision.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/06_Trading_Signal.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/07_Trade_Decision.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/08_Order_Intent.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/09_Order_Result.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/11_Risk_Events.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/12_Live_Shadow.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/13_System_Health.csv",
+            "/mnt/data/crypto_ai_system_step1_157e_extended_merged_full/storage/backup/spreadsheet/17_Limited_Live_Readiness.csv"
+          ]
+        }
+      },
+      {
+        "name": "limited_live_readiness_report",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "readiness_status": "NOT_READY_FOR_LIMITED_LIVE",
+          "checks": {
+            "data_health_healthy": false,
+            "risk_normal": false,
+            "spreadsheet_sync_available": true,
+            "step150_validation_passed": true,
+            "live_readiness_currently_blocked": true
+          },
+          "checks_passed": [
+            "spreadsheet_sync_available",
+            "step150_validation_passed",
+            "live_readiness_currently_blocked"
+          ],
+          "checks_failed": [
+            "data_health_healthy",
+            "risk_normal"
+          ],
+          "max_live_position_usdt": 20.0,
+          "max_order_notional_usdt": 20.0,
+          "required_next_steps": [
+            "Connect real market data",
+            "Run at least 7 wall-clock days of paper forward test",
+            "Implement Binance testnet signed order flow",
+            "Run at least 2 weeks of testnet execution",
+            "Manually review live unlock checklist"
+          ]
+        }
+      },
+      {
+        "name": "safety_tests",
+        "status": "PASSED",
+        "result": "None"
+      },
+      {
+        "name": "forward_test_2_iterations",
+        "status": "PASSED",
+        "result": {
+          "created_at": "2026-06-24T02:21:02+00:00",
+          "requested_iterations": 2,
+          "completed_iterations": 2,
+          "decision_counts": {
+            "BLOCK_DATA_HEALTH": 2
+          },
+          "status": "COMPLETED",
+          "notes": [
+            "This runner simulates scheduled forward cycles.",
+            "Use Windows Task Scheduler, cron, GitHub Actions, or cloud scheduler for real wall-clock operation."
+          ]
+        }
+      }
+    ]
+  }
+}

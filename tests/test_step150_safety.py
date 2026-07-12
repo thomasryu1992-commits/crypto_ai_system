@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from execution.idempotency import make_client_order_id, make_idempotency_key
-from execution.retry_policy import classify_exchange_error
+from crypto_ai_system.execution.idempotency import make_client_order_id, make_idempotency_key
+from crypto_ai_system.execution.retry_policy import classify_exchange_error
 from integrations.spreadsheet_writer import normalize_row
-from trading.atr import stop_distance_bps_from_atr
-from trading.paper_engine import build_paper_position, update_position_conservative
+from crypto_ai_system.trading.atr import stop_distance_bps_from_atr
+from crypto_ai_system.trading.paper_engine import build_paper_position, update_position_conservative
 
 
 def test_spreadsheet_row_has_row_id():

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from execution.reconciler import reconcile_execution_state
+from scripts.common import bootstrap
+
+bootstrap()
+
+from crypto_ai_system.execution.reconciler import reconcile_execution_state
 
 
 def test_reconcile_execution_state() -> None:

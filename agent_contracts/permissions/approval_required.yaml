@@ -1,0 +1,23 @@
+permission_tier: approval_required
+purpose: Manual approval evidence support and validation only; never automatic approval application.
+allowed_actions:
+  - read_artifacts
+  - validate_approval_evidence
+  - prepare_review_only_preview
+  - produce_approval_review_output
+forbidden_actions:
+  - mutate_runtime
+  - mutate_settings_yaml
+  - mutate_score_weights
+  - apply_approval_to_runtime
+  - read_api_key_values
+  - read_api_secret_values
+  - read_secret_files
+  - create_secret_files
+  - enable_place_order
+  - enable_cancel_order
+  - enable_signed_order_executor
+  - submit_testnet_orders
+  - submit_live_orders
+  - auto_promote_signed_testnet
+  - auto_promote_live

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from scripts.common import bootstrap
+
+bootstrap()
+
 import compileall
 import traceback
 
@@ -25,10 +29,10 @@ def main() -> None:
     from check_scheduler_health import check_scheduler_health
     from data_health.health_check import run_data_health_check
     from bridge.research_trading_bridge import run_research_trading_bridge
-    from execution.live_guard import run_live_readiness_check
+    from crypto_ai_system.execution.live_guard import run_live_readiness_check
     from analysis.live_shadow import run_live_shadow_report
     from integrations.spreadsheet_exporter import export_spreadsheet_schema_v3
-    from reports.limited_live_readiness import build_limited_live_readiness_report
+    from crypto_ai_system.reports.limited_live_readiness import build_limited_live_readiness_report
     from forward_test.paper_forward_runner import run_forward_test
     from run_step150_safety_tests import main as run_safety_tests
 

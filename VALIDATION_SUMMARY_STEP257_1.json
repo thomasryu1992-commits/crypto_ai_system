@@ -1,0 +1,52 @@
+{
+  "dependency_policy": {
+    "pytest_declared_as_dev_optional_dependency": true,
+    "pytest_removed_from_runtime_requirements": true,
+    "runtime_dependencies_declared_in_pyproject": true,
+    "runtime_requirements": [
+      "pandas>=2.2,<3.0",
+      "numpy>=1.24,<3.0",
+      "requests>=2.32,<3.0",
+      "python-dotenv>=1.0,<2.0",
+      "PyYAML>=6.0,<7.0",
+      "tabulate>=0.9,<1.0"
+    ]
+  },
+  "fixes": {
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "missing_canonical_module_count_after": 2,
+    "pyproject_runtime_dependencies_declared": true,
+    "pytest_dev_dependency_only": true,
+    "root_package_deletion_deferred": true,
+    "source_and_validation_packages_separated": true,
+    "testnet_executor_plain_checkout_import_safe": true,
+    "testnet_executor_retry_policy_dependency_removed": true
+  },
+  "name": "plain_checkout_dependency_packaging_hotfix",
+  "packaging_policy": {
+    "source_handoff_excludes_runtime_outputs": true,
+    "source_handoff_root": "crypto_ai_system_source",
+    "validation_bundle_default_output": "dist/crypto_ai_system_validation_bundle.zip",
+    "validation_bundle_root": "crypto_ai_system_validation",
+    "validation_bundle_uses_distinct_root": true
+  },
+  "plain_checkout_policy": {
+    "plain_checkout_subprocess_import_test_added": true,
+    "testnet_executor_self_contained_disabled_stub": true,
+    "testnet_executor_uses_local_disabled_recovery_policy": true
+  },
+  "report_status": "DEFERRED_EXECUTION_STUB_POLICY_LOCKED",
+  "status": "validated",
+  "step": "257.1",
+  "test_results": {
+    "full_pytest": "attempted but environment command timed out after partial progress; batch regressions above passed",
+    "step130_219_regression": "74 passed",
+    "step220_239_regression": "61 passed",
+    "step240_244_individual": "8 passed",
+    "step245_251_individual": "19 passed",
+    "step252_257_regression": "24 passed",
+    "step254_256_257_focused": "14 passed",
+    "step257_focused": "7 passed"
+  }
+}

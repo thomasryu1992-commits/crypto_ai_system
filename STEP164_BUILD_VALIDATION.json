@@ -1,0 +1,18 @@
+{
+  "step": "164",
+  "name": "permission_audit_telegram_paper_risk_report",
+  "pytest": "47 passed",
+  "runners": {
+    "run_step164_permission_telegram_validation.py": "STEP164_PERMISSION_TELEGRAM_VALIDATION_OK",
+    "run_trading_cycle.py": "Trading cycle: NONE paper=BLOCKED_BY_PERMISSION_GATE",
+    "run_step162_feature_research_validation.py": "STEP162_FEATURE_RESEARCH_VALIDATION_OK",
+    "run_step161_extra_data_validation.py": "STEP161_EXTRA_DATA_VALIDATION_OK",
+    "run_additional_data_collector.py": "ADDITIONAL_DATA_COLLECTOR_OK"
+  },
+  "added_outputs": [
+    "storage/logs/permission_gate_audit.jsonl",
+    "storage/latest/permission_gate_audit_latest.json",
+    "storage/latest/paper_risk_level_report.json"
+  ],
+  "status": "OK"
+}

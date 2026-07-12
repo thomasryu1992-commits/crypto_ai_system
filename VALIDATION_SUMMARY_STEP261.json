@@ -1,0 +1,36 @@
+{
+  "implemented": [
+    "manual approval packet schema for Step260 production_candidate_profile",
+    "packet validation checks for review-only and no-apply safety locks",
+    "disabled application stub that never mutates runtime score_weights",
+    "script-generated report and latest artifact outputs",
+    "settings calibration_approval policy block with hard false apply/write flags"
+  ],
+  "safety_boundaries": {
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "external_order_submission_performed": false,
+    "live_trading_allowed": false,
+    "missing_canonical_module_count": 2,
+    "order_routing_enabled": false,
+    "production_profile_auto_applied": false,
+    "root_package_deletion_deferred": true,
+    "root_package_deletion_performed": false,
+    "runtime_score_weights_mutated": false,
+    "settings_score_weights_mutated": false
+  },
+  "scope": "researchsignal_v2_manual_approval_packet_for_review_only_candidate_profile",
+  "status": "validated",
+  "step": 261,
+  "validation": {
+    "plain_checkout_disabled_execution_import": "passed",
+    "step130_164_regression": "40 passed",
+    "step209_219_regression": "37 passed",
+    "step220_237_regression": "59 passed",
+    "step240_251_regression": "30 passed",
+    "step252_261_regression": "43 passed",
+    "step258_261_regression": "19 passed",
+    "step261_focused": "5 passed"
+  },
+  "version": "step261_researchsignal_profile_manual_approval_packet_v1"
+}

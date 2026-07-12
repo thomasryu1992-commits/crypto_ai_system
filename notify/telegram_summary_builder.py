@@ -282,6 +282,124 @@ def extract_calibration_advice(
     }
 
 
+
+
+def extract_trade_permission(
+    trading_cycle_result: Dict[str, Any] | None = None,
+    permission_gate_audit: Dict[str, Any] | None = None,
+    paper_risk_level_report: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    trading_cycle_result = trading_cycle_result if isinstance(trading_cycle_result, dict) else {}
+    permission_gate_audit = permission_gate_audit if isinstance(permission_gate_audit, dict) else {}
+    paper_risk_level_report = paper_risk_level_report if isinstance(paper_risk_level_report, dict) else {}
+
+    permission_gate = trading_cycle_result.get("permission_gate", {})
+    if not isinstance(permission_gate, dict):
+        permission_gate = {}
+
+    latest_report_gate = paper_risk_level_report.get("latest_permission_gate", {})
+    if not isinstance(latest_report_gate, dict):
+        latest_report_gate = {}
+
+    source = permission_gate or permission_gate_audit or latest_report_gate
+    if not isinstance(source, dict):
+        source = {}
+
+    block_reasons = first_non_empty(
+        source.get("block_reasons"),
+        permission_gate_audit.get("block_reasons"),
+        default=[],
+    )
+    risk_warnings = first_non_empty(
+        source.get("risk_warnings"),
+        permission_gate_audit.get("risk_warnings"),
+        default=[],
+    )
+
+    if not isinstance(block_reasons, list):
+        block_reasons = [str(block_reasons)] if block_reasons != "-" else []
+    if not isinstance(risk_warnings, list):
+        risk_warnings = [str(risk_warnings)] if risk_warnings != "-" else []
+
+    by_risk = paper_risk_level_report.get("by_risk_level", {})
+    if not isinstance(by_risk, dict):
+        by_risk = {}
+
+    return {
+        "applied": first_non_empty(source.get("applied"), source.get("permission_gate_applied"), default="-"),
+        "allow_long": first_non_empty(source.get("allow_long"), default="-"),
+        "allow_short": first_non_empty(source.get("allow_short"), default="-"),
+        "allow_new_position": first_non_empty(source.get("allow_new_position"), default="-"),
+        "risk_level": first_non_empty(source.get("risk_level"), default="-"),
+        "position_size_multiplier": first_non_empty(source.get("position_size_multiplier"), default="-"),
+        "research_signal_id": first_non_empty(source.get("research_signal_id"), default="-"),
+        "block_reasons": block_reasons,
+        "risk_warnings": risk_warnings,
+        "blocked_total": first_non_empty(paper_risk_level_report.get("total_blocked_by_permission_gate"), default="-"),
+        "opened_total": first_non_empty(paper_risk_level_report.get("total_position_opened"), default="-"),
+        "by_risk_level": by_risk,
+    }
+
+
+
+def format_signed_score(value: Any) -> str:
+    try:
+        return f"{float(value):+.2f}"
+    except Exception:
+        return "-"
+
+
+def format_ratio_pct(value: Any) -> str:
+    try:
+        return f"{float(value) * 100:+.2f}%"
+    except Exception:
+        return "-"
+
+
+def extract_extra_data_summary(research_cycle_result: Dict[str, Any]) -> Dict[str, Any]:
+    research_cycle_result = research_cycle_result if isinstance(research_cycle_result, dict) else {}
+    signal = research_cycle_result.get("research_signal", {})
+    if not isinstance(signal, dict):
+        signal = {}
+    snapshot = research_cycle_result.get("snapshot", {})
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    features = signal.get("features", {})
+    if not isinstance(features, dict):
+        features = {}
+    components = signal.get("score_components", {})
+    if not isinstance(components, dict):
+        components = {}
+
+    return {
+        "binance_derivatives_score": first_non_empty(features.get("binance_derivatives_score"), snapshot.get("binance_derivatives_score"), default="-"),
+        "exchange_flow_score": first_non_empty(features.get("exchange_flow_score"), snapshot.get("exchange_flow_score"), default="-"),
+        "etf_flow_score": first_non_empty(features.get("etf_flow_score"), snapshot.get("etf_flow_score"), default="-"),
+        "stablecoin_liquidity_score": first_non_empty(features.get("stablecoin_liquidity_score"), snapshot.get("stablecoin_liquidity_score"), default="-"),
+        "exchange_netflow_zscore_30d": first_non_empty(features.get("exchange_netflow_zscore_30d"), snapshot.get("exchange_netflow_zscore_30d"), default="-"),
+        "etf_flow_5d": first_non_empty(features.get("etf_flow_5d"), snapshot.get("etf_flow_5d_sum"), default="-"),
+        "stablecoin_supply_change_7d": first_non_empty(features.get("stablecoin_supply_change_7d"), snapshot.get("stablecoin_total_mcap_7d_change"), default="-"),
+        "score_derivatives": first_non_empty(components.get("derivatives"), snapshot.get("score_derivatives"), default="-"),
+        "score_exchange_flow": first_non_empty(components.get("exchange_flow"), snapshot.get("score_exchange_flow"), default="-"),
+        "score_etf_flow": first_non_empty(components.get("etf_flow"), snapshot.get("score_etf_flow"), default="-"),
+        "score_stablecoin_liquidity": first_non_empty(components.get("stablecoin_liquidity"), snapshot.get("score_stablecoin_liquidity"), default="-"),
+        "score_risk": first_non_empty(components.get("risk"), snapshot.get("score_risk"), default="-"),
+    }
+
+def _format_list_for_telegram(values: Any) -> str:
+    if not values:
+        return "-"
+    if isinstance(values, list):
+        return ", ".join(str(x) for x in values[:5]) if values else "-"
+    return str(values)
+
+
+def _risk_bucket_count(by_risk_level: Dict[str, Any], level: str, key: str) -> Any:
+    bucket = by_risk_level.get(level, {}) if isinstance(by_risk_level, dict) else {}
+    if not isinstance(bucket, dict):
+        return "-"
+    return bucket.get(key, 0)
+
 # ============================================================
 # Telegram Message Builder
 # ============================================================
@@ -294,6 +412,9 @@ def build_daily_telegram_message(
     markdown_report_result: Dict[str, Any],
     signal_quality_report: Dict[str, Any],
     signal_calibration_advice: Dict[str, Any],
+    trading_cycle_result: Dict[str, Any] | None = None,
+    permission_gate_audit: Dict[str, Any] | None = None,
+    paper_risk_level_report: Dict[str, Any] | None = None,
 ) -> str:
     report_date = first_non_empty(
         daily_report.get("report_date"),
@@ -361,6 +482,12 @@ def build_daily_telegram_message(
     position_opened = safe_get(paper_report, "position_opened", "-")
     paper_mode = safe_get(paper_report, "mode", "-")
 
+    trade_permission = extract_trade_permission(
+        trading_cycle_result=trading_cycle_result,
+        permission_gate_audit=permission_gate_audit,
+        paper_risk_level_report=paper_risk_level_report,
+    )
+
     scheduler_status = safe_get(scheduler_health, "status", "-")
     operational_dry_run = safe_get(scheduler_health, "operational_dry_run", "-")
     trading_cycle = safe_get(scheduler_health, "trading_cycle", "-")
@@ -382,6 +509,7 @@ def build_daily_telegram_message(
 
     signal_quality = extract_signal_quality(signal_quality_report)
     calibration_advice = extract_calibration_advice(signal_calibration_advice)
+    extra_data = extract_extra_data_summary(research_cycle_result)
 
     message_lines = [
         "[Crypto AI Daily Report]",
@@ -399,6 +527,33 @@ def build_daily_telegram_message(
         f"Confidence: {format_confidence(signal_confidence)}",
         f"Position Opened: {format_bool(position_opened)}",
         f"Mode: {paper_mode}",
+        "",
+        "[Extra Data Summary]",
+        f"Derivatives Score: {format_signed_score(extra_data['binance_derivatives_score'])}",
+        f"Exchange Flow Score: {format_signed_score(extra_data['exchange_flow_score'])}",
+        f"ETF Flow Score: {format_signed_score(extra_data['etf_flow_score'])}",
+        f"Stablecoin Liquidity Score: {format_signed_score(extra_data['stablecoin_liquidity_score'])}",
+        f"Exchange Netflow Z 30D: {format_signed_score(extra_data['exchange_netflow_zscore_30d'])}",
+        f"ETF Flow 5D: {extra_data['etf_flow_5d']}",
+        f"Stablecoin Supply 7D: {format_ratio_pct(extra_data['stablecoin_supply_change_7d'])}",
+        "",
+        "[Trade Permission]",
+        f"Gate Applied: {format_bool(trade_permission['applied'])}",
+        f"Allow Long: {format_bool(trade_permission['allow_long'])}",
+        f"Allow Short: {format_bool(trade_permission['allow_short'])}",
+        f"Allow New Position: {format_bool(trade_permission['allow_new_position'])}",
+        f"Risk Level: {trade_permission['risk_level']}",
+        f"Position Size Multiplier: {trade_permission['position_size_multiplier']}",
+        f"Research Signal ID: {trade_permission['research_signal_id']}",
+        f"Block Reasons: {_format_list_for_telegram(trade_permission['block_reasons'])}",
+        f"Risk Warnings: {_format_list_for_telegram(trade_permission['risk_warnings'])}",
+        "",
+        "[Paper Risk-Level Report]",
+        f"Opened Total: {trade_permission['opened_total']}",
+        f"Blocked Total: {trade_permission['blocked_total']}",
+        f"Normal Attempts: {_risk_bucket_count(trade_permission['by_risk_level'], 'normal', 'audit_count')}",
+        f"Reduced Attempts: {_risk_bucket_count(trade_permission['by_risk_level'], 'reduced', 'audit_count')}",
+        f"Blocked Attempts: {_risk_bucket_count(trade_permission['by_risk_level'], 'blocked', 'audit_count')}",
         "",
         "[Reason]",
         f"Key Reason: {key_reason}",
@@ -458,6 +613,9 @@ def build_and_save_daily_telegram_message(
     markdown_report_result = load_json_file(storage_path / "daily_markdown_report_result.json")
     signal_quality_report = load_json_file(storage_path / "signal_quality_report.json")
     signal_calibration_advice = load_json_file(storage_path / "signal_calibration_advice.json")
+    trading_cycle_result = load_json_file(storage_path / "latest" / "trading_cycle_result.json")
+    permission_gate_audit = load_json_file(storage_path / "latest" / "permission_gate_audit_latest.json")
+    paper_risk_level_report = load_json_file(storage_path / "latest" / "paper_risk_level_report.json")
 
     message = build_daily_telegram_message(
         daily_report=daily_report,
@@ -467,6 +625,9 @@ def build_and_save_daily_telegram_message(
         markdown_report_result=markdown_report_result,
         signal_quality_report=signal_quality_report,
         signal_calibration_advice=signal_calibration_advice,
+        trading_cycle_result=trading_cycle_result,
+        permission_gate_audit=permission_gate_audit,
+        paper_risk_level_report=paper_risk_level_report,
     )
 
     result = {

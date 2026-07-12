@@ -1,0 +1,28 @@
+# Fallback data profiles are separated from primary runtime settings.
+# They are research/backtest/dry-run only and must never be treated as live execution sources.
+profiles:
+  price_data_research:
+    profile_id: price_data_research
+    label: TradingView CSV price-data fallback
+    enabled: true
+    source: price_data_binance_tradingview
+    role: RESEARCH_BACKTEST_ONLY
+    allow_live_execution: false
+    allow_paper_order_execution: false
+    use_for_ohlcv: true
+    use_for_derivatives_proxy: true
+    priority: 1
+    description: Use local Binance BTCUSDT.P TradingView CSV data when Extended API data is unavailable.
+  sample_extended_research:
+    profile_id: sample_extended_research
+    label: Deterministic sample fallback
+    enabled: true
+    source: sample_extended
+    role: RESEARCH_BACKTEST_ONLY
+    allow_live_execution: false
+    allow_paper_order_execution: false
+    use_for_ohlcv: true
+    use_for_derivatives_proxy: true
+    priority: 2
+    description: Use deterministic mock data only when real and local price fallback data are unavailable.
+default_profile: price_data_research

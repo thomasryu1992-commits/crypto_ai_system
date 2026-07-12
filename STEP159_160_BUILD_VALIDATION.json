@@ -1,0 +1,42 @@
+{
+  "package": "crypto_ai_system_step159_160_data_research",
+  "base_package": "crypto_ai_system_step158_price_unified",
+  "created_at": "2026-06-24T04:12:00+00:00",
+  "completed_scope": [
+    "Data source policy added",
+    "Data contract validation added",
+    "Coinalyze real derivatives client endpoints added",
+    "Raw + normalized append/deduplicate storage added",
+    "BTC 7-timeframe historical Price Data kept in research layer",
+    "ResearchSignal canonical object added",
+    "ResearchBot now emits entry side, entry permission, confidence, and block reasons",
+    "TradingBot can consume ResearchSignal-style snapshot fields"
+  ],
+  "validation": {
+    "PYTHONPATH=src pytest -q": {
+      "ok": true,
+      "result": "25 passed"
+    },
+    "python -m compileall -q .": {
+      "ok": true,
+      "result": "no syntax errors"
+    },
+    "python run_step159_data_foundation.py": {
+      "ok": true,
+      "result": "source=price_data_binance_tradingview; rows=500; allow_trading=false; 7 price timeframes loaded"
+    },
+    "python run_step160_research_signal.py": {
+      "ok": true,
+      "result": "research_signal emitted; entry_allowed=false under research-only price fallback"
+    },
+    "python run_daily_research_report.py": {
+      "ok": true,
+      "result": "latest_research_report.md generated with ResearchSignal and MTF price context"
+    },
+    "python run_step157e_full_validation.py": {
+      "ok": true,
+      "result": "ok=true; trading_decision_status=NO_TRADE"
+    }
+  },
+  "expected_environment_note": "In the sandbox, Extended DNS/API access is unavailable and COINALYZE_API_KEY is not configured, so the package correctly falls back to embedded BTC price data for research-only analysis and blocks execution."
+}

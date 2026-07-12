@@ -1,0 +1,121 @@
+name: review-only-chain-validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e ".[dev]"
+      - name: Compile
+        run: python -m compileall -q src config tests scripts
+      - name: P69 Extended venue alignment consistency
+        run: python scripts/check_venue_alignment.py
+      - name: P70 Venue-neutral execution contract
+        run: python scripts/check_venue_neutral_contract.py
+      - name: P71 Extended read-only contract tests (network disabled)
+        run: python -m pytest -q tests/test_p71_extended_read_only_connectivity.py
+      - name: Phase7 Signed Testnet Validation Design Guard
+        run: |
+          python scripts/lint_agents.py
+          python scripts/validate_agent_contracts.py
+          python scripts/validate_agent_outputs.py
+          python scripts/run_agent_evals.py
+          python scripts/generate_agent_index.py
+          python scripts/build_agent_library_contract_review.py
+          python scripts/build_baseline_integrity_freeze.py
+          python scripts/build_valid_price_lineage_artifacts.py
+          python scripts/build_paper_data_quality_gate.py
+          python scripts/build_paper_strategy_validation.py
+          python scripts/build_phase4_outcome_candidate_feedback.py
+          python scripts/build_phase4_1_paper_outcome_sample_accumulation.py
+          python scripts/build_phase4_2_signal_drift_candidate_readiness.py
+          python scripts/build_phase4_3_research_signal_score_bucket_replay.py
+          python scripts/build_phase4_4_candidate_profile_review_packet.py
+          python scripts/build_phase5_manual_approval_intake_validation.py
+          python scripts/build_phase5_1_manual_approval_operator_handoff.py
+          python scripts/build_phase5_2_manual_approval_submission_fixture_validator.py
+          python scripts/build_phase6_signed_testnet_preparation_preview.py
+          python scripts/build_phase6_1_signed_testnet_operator_unlock_request_template.py
+          python scripts/build_phase6_2_operator_unlock_request_fixture_validator.py
+          python scripts/build_phase6_3_signed_testnet_readiness_gate_review.py
+          python scripts/build_phase6_4_signed_testnet_readiness_review_packet.py
+          python scripts/build_phase6_5_actual_manual_approval_operator_unlock_intake_sandbox.py
+          python scripts/build_phase6_6_actual_intake_validation_bridge.py
+          python scripts/build_phase7_signed_testnet_validation_design_guard.py
+          python scripts/build_phase7_1_signed_testnet_pre_submit_payload_guard.py
+          python scripts/run_phase7_1_review_chain.py
+          python scripts/build_phase7_1_1_review_chain_state_doctor.py
+          python scripts/build_phase7_2_executor_enablement_review_packet.py
+          python scripts/build_phase7_3_disabled_signed_testnet_executor_review.py
+          python scripts/build_phase7_4_disabled_execution_reconciliation_session_close.py
+          python scripts/build_phase7_5_reconciliation_session_close_review_packet.py
+          python scripts/build_phase7_6_disabled_signed_testnet_session_operator_handoff.py
+          python scripts/build_phase7_7_future_executor_review_prerequisite_design.py
+          python scripts/build_phase7_8_future_executor_approval_packet_template.py
+          python scripts/build_phase7_9_future_executor_approval_intake_validator.py
+          python scripts/build_phase7_10_future_executor_approval_review_packet.py
+          python scripts/build_phase7_11_future_executor_enablement_design_review.py
+          python scripts/build_phase7_12_future_executor_enablement_guard_fixture.py
+          python scripts/build_phase7_13_future_executor_enablement_review_packet.py
+          python scripts/build_phase7_14_future_executor_operator_decision_packet.py
+          python -m pytest -q tests/agents/
+          python scripts/status_consistency_checker.py
+
+      - name: Step280 chunked full regression
+        run: python scripts/run_step280_full_regression.py --durations 10
+
+      - name: Step258-282 and Step286 focused regression + Step287/288 registry + Step289 Signal QA + Step290 legacy fallback blocker + Step291 decision pipeline registry + Step293 pre-order risk gate full policy expansion + Step294 paper execution engine v2 + Step295 paper reconciliation v2 + Step296 outcome analytics v2 + Step297 performance report generator + Step298 candidate profile registry + Step299 prompt/profile library + Step300 approval registry hardening + Step301 review-only export packet v2 + Step302 settings write preview guard v2 + Step303 real testnet read-only adapter + Step304 metadata intake + Step305 read-only venue probe + Step306 pre-submit validator + Step307 execution enablement packet + Step308 signed testnet order executor + Step309 signed testnet reconciliation + Step310 session close report + Step311 live read-only adapter probe + Step312 live key scope validator + Step313 live canary approval packet + Step314 live canary executor + Step315 live canary reconciliation + Step316 monitoring alerting + Step317 deployment runbook + Step318 canary outcome report + Step319 live scaled readiness gate regression
+        run: |
+          # Compatibility marker: tests/test_step280_*.py tests/test_step281_*.py tests/test_step282_*.py tests/test_step286_*.py tests/test_step287_*.py tests/test_step288_*.py tests/test_step289_*.py tests/test_step290_*.py tests/test_step291_*.py tests/test_step292_*.py tests/test_step293_*.py tests/test_step294_*.py tests/test_step295_*.py tests/test_step296_*.py tests/test_step297_*.py tests/test_step298_*.py tests/test_step299_*.py tests/test_step300_*.py tests/test_step301_*.py tests/test_step302_*.py tests/test_step303_*.py tests/test_step304_*.py tests/test_step305_*.py tests/test_step306_*.py tests/test_step307_*.py tests/test_step308_*.py tests/test_step309_*.py tests/test_step310_*.py tests/test_step311_*.py tests/test_step312_*.py tests/test_step313_*.py tests/test_step314_*.py tests/test_step315_*.py tests/test_step316_*.py tests/test_step317_*.py tests/test_step318_*.py tests/test_step319_*.py
+          python -m pytest -q tests/test_step258_*.py tests/test_step259_*.py tests/test_step260_*.py tests/test_step261_*.py tests/test_step262_*.py tests/test_step263_*.py tests/test_step264_*.py tests/test_step265_*.py tests/test_step266_*.py tests/test_step267_*.py tests/test_step268_*.py tests/test_step269_*.py tests/test_step270_*.py tests/test_step271_*.py tests/test_step272_*.py tests/test_step273_*.py tests/test_step274_*.py tests/test_step275_*.py tests/test_step276_*.py tests/test_step277_*.py tests/test_step278_*.py tests/test_step279_*.py tests/test_step280_*.py tests/test_step281_*.py tests/test_step282_*.py tests/test_step283_*.py tests/test_step284_*.py tests/test_step285_*.py tests/test_step286_*.py tests/test_step287_*.py tests/test_step288_*.py tests/test_step289_*.py tests/test_step290_*.py tests/test_step291_*.py tests/test_step292_*.py tests/test_step293_*.py tests/test_step294_*.py tests/test_step295_*.py tests/test_step296_*.py tests/test_step297_*.py tests/test_step298_*.py tests/test_step299_*.py tests/test_step300_*.py tests/test_step301_*.py tests/test_step302_*.py tests/test_step303_*.py tests/test_step304_*.py tests/test_step305_*.py tests/test_step306_*.py tests/test_step307_*.py tests/test_step308_*.py tests/test_step309_*.py tests/test_step310_*.py tests/test_step311_*.py tests/test_step312_*.py tests/test_step313_*.py tests/test_step314_*.py tests/test_step315_*.py tests/test_step316_*.py tests/test_step317_*.py tests/test_step318_*.py tests/test_step319_*.py
+      - name: Step209-237 chain smoke
+        run: python run_step209_237_v5_chain_bootstrap.py
+      - name: Step237 direct runner smoke
+        run: python run_step237_v5_enablement_submit_dry_run_review.py
+      - name: Legacy root package boundary audit
+        run: python scripts/audit_legacy_root_packages.py --fail-on-unmarked-legacy-init
+      - name: Legacy root import retirement plan
+        run: python scripts/plan_legacy_root_import_retirement.py
+      - name: Step241 import rewrite candidate report
+        run: python scripts/report_step241_import_rewrite_candidates.py
+      - name: Step242 manual mapping review
+        run: python scripts/review_legacy_root_manual_mappings.py
+      - name: Step243 canonical port plan
+        run: python scripts/plan_canonical_ports_for_root_only_features.py
+      - name: Step244 canonical port batch 1 report
+        run: python scripts/report_step244_canonical_port_batch1.py
+      - name: Step245 canonical port batch 2 report
+        run: python scripts/report_step245_canonical_port_batch2.py
+      - name: Step246 canonical port batch 3 report
+        run: python scripts/report_step246_canonical_port_batch3.py
+      - name: Step247 canonical port batch 4 report
+        run: python scripts/report_step247_canonical_port_batch4.py
+      - name: Step248 canonical port batch 5 report
+        run: python scripts/report_step248_canonical_port_batch5.py
+      - name: Step249 execution reconciler canonical port report
+        run: python scripts/report_step249_execution_reconciler_port.py
+      - name: Step250 research engine canonical port report
+        run: python scripts/report_step250_research_engine_port.py
+      - name: Step251 trading cycle canonical port report
+        run: python scripts/report_step251_trading_cycle_port.py
+      - name: Step252 thin wrapper conversion plan
+        run: python scripts/plan_thin_wrapper_conversion.py
+      - name: Step253 thin wrapper batch 1 report
+        run: python scripts/report_step253_thin_wrapper_batch1.py
+      - name: Step254 missing canonical disposition plan
+        run: python scripts/plan_missing_canonical_module_disposition.py
+      - name: Step255 execution support canonical port report
+        run: python scripts/report_step255_execution_support_port.py
+      - name: Step256 paper research v1 canonical port report
+        run: python scripts/report_step256_paper_research_v1_port.py

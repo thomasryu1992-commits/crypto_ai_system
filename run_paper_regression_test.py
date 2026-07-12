@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from scripts.common import bootstrap
+
+bootstrap()
+
 from core.console import configure_utf8_console, safe_print
 from core.json_io import write_storage_json
 from core.time_utils import utc_now_iso
-from trading.paper_engine import run_paper_engine
+from crypto_ai_system.trading.paper_engine import run_paper_engine
 
 
 def main() -> None:

@@ -1,0 +1,35 @@
+{
+  "changes": [
+    "Step208 compatibility backfill explicitly marked as compat_stub",
+    "Fallback data profiles separated into config/fallback_data_profiles.yaml",
+    "config/settings.py import-time side effects removed",
+    "Step209~237 tests switched to tmp_path-isolated project roots"
+  ],
+  "key_files_added_or_changed": [
+    "config/fallback_data_profiles.yaml",
+    "config/settings.py",
+    "src/crypto_ai_system/config.py",
+    "src/crypto_ai_system/data/collectors.py",
+    "src/crypto_ai_system/backtest/paper_trading_candidate_registry.py",
+    "src/crypto_ai_system/backtest/strategy_matrix_execution.py",
+    "docs/STEP208_COMPATIBILITY_BACKFILL_NOTE.md",
+    "tests/conftest.py",
+    "tests/test_step237_hardening_backfill_profiles_settings.py",
+    "tests/test_step209_237_v5_chain_bootstrap.py",
+    "tests/test_step209_v5_paper_observation_queue.py through tests/test_step237_v5_enablement_submit_dry_run_review.py",
+    "README.md",
+    "ZIP_PACKAGING_CRITERIA_STEP237.md"
+  ],
+  "live_trading_allowed": false,
+  "operating_validation_passed": false,
+  "package": "crypto_ai_system_step237_hardening_6_9_validated",
+  "production_live_trading_validation_performed": false,
+  "status": "PASS",
+  "test_results": {
+    "pytest_tests": "136 passed in 20.60s",
+    "python_m_compileall_src_config_tests": "PASS",
+    "run_step209_237_v5_chain_bootstrap": "PASS; 29 runners passed; 0 failed"
+  },
+  "timestamp_utc": "2026-06-29T03:55:15.216173+00:00",
+  "validation_wording": "체인/산출물 생성 검증 통과"
+}

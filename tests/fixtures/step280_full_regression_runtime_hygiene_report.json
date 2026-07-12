@@ -1,0 +1,23 @@
+{
+  "step": "step280_full_regression_runtime_hygiene",
+  "status": "passed",
+  "full_regression_strategy": "chunked_pytest_suites_with_progress_and_runtime_report",
+  "single_pytest_tests_command_replaced_in_ci": true,
+  "live_trading_enabled": false,
+  "testnet_order_submission_allowed": false,
+  "signed_testnet_promotion_allowed": false,
+  "external_order_submission_performed": false,
+  "settings_write_enabled": false,
+  "score_weights_mutation_allowed": false,
+  "chunked_full_regression_coverage_test_count": 1,
+  "focused_step258_281_test_count": 1,
+  "records": [
+    {
+      "name": "fixture_step280_full_regression_runtime_hygiene",
+      "returncode": 0,
+      "elapsed_sec": 0.0,
+      "file_count": 1,
+      "files": ["tests/fixtures/step280_full_regression_runtime_hygiene_report.json"]
+    }
+  ]
+}
