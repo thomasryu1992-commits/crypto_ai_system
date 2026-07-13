@@ -371,8 +371,6 @@ def websocket_public_snapshot_probe(
                 url,
                 user_agent_header=str(headers.get("User-Agent") or P71_SDK_USER_AGENT),
                 open_timeout=min(observation, 15.0),
-                ping_interval=P71_SERVER_PING_INTERVAL_SECONDS,
-                ping_timeout=P71_PONG_TIMEOUT_SECONDS,
                 close_timeout=2,
             ) as ws:
                 deadline = monotonic_fn() + observation

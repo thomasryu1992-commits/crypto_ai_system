@@ -268,8 +268,6 @@ def websocket_private_account_snapshot_probe(
                 additional_headers={"X-Api-Key": api_key},
                 user_agent_header=str(headers.get("User-Agent") or "crypto-ai-system-p71-external-read-only/2"),
                 open_timeout=min(observation, 15.0),
-                ping_interval=P71_SERVER_PING_INTERVAL_SECONDS,
-                ping_timeout=P71_PONG_TIMEOUT_SECONDS,
                 close_timeout=2,
             ) as ws:
                 deadline = monotonic_fn() + observation
