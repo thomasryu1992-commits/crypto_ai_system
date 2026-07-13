@@ -27,6 +27,20 @@ powershell -ExecutionPolicy Bypass -File scripts/run_p71_live_readonly_closure.p
 
 The credential target is a metadata reference, not the credential value.
 
+Optional stream override:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_p71_live_readonly_closure.ps1 `
+  -CredentialTarget "<WINDOWS_GENERIC_CREDENTIAL_TARGET>" `
+  -CredentialReferenceId "os_credential_ref:p71/extended/read_only" `
+  -TimeoutSeconds 35 `
+  -StreamUrlOverride "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
+```
+
+The override may also be supplied with `EXTENDED_STREAM_URL_OVERRIDE`. It is
+restricted to Extended Starknet Sepolia `wss://.../stream.extended.exchange/v1`
+host forms and never carries a credential.
+
 The runner performs these steps in order:
 
 1. public Extended Sepolia REST and BTC-USD orderbook WebSocket evidence
@@ -90,6 +104,7 @@ For host/path diagnosis, run:
 ```powershell
 python scripts/check_p71_extended_stream_hosts.py
 python scripts/check_p71_extended_stream_hosts.py --credential-target p71_extended_read_only
+python scripts/check_p71_extended_stream_hosts.py --stream-url-override "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
 python scripts/probe_p71_official_sdk_stream.py
 ```
 
@@ -99,6 +114,11 @@ The checker is redacted and read-only. It distinguishes:
 - documented non-api testnet host returning HTTP 403
 - SDK v2 RPC candidate returning HTTP 404
 - installed official SDK public orderbook stream returning HTTP 503
+
+The public and private probes now record stream endpoint source, host, HTTP
+status, and failure reason for every attempted candidate. Public REST fallback
+market data may be recorded for later operations work, but it is not accepted as
+P71 WebSocket closure evidence.
 
 If all WebSocket candidates are blocked before the first snapshot, do not treat
 the failure as missing local evidence. Keep P71 blocked and rerun after the

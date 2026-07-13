@@ -17,10 +17,18 @@ def main() -> int:
     )
     parser.add_argument("--network-enabled", action="store_true", help="Allow only pinned Extended Sepolia public GET/WSS endpoints")
     parser.add_argument("--timeout-seconds", type=float, default=30.0)
+    parser.add_argument(
+        "--stream-url-override",
+        help="Optional wss:// Extended Starknet Sepolia stream base URL override; never an API key or secret",
+    )
     parser.add_argument("--output", help="Optional redacted JSON evidence path")
     args = parser.parse_args()
 
-    evidence = run_p71_public_probe(network_enabled=args.network_enabled, timeout_seconds=args.timeout_seconds)
+    evidence = run_p71_public_probe(
+        network_enabled=args.network_enabled,
+        timeout_seconds=args.timeout_seconds,
+        stream_url_override=args.stream_url_override,
+    )
     if args.output:
         output = Path(args.output).resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +44,12 @@ def main() -> int:
         "public_stream_sequence_valid",
         "public_stream_reconnect_count",
         "public_stream_heartbeat_evidence_mode",
+        "public_stream_failure_reason",
+        "public_stream_endpoint_source",
+        "public_stream_host",
         "public_rest_ws_consistency_valid",
+        "rest_market_data_fallback_available",
+        "rest_market_data_fallback_counts_as_websocket_evidence",
         "private_account_read_evidence_valid",
         "private_account_stream_evidence_valid",
         "p71_complete",

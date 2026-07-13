@@ -17,6 +17,10 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--network-enabled", action="store_true")
     parser.add_argument("--timeout-seconds", type=float, default=30.0)
+    parser.add_argument(
+        "--stream-url-override",
+        help="Optional wss:// Extended Starknet Sepolia stream base URL override; never the credential value",
+    )
     args = parser.parse_args()
 
     api_key = read_generic_credential_secret(args.credential_target)
@@ -26,6 +30,7 @@ def main() -> int:
             credential_reference_id=args.credential_reference_id,
             network_enabled=args.network_enabled,
             timeout_seconds=args.timeout_seconds,
+            stream_url_override=args.stream_url_override,
             source_is_fixture=False,
         ),
     )
@@ -40,6 +45,9 @@ def main() -> int:
                 "read_session_id": receipt.get("read_session_id"),
                 "actual_network_read_performed": receipt.get("actual_network_read_performed"),
                 "private_account_stream_valid": (receipt.get("account_stream_receipt") or {}).get("initial_snapshot_valid") is True,
+                "private_account_stream_failure_reason": (receipt.get("account_stream_receipt") or {}).get("stream_failure_reason"),
+                "private_account_stream_endpoint_source": (receipt.get("account_stream_receipt") or {}).get("stream_url_source"),
+                "private_account_stream_host": (receipt.get("account_stream_receipt") or {}).get("stream_host"),
                 "rest_ws_consistency_valid": receipt.get("rest_ws_consistency_valid"),
                 "write_call_performed": False,
                 "signature_created": False,

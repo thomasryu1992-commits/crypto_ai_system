@@ -36,13 +36,19 @@ The evidence contract now requires:
 
 ## Public WebSocket requirements
 
-Endpoint:
+Default endpoint candidates:
 
 `wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/orderbooks/BTC-USD?depth=1`
+`wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1/orderbooks/BTC-USD?depth=1`
 
 The v1 stream is path-based; no post-connect subscribe payload is sent. This
 matches the Extended orderbook stream contract documented as
 `GET /stream.extended.exchange/v1/orderbooks/{market}?depth=1`.
+
+P71 resolves stream candidates in this order: explicit `EXTENDED_STREAM_URL_OVERRIDE`
+or `--stream-url-override`, installed SDK testnet stream URL, pinned `api.`
+host, and documented non-api host. The override is intentionally restricted to
+the Extended Starknet Sepolia `wss://.../stream.extended.exchange/v1` host forms.
 
 The client requires:
 
@@ -97,9 +103,10 @@ The private evidence contract requires:
 
 ## Private account WebSocket boundary
 
-Endpoint:
+Default endpoint candidates:
 
 `wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/account`
+`wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1/account`
 
 The v1 private stream is also path-based; no post-connect subscribe payload is
 sent. Only the external credential-bearing process may set `X-Api-Key`. The
@@ -119,6 +126,11 @@ P71 validates:
 
 Order updates, fills, fee changes, post-submit position/balance deltas, ambiguous submit recovery, and execution reconciliation remain P76/P78 work.
 
+If private REST succeeds but all private WebSocket candidates fail before a
+snapshot, the external process still writes a redacted blocked receipt. The
+receipt records host, source, HTTP status, and failure reason, but never records
+the credential value.
+
 ## Stream host diagnostic
 
 Use the redacted host matrix when a WebSocket attempt is blocked before the
@@ -127,6 +139,7 @@ first snapshot:
 ```powershell
 python scripts/check_p71_extended_stream_hosts.py
 python scripts/check_p71_extended_stream_hosts.py --credential-target p71_extended_read_only
+python scripts/check_p71_extended_stream_hosts.py --stream-url-override "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
 python scripts/probe_p71_official_sdk_stream.py
 ```
 
@@ -136,6 +149,11 @@ candidate. It also runs the installed official SDK public orderbook stream probe
 against the SDK-resolved testnet stream URL. It prints only host, mode, HTTP
 status, and redacted success fields. It never sends an order, creates a
 signature, or prints an API key.
+
+The public evidence also records a REST polling market-data fallback summary.
+That fallback can support later operational design work, but it is explicitly
+marked `counts_toward_p71_completion=false` and never substitutes for WebSocket
+snapshot evidence.
 
 As of the latest local operator check, the path and no-subscribe contract were
 correct, but Extended testnet WebSocket handshakes were blocked before the first

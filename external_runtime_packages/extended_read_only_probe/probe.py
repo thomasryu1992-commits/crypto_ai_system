@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import random
 import re
 import time
@@ -11,12 +12,15 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Iterable, Mapping, Sequence
+from urllib.parse import urlparse
 
 import requests
 
 P71_PRIVATE_RECEIPT_VERSION = "p71_extended_private_read_only_receipt_v2"
 API_BASE_URL = "https://api.starknet.sepolia.extended.exchange/api/v1"
 STREAM_BASE_URL = "wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
+DOCUMENTED_STREAM_BASE_URL = "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
+STREAM_URL_OVERRIDE_ENV = "EXTENDED_STREAM_URL_OVERRIDE"
 ACCOUNT_STREAM_PATH = "/account"
 MARKET = "BTC-USD"
 P71_SERVER_PING_INTERVAL_SECONDS = 15
@@ -26,6 +30,12 @@ P71_MAX_CLOCK_OFFSET_MS = 5_000
 P71_EVIDENCE_MAX_AGE_SECONDS = 600
 P71_MAX_REST_RETRIES = 3
 P71_MAX_STREAM_ATTEMPTS = 3
+ALLOWED_STREAM_HOSTS = frozenset(
+    {
+        "api.starknet.sepolia.extended.exchange",
+        "starknet.sepolia.extended.exchange",
+    }
+)
 
 ALLOWED_GET_PATHS: tuple[tuple[str, str, Mapping[str, Any]], ...] = (
     ("account_info", "/user/account/info", {}),
@@ -45,6 +55,19 @@ class PrivateStreamResyncRequired(RuntimeError):
         self.reason = reason
         self.previous_sequence = previous_sequence
         self.received_sequence = received_sequence
+
+
+@dataclass(frozen=True)
+class PrivateStreamEndpoint:
+    base_url: str
+    source: str
+
+    @property
+    def host(self) -> str:
+        return str(urlparse(self.base_url).netloc)
+
+    def with_path(self, path: str) -> str:
+        return f"{self.base_url}{path}"
 
 
 def _epoch_ms() -> int:
@@ -135,6 +158,67 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_stream_base_url(value: str) -> str:
+    text = str(value or "").strip().rstrip("/")
+    parsed = urlparse(text)
+    if parsed.scheme != "wss":
+        raise ValueError("P71 private stream URL override must use wss://")
+    if parsed.netloc not in ALLOWED_STREAM_HOSTS:
+        raise ValueError("P71 private stream URL override must remain on Extended Starknet Sepolia hosts")
+    if parsed.path != "/stream.extended.exchange/v1":
+        raise ValueError("P71 private stream URL override must target /stream.extended.exchange/v1")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise ValueError("P71 private stream base URL must not include params, query, or fragment")
+    return text
+
+
+def _sdk_stream_base_url() -> str | None:
+    try:
+        from x10.config import TESTNET_CONFIG
+    except Exception:
+        return None
+    try:
+        return _normalize_stream_base_url(str(TESTNET_CONFIG.endpoints.stream_url))
+    except Exception:
+        return None
+
+
+def resolve_private_stream_endpoints(
+    *,
+    explicit_base_url: str | None = None,
+    override_base_url: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[PrivateStreamEndpoint, ...]:
+    env = dict(os.environ if environ is None else environ)
+    configured_override = override_base_url or env.get(STREAM_URL_OVERRIDE_ENV)
+    raw_candidates: list[tuple[str, str]] = []
+    if configured_override:
+        raw_candidates.append((_normalize_stream_base_url(configured_override), "env_override"))
+    if explicit_base_url:
+        raw_candidates.append((_normalize_stream_base_url(explicit_base_url), "explicit_policy"))
+    sdk_base = _sdk_stream_base_url()
+    if sdk_base:
+        raw_candidates.append((sdk_base, "sdk_resolved_testnet"))
+    raw_candidates.extend(
+        (
+            (STREAM_BASE_URL, "pinned_api_testnet"),
+            (DOCUMENTED_STREAM_BASE_URL, "documented_testnet"),
+        )
+    )
+
+    endpoints: list[PrivateStreamEndpoint] = []
+    seen: set[str] = set()
+    for raw_url, source in raw_candidates:
+        base_url = _normalize_stream_base_url(raw_url)
+        if base_url in seen:
+            continue
+        seen.add(base_url)
+        endpoints.append(PrivateStreamEndpoint(base_url=base_url, source=source))
+    if not endpoints:
+        raise ValueError("P71 private stream endpoint resolver produced no candidates")
+    return tuple(endpoints)
 
 
 def _as_decimal(value: Any) -> Decimal | None:
@@ -251,6 +335,22 @@ def _websocket_error_diagnostic(exc: Exception) -> dict[str, Any]:
         "http_status": _as_int(status_code),
         "error": str(exc)[:500],
     }
+
+
+def _stream_failure_reason(status: Any, error_type: Any = None) -> str:
+    code = _as_int(status)
+    if code in {502, 503, 504}:
+        return f"stream_endpoint_unavailable_http_{code}"
+    if code == 403:
+        return "stream_handshake_forbidden_http_403"
+    if code == 404:
+        return "stream_path_not_found_http_404"
+    if code is not None:
+        return f"stream_handshake_rejected_http_{code}"
+    text = str(error_type or "").lower()
+    if text:
+        return f"stream_error_{text}"
+    return "stream_error_unknown"
 
 
 def websocket_private_account_snapshot_probe(
@@ -403,7 +503,8 @@ def websocket_private_account_snapshot_probe(
 class PrivateReadOnlyProbePolicy:
     credential_reference_id: str
     api_base_url: str = API_BASE_URL
-    stream_base_url: str = STREAM_BASE_URL
+    stream_base_url: str | None = None
+    stream_url_override: str | None = None
     market: str = MARKET
     network_enabled: bool = False
     timeout_seconds: float = 30.0
@@ -424,8 +525,12 @@ class ExtendedPrivateReadOnlyProbe:
     ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("P71 external probe requires an API key in process memory")
-        if policy.api_base_url != API_BASE_URL or policy.stream_base_url != STREAM_BASE_URL or policy.market != MARKET:
+        if policy.api_base_url != API_BASE_URL or policy.market != MARKET:
             raise ValueError("P71 external probe is restricted to pinned Extended Sepolia BTC-USD endpoints")
+        self.stream_endpoints = resolve_private_stream_endpoints(
+            explicit_base_url=policy.stream_base_url,
+            override_base_url=policy.stream_url_override,
+        )
         self._api_key = api_key.strip()
         self.policy = policy
         self.transport = transport or _requests_get
@@ -508,6 +613,66 @@ class ExtendedPrivateReadOnlyProbe:
         }
         return receipt, data
 
+    def _read_account_stream(self) -> dict[str, Any]:
+        attempts: list[dict[str, Any]] = []
+        headers = {"User-Agent": self.policy.user_agent, "X-Api-Key": self._api_key}
+        for endpoint in self.stream_endpoints:
+            url = endpoint.with_path(ACCOUNT_STREAM_PATH)
+            try:
+                receipt = dict(self.stream_probe(url, headers, self.policy.timeout_seconds))
+                receipt.update(
+                    {
+                        "blocked": False,
+                        "stream_url_source": endpoint.source,
+                        "stream_base_url": endpoint.base_url,
+                        "stream_host": endpoint.host,
+                        "stream_endpoint_candidates": [
+                            {"source": item.source, "host": item.host, "base_url": item.base_url}
+                            for item in self.stream_endpoints
+                        ],
+                        "stream_attempt_diagnostics": attempts,
+                    }
+                )
+                return receipt
+            except Exception as exc:
+                diagnostic = _websocket_error_diagnostic(exc)
+                attempts.append(
+                    {
+                        "source": endpoint.source,
+                        "host": endpoint.host,
+                        "base_url": endpoint.base_url,
+                        "path": ACCOUNT_STREAM_PATH,
+                        "url_sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(),
+                        "failure_reason": _stream_failure_reason(
+                            diagnostic.get("http_status"), diagnostic.get("error_type")
+                        ),
+                        **diagnostic,
+                    }
+                )
+                continue
+
+        last = attempts[-1] if attempts else {}
+        return {
+            "actual_network_read_performed": False,
+            "blocked": True,
+            "received": False,
+            "initial_snapshot_valid": False,
+            "sequence_valid": False,
+            "heartbeat_policy_valid": False,
+            "clock_evidence_valid": False,
+            "no_secret_scan_passed": True,
+            "stream_url_source": last.get("source"),
+            "stream_base_url": last.get("base_url"),
+            "stream_host": last.get("host"),
+            "stream_endpoint_candidates": [
+                {"source": item.source, "host": item.host, "base_url": item.base_url}
+                for item in self.stream_endpoints
+            ],
+            "stream_attempt_diagnostics": attempts,
+            "stream_failure_reason": last.get("failure_reason"),
+            **{k: v for k, v in last.items() if k in {"error_type", "http_status", "error"}},
+        }
+
     def run(self) -> dict[str, Any]:
         if not self.policy.network_enabled:
             return self._blocked_receipt("P71_PRIVATE_NETWORK_DISABLED")
@@ -531,13 +696,7 @@ class ExtendedPrivateReadOnlyProbe:
             endpoint_receipts[name] = item
             rest_state[name] = data
 
-        stream_receipt = dict(
-            self.stream_probe(
-                f"{self.policy.stream_base_url}{ACCOUNT_STREAM_PATH}",
-                {"User-Agent": self.policy.user_agent, "X-Api-Key": self._api_key},
-                self.policy.timeout_seconds,
-            )
-        )
+        stream_receipt = self._read_account_stream()
 
         rest_position_count = int(endpoint_receipts["positions"].get("item_count") or 0)
         rest_order_count = int(endpoint_receipts["open_orders"].get("item_count") or 0)
@@ -556,7 +715,7 @@ class ExtendedPrivateReadOnlyProbe:
         rest_ws_consistency_valid = all(
             rest_ws_consistency[key]
             for key in ("position_count_match", "open_order_count_match", "balance_presence_match")
-        )
+        ) and stream_receipt.get("actual_network_read_performed") is True
 
         completed_ms = _epoch_ms()
         api_fingerprint = hashlib.sha256(self._api_key.encode("utf-8")).hexdigest()
@@ -633,11 +792,15 @@ __all__ = [
     "P71_PRIVATE_RECEIPT_VERSION",
     "API_BASE_URL",
     "STREAM_BASE_URL",
+    "DOCUMENTED_STREAM_BASE_URL",
+    "STREAM_URL_OVERRIDE_ENV",
     "ACCOUNT_STREAM_PATH",
     "MARKET",
     "P71_HEARTBEAT_OBSERVATION_SECONDS",
+    "PrivateStreamEndpoint",
     "PrivateReadOnlyProbePolicy",
     "ExtendedPrivateReadOnlyProbe",
+    "resolve_private_stream_endpoints",
     "websocket_private_account_snapshot_probe",
     "_requests_get",
 ]

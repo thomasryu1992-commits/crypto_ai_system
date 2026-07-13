@@ -3,25 +3,27 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from websockets.sync.client import connect
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from crypto_ai_system.execution.extended_read_only_connectivity import (  # noqa: E402
+    EXTENDED_STREAM_URL_OVERRIDE_ENV,
+    PUBLIC_ORDERBOOK_STREAM_PATH,
+    resolve_extended_stream_endpoints,
+)
 
 
 USER_AGENT = "X10PythonTradingClient/2.4.0"
 
-PUBLIC_V1_URLS = (
-    "wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/orderbooks/BTC-USD?depth=1",
-    "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1/orderbooks/BTC-USD?depth=1",
-)
-PUBLIC_V2_RPC_URLS = (
-    "wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v2/rpc",
-    "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v2/rpc",
-)
-PRIVATE_V1_URLS = (
-    "wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/account",
-    "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1/account",
-)
+PUBLIC_V2_RPC_PATH = "/stream.extended.exchange/v2/rpc"
+PRIVATE_ACCOUNT_STREAM_PATH = "/account"
 
 
 def _error_summary(exc: Exception) -> dict[str, Any]:
@@ -40,8 +42,23 @@ def _host(url: str) -> str:
     return url.split("/")[2]
 
 
-def check_public_v1(url: str) -> dict[str, Any]:
-    result: dict[str, Any] = {"mode": "public_v1_path", "host": _host(url), "ok": False}
+def _v2_rpc_url(v1_base_url: str) -> str:
+    parsed = urlparse(v1_base_url)
+    return f"{parsed.scheme}://{parsed.netloc}{PUBLIC_V2_RPC_PATH}"
+
+
+def _base_record(mode: str, url: str, source: str) -> dict[str, Any]:
+    return {
+        "mode": mode,
+        "source": source,
+        "host": _host(url),
+        "url_sha256": __import__("hashlib").sha256(url.encode("utf-8")).hexdigest(),
+        "ok": False,
+    }
+
+
+def check_public_v1(url: str, source: str) -> dict[str, Any]:
+    result: dict[str, Any] = _base_record("public_v1_path", url, source)
     try:
         with connect(url, user_agent_header=USER_AGENT, open_timeout=15, close_timeout=2) as ws:
             payload = json.loads(ws.recv(timeout=10))
@@ -63,8 +80,8 @@ def check_public_v1(url: str) -> dict[str, Any]:
     return result
 
 
-def check_public_v2_rpc(url: str) -> dict[str, Any]:
-    result: dict[str, Any] = {"mode": "public_v2_rpc", "host": _host(url), "ok": False}
+def check_public_v2_rpc(url: str, source: str) -> dict[str, Any]:
+    result: dict[str, Any] = _base_record("public_v2_rpc", url, source)
     try:
         with connect(url, user_agent_header=USER_AGENT, open_timeout=15, close_timeout=2) as ws:
             ws.send(
@@ -151,7 +168,7 @@ def check_public_official_sdk_orderbook() -> dict[str, Any]:
 
 
 def check_private_v1(url: str, api_key: str) -> dict[str, Any]:
-    result: dict[str, Any] = {"mode": "private_v1_account", "host": _host(url), "ok": False}
+    result: dict[str, Any] = _base_record("private_v1_account", url, "resolved_v1_candidate")
     try:
         with connect(
             url,
@@ -183,11 +200,18 @@ def check_private_v1(url: str, api_key: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check P71 Extended testnet WebSocket host/path candidates.")
     parser.add_argument("--credential-target", help="Optional Windows Credential Manager target for private stream checks.")
+    parser.add_argument(
+        "--stream-url-override",
+        help=f"Optional wss:// Extended Starknet Sepolia stream base URL override. Also honors {EXTENDED_STREAM_URL_OVERRIDE_ENV}.",
+    )
     args = parser.parse_args()
 
+    endpoints = resolve_extended_stream_endpoints(override_base_url=args.stream_url_override)
     results: list[dict[str, Any]] = []
-    results.extend(check_public_v1(url) for url in PUBLIC_V1_URLS)
-    results.extend(check_public_v2_rpc(url) for url in PUBLIC_V2_RPC_URLS)
+    for endpoint in endpoints:
+        results.append(check_public_v1(endpoint.with_path(PUBLIC_ORDERBOOK_STREAM_PATH), endpoint.source))
+    for endpoint in endpoints:
+        results.append(check_public_v2_rpc(_v2_rpc_url(endpoint.base_url), endpoint.source))
     results.append(check_public_official_sdk_orderbook())
 
     if args.credential_target:
@@ -196,7 +220,10 @@ def main() -> int:
         )
 
         api_key = read_generic_credential_secret(args.credential_target)
-        results.extend(check_private_v1(url, api_key) for url in PRIVATE_V1_URLS)
+        for endpoint in endpoints:
+            item = check_private_v1(endpoint.with_path(PRIVATE_ACCOUNT_STREAM_PATH), api_key)
+            item["source"] = endpoint.source
+            results.append(item)
 
     print(json.dumps({"redacted": True, "write_paths_used": False, "results": results}, indent=2, sort_keys=True))
     return 0 if any(item.get("ok") is True for item in results) else 1

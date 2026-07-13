@@ -9,7 +9,9 @@ param(
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
 
     [ValidateRange(30, 120)]
-    [int]$TimeoutSeconds = 35
+    [int]$TimeoutSeconds = 35,
+
+    [string]$StreamUrlOverride = $env:EXTENDED_STREAM_URL_OVERRIDE
 )
 
 Set-StrictMode -Version Latest
@@ -40,14 +42,19 @@ $closureCopy = Join-Path $sessionDir "closure_report.json"
 
 Push-Location $ProjectRoot
 try {
-    $publicExit = Invoke-PythonStep -Label "Public REST/WebSocket live evidence" -Arguments @(
+    $publicArgs = @(
         "scripts/run_p71_extended_public_probe.py",
         "--network-enabled",
         "--timeout-seconds", "$TimeoutSeconds",
         "--output", $publicEvidence
     )
+    if ($StreamUrlOverride -and $StreamUrlOverride.Trim()) {
+        $publicArgs += @("--stream-url-override", $StreamUrlOverride)
+    }
 
-    $privateExit = Invoke-PythonStep -Label "External private REST/account-WebSocket live evidence" -Arguments @(
+    $publicExit = Invoke-PythonStep -Label "Public REST/WebSocket live evidence" -Arguments $publicArgs
+
+    $privateArgs = @(
         "-m", "external_runtime_packages.extended_read_only_probe.run_windows_probe",
         "--credential-target", $CredentialTarget,
         "--credential-reference-id", $CredentialReferenceId,
@@ -55,6 +62,11 @@ try {
         "--timeout-seconds", "$TimeoutSeconds",
         "--output", $privateReceipt
     )
+    if ($StreamUrlOverride -and $StreamUrlOverride.Trim()) {
+        $privateArgs += @("--stream-url-override", $StreamUrlOverride)
+    }
+
+    $privateExit = Invoke-PythonStep -Label "External private REST/account-WebSocket live evidence" -Arguments $privateArgs
 
     if (-not (Test-Path $publicEvidence)) {
         throw "Public evidence file was not created: $publicEvidence"

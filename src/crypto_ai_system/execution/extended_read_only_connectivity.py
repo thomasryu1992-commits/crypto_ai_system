@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 import time
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
+from urllib.parse import urlparse
 
 import requests
 
@@ -19,6 +21,8 @@ P71_VERSION = "p71_extended_testnet_read_only_connectivity_v3"
 P71_PRIVATE_RECEIPT_VERSION = "p71_extended_private_read_only_receipt_v2"
 EXTENDED_TESTNET_API_BASE_URL = "https://api.starknet.sepolia.extended.exchange/api/v1"
 EXTENDED_TESTNET_STREAM_BASE_URL = "wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
+EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL = "wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"
+EXTENDED_STREAM_URL_OVERRIDE_ENV = "EXTENDED_STREAM_URL_OVERRIDE"
 EXTENDED_TESTNET_MARKET = "BTC-USD"
 PUBLIC_MARKET_PATH = "/info/markets"
 PUBLIC_ORDERBOOK_PATH = "/info/markets/BTC-USD/orderbook"
@@ -34,6 +38,12 @@ P71_EVIDENCE_MAX_AGE_SECONDS = 600
 P71_MAX_REST_RETRIES = 3
 P71_MAX_STREAM_ATTEMPTS = 3
 P71_MAX_ORDERBOOK_MID_DIVERGENCE_BPS = Decimal("200")
+P71_ALLOWED_STREAM_HOSTS = frozenset(
+    {
+        "api.starknet.sepolia.extended.exchange",
+        "starknet.sepolia.extended.exchange",
+    }
+)
 
 RestGet = Callable[[str, Mapping[str, Any], Mapping[str, str], float], Any]
 SleepFn = Callable[[float], None]
@@ -53,6 +63,19 @@ class ExtendedStreamResyncRequired(RuntimeError):
         self.reason = reason
         self.previous_sequence = previous_sequence
         self.received_sequence = received_sequence
+
+
+@dataclass(frozen=True)
+class ExtendedStreamEndpoint:
+    base_url: str
+    source: str
+
+    @property
+    def host(self) -> str:
+        return str(urlparse(self.base_url).netloc)
+
+    def with_path(self, path: str) -> str:
+        return f"{self.base_url}{path}"
 
 
 def _epoch_ms() -> int:
@@ -91,6 +114,67 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_stream_base_url(value: str) -> str:
+    text = str(value or "").strip().rstrip("/")
+    parsed = urlparse(text)
+    if parsed.scheme != "wss":
+        raise ExtendedReadOnlyPolicyError("P71 stream URL override must use wss://")
+    if parsed.netloc not in P71_ALLOWED_STREAM_HOSTS:
+        raise ExtendedReadOnlyPolicyError("P71 stream URL override must remain on the Extended Starknet Sepolia hosts")
+    if parsed.path != "/stream.extended.exchange/v1":
+        raise ExtendedReadOnlyPolicyError("P71 stream URL override must target /stream.extended.exchange/v1")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise ExtendedReadOnlyPolicyError("P71 stream base URL must not include params, query, or fragment")
+    return text
+
+
+def _sdk_stream_base_url() -> str | None:
+    try:
+        from x10.config import TESTNET_CONFIG
+    except Exception:
+        return None
+    try:
+        return _normalize_stream_base_url(str(TESTNET_CONFIG.endpoints.stream_url))
+    except Exception:
+        return None
+
+
+def resolve_extended_stream_endpoints(
+    *,
+    explicit_base_url: str | None = None,
+    override_base_url: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[ExtendedStreamEndpoint, ...]:
+    env = dict(os.environ if environ is None else environ)
+    configured_override = override_base_url or env.get(EXTENDED_STREAM_URL_OVERRIDE_ENV)
+    raw_candidates: list[tuple[str, str]] = []
+    if configured_override:
+        raw_candidates.append((_normalize_stream_base_url(configured_override), "env_override"))
+    if explicit_base_url:
+        raw_candidates.append((_normalize_stream_base_url(explicit_base_url), "explicit_policy"))
+    sdk_base = _sdk_stream_base_url()
+    if sdk_base:
+        raw_candidates.append((sdk_base, "sdk_resolved_testnet"))
+    raw_candidates.extend(
+        (
+            (EXTENDED_TESTNET_STREAM_BASE_URL, "pinned_api_testnet"),
+            (EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL, "documented_testnet"),
+        )
+    )
+
+    endpoints: list[ExtendedStreamEndpoint] = []
+    seen: set[str] = set()
+    for raw_url, source in raw_candidates:
+        base_url = _normalize_stream_base_url(raw_url)
+        if base_url in seen:
+            continue
+        seen.add(base_url)
+        endpoints.append(ExtendedStreamEndpoint(base_url=base_url, source=source))
+    if not endpoints:
+        raise ExtendedReadOnlyPolicyError("P71 stream endpoint resolver produced no candidates")
+    return tuple(endpoints)
 
 
 def _as_decimal(value: Any) -> Decimal | None:
@@ -275,6 +359,38 @@ def _websocket_error_diagnostic(exc: Exception) -> dict[str, Any]:
         "http_status": _as_int(status_code),
         "error": str(exc)[:500],
     }
+
+
+def _stream_failure_reason(status: Any, error_type: Any = None) -> str:
+    code = _as_int(status)
+    if code in {502, 503, 504}:
+        return f"stream_endpoint_unavailable_http_{code}"
+    if code == 403:
+        return "stream_handshake_forbidden_http_403"
+    if code == 404:
+        return "stream_path_not_found_http_404"
+    if code is not None:
+        return f"stream_handshake_rejected_http_{code}"
+    text = str(error_type or "").lower()
+    if text:
+        return f"stream_error_{text}"
+    return "stream_error_unknown"
+
+
+def _stream_block_reasons(prefix: str, stream_response: Mapping[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    attempts = stream_response.get("stream_attempt_diagnostics")
+    diagnostics = attempts if isinstance(attempts, Sequence) and not isinstance(attempts, (str, bytes, bytearray)) else []
+    sources = list(diagnostics) if diagnostics else [stream_response]
+    for item in sources:
+        if not isinstance(item, Mapping):
+            continue
+        code = _as_int(item.get("http_status"))
+        if code is not None:
+            reasons.append(f"{prefix}_STREAM_HANDSHAKE_REJECTED_HTTP_{code}")
+    if not reasons and stream_response.get("error_type"):
+        reasons.append(f"{prefix}_STREAM_ERROR_{str(stream_response.get('error_type')).upper()}")
+    return reasons
 
 
 def _extract_levels(payload: Mapping[str, Any], side: str) -> list[tuple[Decimal, Decimal]]:
@@ -509,7 +625,8 @@ def websocket_public_snapshot_probe(
 @dataclass(frozen=True)
 class ExtendedPublicReadOnlyPolicy:
     api_base_url: str = EXTENDED_TESTNET_API_BASE_URL
-    stream_base_url: str = EXTENDED_TESTNET_STREAM_BASE_URL
+    stream_base_url: str | None = None
+    stream_url_override: str | None = None
     market: str = EXTENDED_TESTNET_MARKET
     network_enabled: bool = False
     write_calls_allowed: bool = False
@@ -533,10 +650,12 @@ class ExtendedPublicReadOnlyClient:
         self.stream_probe = stream_probe or websocket_public_snapshot_probe
         self.sleep_fn = sleep_fn
         self.random_fn = random_fn
+        self.stream_endpoints = resolve_extended_stream_endpoints(
+            explicit_base_url=policy.stream_base_url,
+            override_base_url=policy.stream_url_override,
+        )
         if policy.api_base_url != EXTENDED_TESTNET_API_BASE_URL:
             raise ExtendedReadOnlyPolicyError("P71 API base URL must be the pinned Extended Starknet Sepolia endpoint")
-        if policy.stream_base_url != EXTENDED_TESTNET_STREAM_BASE_URL:
-            raise ExtendedReadOnlyPolicyError("P71 stream URL must be the pinned official-SDK Starknet Sepolia WSS endpoint")
         if policy.market != EXTENDED_TESTNET_MARKET:
             raise ExtendedReadOnlyPolicyError("P71 market must be BTC-USD")
         if policy.write_calls_allowed:
@@ -574,11 +693,59 @@ class ExtendedPublicReadOnlyClient:
         path = PUBLIC_ORDERBOOK_STREAM_PATH
         if not self.policy.network_enabled:
             return {"called": False, "blocked": True, "reason": "P71_NETWORK_DISABLED", "path": path}
-        try:
-            result = dict(self.stream_probe(f"{self.policy.stream_base_url}{path}", self.headers, self.policy.timeout_seconds))
-            return {"called": True, "blocked": False, "path": path, **result}
-        except Exception as exc:
-            return {"called": True, "blocked": True, "received": False, "path": path, **_websocket_error_diagnostic(exc)}
+        attempts: list[dict[str, Any]] = []
+        for endpoint in self.stream_endpoints:
+            url = endpoint.with_path(path)
+            try:
+                result = dict(self.stream_probe(url, self.headers, self.policy.timeout_seconds))
+                return {
+                    "called": True,
+                    "blocked": False,
+                    "path": path,
+                    "stream_url_source": endpoint.source,
+                    "stream_base_url": endpoint.base_url,
+                    "stream_host": endpoint.host,
+                    "stream_endpoint_candidates": [
+                        {"source": item.source, "host": item.host, "base_url": item.base_url}
+                        for item in self.stream_endpoints
+                    ],
+                    "stream_attempt_diagnostics": attempts,
+                    **result,
+                }
+            except Exception as exc:
+                diagnostic = _websocket_error_diagnostic(exc)
+                attempts.append(
+                    {
+                        "source": endpoint.source,
+                        "host": endpoint.host,
+                        "base_url": endpoint.base_url,
+                        "path": path,
+                        "url_sha256": __import__("hashlib").sha256(url.encode("utf-8")).hexdigest(),
+                        "failure_reason": _stream_failure_reason(
+                            diagnostic.get("http_status"), diagnostic.get("error_type")
+                        ),
+                        **diagnostic,
+                    }
+                )
+                continue
+
+        last = attempts[-1] if attempts else {}
+        return {
+            "called": True,
+            "blocked": True,
+            "received": False,
+            "path": path,
+            "stream_url_source": last.get("source"),
+            "stream_base_url": last.get("base_url"),
+            "stream_host": last.get("host"),
+            "stream_endpoint_candidates": [
+                {"source": item.source, "host": item.host, "base_url": item.base_url}
+                for item in self.stream_endpoints
+            ],
+            "stream_attempt_diagnostics": attempts,
+            "stream_failure_reason": last.get("failure_reason"),
+            **{k: v for k, v in last.items() if k in {"error_type", "http_status", "error"}},
+        }
 
     def post(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
         return {"called": False, "blocked": True, "reason": "P71_WRITE_CALL_BLOCKED", "http_method": "POST"}
@@ -624,6 +791,29 @@ def _rate_limit_evidence_valid(response: Mapping[str, Any]) -> bool:
         and evidence.get("exhausted") is False
         and response.get("http_status") != 429
     )
+
+
+def _rest_market_data_fallback_evidence(
+    *,
+    public_rest_valid: bool,
+    market_rules_fresh: bool,
+    orderbook_fresh: bool,
+    market_response: Mapping[str, Any],
+    orderbook_response: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "available": bool(public_rest_valid),
+        "mode": "REST_POLLING_MARKET_DATA_FALLBACK",
+        "allowed_as_p71_websocket_evidence": False,
+        "counts_toward_p71_completion": False,
+        "reason": "P71_REST_FALLBACK_IS_OPERATIONAL_AID_NOT_WEBSOCKET_CLOSURE_EVIDENCE",
+        "market_rules_fresh": bool(market_rules_fresh),
+        "orderbook_fresh": bool(orderbook_fresh),
+        "market_http_status": market_response.get("http_status"),
+        "orderbook_http_status": orderbook_response.get("http_status"),
+        "market_response_hash": sha256_json(dict(market_response)),
+        "orderbook_response_hash": sha256_json(dict(orderbook_response)),
+    }
 
 
 def _recursive_forbidden_key_matches(value: Any, path: str = "$") -> list[str]:
@@ -728,6 +918,7 @@ def build_p71_public_connectivity_evidence(
 
     if not stream_called or not stream_received:
         blockers.append("P71_PUBLIC_STREAM_SNAPSHOT_MISSING")
+        blockers.extend(_stream_block_reasons("P71_PUBLIC", stream_response))
     if not initial_snapshot_valid:
         blockers.append("P71_PUBLIC_STREAM_INITIAL_SNAPSHOT_INVALID")
     if not sequence_valid:
@@ -798,6 +989,13 @@ def build_p71_public_connectivity_evidence(
         )
     )
     public_valid = not blockers
+    rest_fallback = _rest_market_data_fallback_evidence(
+        public_rest_valid=public_rest_valid,
+        market_rules_fresh=market_rules_fresh,
+        orderbook_fresh=orderbook_fresh,
+        market_response=market_response,
+        orderbook_response=orderbook_response,
+    )
     evidence = {
         "version": P71_VERSION,
         "evidence_id": stable_id("p71_extended_public_read_only", {"session": uuid.uuid4().hex, "observed_at_utc": observed_at}),
@@ -823,6 +1021,12 @@ def build_p71_public_connectivity_evidence(
         "public_stream_error_type": stream_response.get("error_type"),
         "public_stream_http_status": stream_response.get("http_status"),
         "public_stream_error": stream_response.get("error"),
+        "public_stream_failure_reason": stream_response.get("stream_failure_reason"),
+        "public_stream_endpoint_source": stream_response.get("stream_url_source"),
+        "public_stream_host": stream_response.get("stream_host"),
+        "public_stream_base_url": stream_response.get("stream_base_url"),
+        "public_stream_endpoint_candidates": stream_response.get("stream_endpoint_candidates"),
+        "public_stream_attempt_diagnostics": stream_response.get("stream_attempt_diagnostics"),
         "public_stream_initial_snapshot_valid": initial_snapshot_valid,
         "public_stream_sequence_valid": sequence_valid,
         "public_stream_sequence_gap_count": stream_response.get("sequence_gap_count"),
@@ -839,6 +1043,9 @@ def build_p71_public_connectivity_evidence(
         "public_stream_max_abs_clock_offset_ms": stream_response.get("max_abs_clock_offset_ms"),
         "public_rest_ws_consistency": consistency,
         "public_rest_ws_consistency_valid": consistency["valid"],
+        "rest_market_data_fallback": rest_fallback,
+        "rest_market_data_fallback_available": rest_fallback["available"],
+        "rest_market_data_fallback_counts_as_websocket_evidence": False,
         "market_status": market_status or None,
         "trading_rules_present": isinstance(trading_config, Mapping) and bool(trading_config),
         "no_secret_scan_passed": not secret_matches,
@@ -871,11 +1078,18 @@ def run_p71_public_probe(
     rest_get: RestGet | None = None,
     stream_probe: PublicStreamProbe | None = None,
     timeout_seconds: float = 30.0,
+    stream_base_url: str | None = None,
+    stream_url_override: str | None = None,
     sleep_fn: SleepFn = time.sleep,
     random_fn: Callable[[], float] = random.random,
 ) -> dict[str, Any]:
     client = ExtendedPublicReadOnlyClient(
-        ExtendedPublicReadOnlyPolicy(network_enabled=network_enabled, timeout_seconds=timeout_seconds),
+        ExtendedPublicReadOnlyPolicy(
+            network_enabled=network_enabled,
+            timeout_seconds=timeout_seconds,
+            stream_base_url=stream_base_url,
+            stream_url_override=stream_url_override,
+        ),
         rest_get=rest_get,
         stream_probe=stream_probe,
         sleep_fn=sleep_fn,
@@ -1136,6 +1350,8 @@ __all__ = [
     "P71_PRIVATE_RECEIPT_VERSION",
     "EXTENDED_TESTNET_API_BASE_URL",
     "EXTENDED_TESTNET_STREAM_BASE_URL",
+    "EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL",
+    "EXTENDED_STREAM_URL_OVERRIDE_ENV",
     "EXTENDED_TESTNET_MARKET",
     "PUBLIC_ORDERBOOK_STREAM_PATH",
     "P71_SDK_USER_AGENT",
@@ -1146,8 +1362,10 @@ __all__ = [
     "P71_MARKET_RULE_MAX_AGE_MS",
     "P71_ORDERBOOK_MAX_AGE_MS",
     "P71_EVIDENCE_MAX_AGE_SECONDS",
+    "ExtendedStreamEndpoint",
     "ExtendedReadOnlyPolicyError",
     "ExtendedStreamResyncRequired",
+    "resolve_extended_stream_endpoints",
     "ExtendedPublicReadOnlyPolicy",
     "ExtendedPublicReadOnlyClient",
     "websocket_public_snapshot_probe",

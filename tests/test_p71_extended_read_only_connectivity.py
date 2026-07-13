@@ -8,6 +8,7 @@ import pytest
 
 from crypto_ai_system.execution.extended_read_only_connectivity import (
     EXTENDED_TESTNET_API_BASE_URL,
+    EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL,
     EXTENDED_TESTNET_STREAM_BASE_URL,
     P71_EVIDENCE_MAX_AGE_SECONDS,
     P71_HEARTBEAT_OBSERVATION_SECONDS,
@@ -22,6 +23,7 @@ from crypto_ai_system.execution.extended_read_only_connectivity import (
     ExtendedReadOnlyPolicyError,
     build_p71_complete_evidence,
     build_p71_public_connectivity_evidence,
+    resolve_extended_stream_endpoints,
     run_p71_public_probe,
     validate_p71_private_account_evidence,
     _websocket_error_diagnostic,
@@ -30,6 +32,7 @@ from crypto_ai_system.execution.extended_read_only_connectivity import (
 from external_runtime_packages.extended_read_only_probe import (
     ExtendedPrivateReadOnlyProbe,
     PrivateReadOnlyProbePolicy,
+    resolve_private_stream_endpoints,
     websocket_private_account_snapshot_probe,
 )
 from external_runtime_packages.extended_read_only_probe.probe import (
@@ -250,13 +253,78 @@ def test_p71_network_disabled_fails_closed():
 def test_p71_rejects_wrong_venue_market_and_write_policy():
     for policy in (
         ExtendedPublicReadOnlyPolicy(api_base_url="https://api.starknet.extended.exchange/api/v1"),
-        ExtendedPublicReadOnlyPolicy(stream_base_url="wss://starknet.sepolia.extended.exchange/stream.extended.exchange/v1"),
+        ExtendedPublicReadOnlyPolicy(stream_base_url="wss://api.starknet.extended.exchange/stream.extended.exchange/v1"),
         ExtendedPublicReadOnlyPolicy(market="ETH-USD"),
         ExtendedPublicReadOnlyPolicy(write_calls_allowed=True),
         ExtendedPublicReadOnlyPolicy(credential_headers_allowed=True),
     ):
         with pytest.raises(ExtendedReadOnlyPolicyError):
             ExtendedPublicReadOnlyClient(policy)
+
+
+def test_p71_stream_endpoint_resolver_accepts_sdk_documented_and_override_hosts(monkeypatch):
+    monkeypatch.delenv("EXTENDED_STREAM_URL_OVERRIDE", raising=False)
+    endpoints = resolve_extended_stream_endpoints()
+    bases = [item.base_url for item in endpoints]
+    assert EXTENDED_TESTNET_STREAM_BASE_URL in bases
+    assert EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL in bases
+
+    override = EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL
+    overridden = resolve_extended_stream_endpoints(override_base_url=override)
+    assert overridden[0].base_url == override
+    assert overridden[0].source == "env_override"
+
+    with pytest.raises(ExtendedReadOnlyPolicyError):
+        resolve_extended_stream_endpoints(
+            override_base_url="wss://example.invalid/stream.extended.exchange/v1"
+        )
+
+
+def test_p71_public_probe_falls_through_stream_endpoint_candidates(monkeypatch):
+    monkeypatch.setattr("crypto_ai_system.execution.extended_read_only_connectivity._epoch_ms", lambda: BASE_EPOCH_MS)
+    calls = []
+
+    def stream_probe(url, _headers, _timeout):
+        calls.append(url)
+        if len(calls) == 1:
+            raise RuntimeError("server rejected WebSocket connection: HTTP 503")
+        return _valid_public_stream_result()
+
+    evidence = run_p71_public_probe(
+        network_enabled=True,
+        rest_get=_rest_get,
+        stream_probe=stream_probe,
+        stream_url_override=EXTENDED_TESTNET_STREAM_BASE_URL,
+    )
+    assert len(calls) == 2
+    assert calls[0] == f"{EXTENDED_TESTNET_STREAM_BASE_URL}/orderbooks/BTC-USD?depth=1"
+    assert calls[1] == f"{EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL}/orderbooks/BTC-USD?depth=1"
+    assert evidence["public_stream_valid"] is True
+    assert evidence["public_stream_endpoint_source"] == "documented_testnet"
+    assert evidence["public_stream_attempt_diagnostics"][0]["http_status"] == 503
+
+
+def test_p71_public_stream_handshake_rejection_is_classified_without_rest_fallback_completion(monkeypatch):
+    monkeypatch.setattr("crypto_ai_system.execution.extended_read_only_connectivity._epoch_ms", lambda: BASE_EPOCH_MS)
+
+    def stream_probe(url, _headers, _timeout):
+        if "api." in url:
+            raise RuntimeError("server rejected WebSocket connection: HTTP 503")
+        raise RuntimeError("server rejected WebSocket connection: HTTP 403")
+
+    evidence = run_p71_public_probe(
+        network_enabled=True,
+        rest_get=_rest_get,
+        stream_probe=stream_probe,
+        stream_url_override=EXTENDED_TESTNET_STREAM_BASE_URL,
+    )
+    assert evidence["public_rest_valid"] is True
+    assert evidence["public_stream_valid"] is False
+    assert evidence["rest_market_data_fallback_available"] is True
+    assert evidence["rest_market_data_fallback_counts_as_websocket_evidence"] is False
+    assert "P71_PUBLIC_STREAM_HANDSHAKE_REJECTED_HTTP_503" in evidence["block_reasons"]
+    assert "P71_PUBLIC_STREAM_HANDSHAKE_REJECTED_HTTP_403" in evidence["block_reasons"]
+    assert "P71_PUBLIC_STREAM_SNAPSHOT_MISSING" in evidence["block_reasons"]
 
 
 def test_p71_public_rest_rate_limit_retries_retry_after_then_succeeds(monkeypatch):
@@ -483,6 +551,45 @@ def test_p71_private_probe_strips_credential_whitespace():
     )
     probe.run()
     assert set(observed) == {"test-only-api-key"}
+
+
+def test_p71_private_stream_endpoint_resolver_accepts_documented_host_and_rejects_mainnet():
+    endpoints = resolve_private_stream_endpoints(override_base_url=EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL)
+    assert endpoints[0].base_url == EXTENDED_TESTNET_DOCUMENTED_STREAM_BASE_URL
+    assert endpoints[0].source == "env_override"
+
+    with pytest.raises(ValueError):
+        resolve_private_stream_endpoints(
+            override_base_url="wss://api.starknet.extended.exchange/stream.extended.exchange/v1"
+        )
+
+
+def test_p71_private_stream_failure_returns_redacted_blocked_receipt():
+    def failing_stream_probe(url, headers, _timeout):
+        assert headers["X-Api-Key"] == "test-only-api-key"
+        if "api." in url:
+            raise RuntimeError("server rejected WebSocket connection: HTTP 503")
+        raise RuntimeError("server rejected WebSocket connection: HTTP 403")
+
+    receipt = ExtendedPrivateReadOnlyProbe(
+        api_key="test-only-api-key",
+        policy=PrivateReadOnlyProbePolicy(
+            credential_reference_id="os_credential_ref:p71/extended/read_only",
+            network_enabled=True,
+            stream_url_override=EXTENDED_TESTNET_STREAM_BASE_URL,
+        ),
+        transport=_private_transport,
+        stream_probe=failing_stream_probe,
+    ).run()
+    serialized = str(receipt)
+    stream_receipt = receipt["account_stream_receipt"]
+    assert "test-only-api-key" not in serialized
+    assert receipt["actual_network_read_performed"] is False
+    assert receipt["rest_ws_consistency_valid"] is False
+    assert stream_receipt["blocked"] is True
+    assert stream_receipt["stream_failure_reason"] == "stream_handshake_forbidden_http_403"
+    assert [item["http_status"] for item in stream_receipt["stream_attempt_diagnostics"]] == [503, 403]
+    assert validate_p71_private_account_evidence(receipt)["valid"] is False
 
 
 def test_p71_private_rate_limit_retries_and_records_evidence():
