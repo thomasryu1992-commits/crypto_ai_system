@@ -24,17 +24,20 @@ network, signing, and submission remain disabled. See
 
 ## P71 Extended Testnet Read-only Connectivity — In Progress
 
-The public REST probe has validated an active BTC-USD market, trading rules, and
-orderbook data on Extended Starknet Sepolia without credentials or write calls.
-P71 remains incomplete because the current official-SDK WebSocket host returns
-HTTP 503 after bounded retries and private account read evidence has not been
-supplied.
+P71 remains incomplete. Real Extended Starknet Sepolia public REST evidence is valid, and external private account REST evidence is valid. The new P71 v3/v2 contracts now harden public and private WebSocket connectivity, freshness, rate-limit handling, evidence integrity, replay protection, and REST/WebSocket consistency without enabling any write path.
 
-The private read path is implemented as a physically separate Windows
-Credential Manager-backed GET-only process. Its redacted receipt cannot complete
-P71 unless it proves real non-fixture reads for account info, balance, BTC-USD
-positions, and BTC-USD open orders.
-See `docs/P71_EXTENDED_TESTNET_READ_ONLY_CONNECTIVITY.md`.
+Current live-evidence state:
+
+- public REST evidence is valid
+- private account REST evidence is valid
+- public WebSocket live evidence is pending
+- private account WebSocket live evidence is pending
+- `p71_complete=false`
+- `testnet_order_submission_allowed=false`
+
+The public and private WebSocket contracts require first-message `SNAPSHOT`, `seq=1`, contiguous sequences, sequence-gap reconnect with fresh snapshot resync, a minimum 27-second inferred heartbeat-survival window, server/client clock evidence, and redacted hashes. The external private process remains Windows Credential Manager-backed and GET-only; Core never receives the API-key value.
+
+Order, cancel, signature, Stark private-key access, signed-testnet execution, and live execution remain disabled. The canonical operator closure flow is documented in `docs/P71_EXTENDED_TESTNET_READ_ONLY_CLOSURE_RUNBOOK.md`; successful closure still leaves all execution permissions false. See `docs/P71_EXTENDED_TESTNET_READ_ONLY_CONNECTIVITY.md`.
 
 ## P45 Current Package Status — Review Only
 

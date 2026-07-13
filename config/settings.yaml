@@ -18,16 +18,38 @@ venue_contract:
   network_enabled: false
   submit_enabled: false
 p71_extended_read_only:
-  status: public_rest_valid_stream_and_private_evidence_pending
+  status: public_and_private_rest_valid_public_and_private_websocket_live_evidence_pending
+  public_contract_version: p71_extended_testnet_read_only_connectivity_v3
+  private_receipt_version: p71_extended_private_read_only_receipt_v2
   api_base_url: https://api.starknet.sepolia.extended.exchange/api/v1
   stream_base_url: wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1
   market: BTC-USD
   public_network_enabled_by_default: false
-  private_account_probe_enabled: false
+  private_account_probe_enabled_by_default: false
+  public_rest_evidence_valid: true
+  private_account_rest_evidence_valid: true
+  public_websocket_contract_hardened: true
+  private_account_websocket_contract_hardened: true
+  public_websocket_live_evidence_valid: false
+  private_account_websocket_live_evidence_valid: false
+  p71_complete: false
   api_key_value_allowed_in_core: false
   write_calls_allowed: false
   order_endpoint_allowed: false
-  p71_complete: false
+  cancel_endpoint_allowed: false
+  signature_allowed: false
+  stark_private_key_access_allowed: false
+  testnet_order_submission_allowed: false
+  market_rule_max_age_ms: 60000
+  orderbook_max_age_ms: 5000
+  evidence_max_age_seconds: 600
+  rest_max_attempts: 3
+  heartbeat_server_ping_interval_seconds: 15
+  heartbeat_pong_timeout_seconds: 10
+  heartbeat_observation_seconds: 27
+  heartbeat_evidence_mode: INFERRED_FROM_CONNECTION_SURVIVAL
+  max_clock_offset_ms: 5000
+  max_orderbook_mid_divergence_bps: 200
   official_sdk_version: 2.4.0
   websockets_compatibility: '>=12,<14'
   external_private_probe:
@@ -41,6 +63,7 @@ p71_extended_read_only:
       - /user/balance
       - /user/positions
       - /user/orders
+    private_account_stream_path: /account
     network_enabled_by_default: false
     write_calls_allowed: false
 safety:

@@ -1,5 +1,23 @@
 # Crypto AI System — P70 Venue-neutral Execution Contract
 
+## P71 Extended Testnet Read-only Connectivity — Current Status
+
+P71 remains incomplete. Real Extended Starknet Sepolia public REST evidence is valid, and external private account REST evidence is valid. The current implementation adds the required public/private WebSocket contracts, freshness, rate-limit, hash, TTL, anti-replay, no-secret, and REST/WebSocket consistency controls, but fresh real WebSocket evidence must still be captured.
+
+Canonical state:
+
+- public REST evidence is valid
+- private account REST evidence is valid
+- public WebSocket live evidence is pending
+- private account WebSocket live evidence is pending
+- `p71_complete=false`
+- `testnet_order_submission_allowed=false`
+
+Heartbeat evidence is labelled `INFERRED_FROM_CONNECTION_SURVIVAL` because the selected sync client automatically handles control-frame Pong responses but doesn't expose direct server-Ping/client-Pong counters. A minimum 27-second connection-survival window is required. Sequence gaps force bounded reconnect and a new `SNAPSHOT seq=1` baseline.
+
+P71 does not read a Stark private key, create a signature, call an order or cancel endpoint, or grant signed-testnet/live authority. The live closure layer validates fresh public/private evidence, emits a redacted attestation, and consumes successful evidence IDs once in an append-only anti-replay registry. Post-submit events, fills, fees, ambiguous-submit recovery, and execution reconciliation remain P76/P78 scope.
+
+
 ## P70 canonical execution contract
 
 Core execution uses the venue-neutral contracts defined in

@@ -1,10 +1,18 @@
-"""External P71 read-only account probe.
+"""External P71 credential-bearing read-only probe.
 
-This package is physically separate from the Crypto_AI_System core because it
-may temporarily hold an Extended API key in process memory. It provides GET-only
-account evidence and has no signing or write capability.
+The package may temporarily hold an Extended API key in its own process memory.
+It exposes GET-only private REST and authenticated private account-stream
+connectivity. It has no signer, no Stark private-key access, and no write method.
 """
 
-from .probe import ExtendedPrivateReadOnlyProbe, PrivateReadOnlyProbePolicy
+from .probe import (
+    ExtendedPrivateReadOnlyProbe,
+    PrivateReadOnlyProbePolicy,
+    websocket_private_account_snapshot_probe,
+)
 
-__all__ = ["ExtendedPrivateReadOnlyProbe", "PrivateReadOnlyProbePolicy"]
+__all__ = [
+    "ExtendedPrivateReadOnlyProbe",
+    "PrivateReadOnlyProbePolicy",
+    "websocket_private_account_snapshot_probe",
+]
