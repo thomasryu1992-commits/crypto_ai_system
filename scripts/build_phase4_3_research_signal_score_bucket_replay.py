@@ -4,7 +4,10 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase4_3_research_signal_score_bucket_replay import persist_phase4_3_research_signal_score_bucket_replay_report
+# Historical command compatibility. Active implementation is semantic, not phase-bound.
+from crypto_ai_system.feedback.signal_score_replay import (
+    persist_phase4_3_research_signal_score_bucket_replay_report,
+)
 
 
 def main() -> None:

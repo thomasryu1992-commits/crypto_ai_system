@@ -4,7 +4,10 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase4_1_paper_outcome_sample_accumulation import persist_phase4_1_paper_outcome_sample_accumulation_report
+# Historical command compatibility. Active implementation is semantic, not phase-bound.
+from crypto_ai_system.feedback.paper_sample_accumulation import (
+    persist_phase4_1_paper_outcome_sample_accumulation_report,
+)
 
 
 def main() -> None:

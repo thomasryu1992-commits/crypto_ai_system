@@ -4,7 +4,10 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase4_4_candidate_profile_review_packet import persist_phase4_4_candidate_profile_review_packet_report
+# Historical command compatibility. Active implementation is semantic, not phase-bound.
+from crypto_ai_system.feedback.candidate_review import (
+    persist_phase4_4_candidate_profile_review_packet_report,
+)
 
 
 def main() -> None:

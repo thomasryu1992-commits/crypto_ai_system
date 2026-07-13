@@ -1,0 +1,44 @@
+{
+  "version": "phase5_lean_closure_v1",
+  "status": "PHASE5_LEAN_MERGE_CLOSED",
+  "active_domain": "governance.approval",
+  "runtime_authority": false,
+  "canonical_entry_point": "crypto_ai_system.governance.approval.run_approval_review_chain",
+  "canonical_modules": [
+    "src/crypto_ai_system/governance/common.py",
+    "src/crypto_ai_system/governance/approval.py",
+    "src/crypto_ai_system/governance/approval_intake.py",
+    "src/crypto_ai_system/governance/operator_handoff.py",
+    "src/crypto_ai_system/governance/approval_fixtures.py"
+  ],
+  "approval_states": [
+    "WAITING_FOR_HUMAN",
+    "SUBMITTED_REVIEW_ONLY",
+    "BLOCKED"
+  ],
+  "legacy_module_disposition": "THIN_COMPATIBILITY_WRAPPER_UNTIL_GLOBAL_ARCHIVE",
+  "legacy_script_disposition": "SEMANTIC_IMPORT_COMPATIBILITY_WRAPPER_UNTIL_GLOBAL_ARCHIVE",
+  "historical_report_disposition": "SUMMARIZED_NOW_ARCHIVE_AT_GLOBAL_COMPACTION",
+  "next_work": "PHASE6_READINESS_MERGE",
+  "safety": {
+    "runtime_permission_source": false,
+    "approval_intake_validated": false,
+    "approval_packet_created": false,
+    "runtime_settings_mutated": false,
+    "score_weights_mutated": false,
+    "candidate_profile_applied": false,
+    "settings_write_preview_applied": false,
+    "auto_promotion_allowed": false,
+    "signed_testnet_unlock_allowed": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "signed_testnet_promotion_allowed": false,
+    "live_canary_execution_enabled": false,
+    "live_scaled_execution_enabled": false,
+    "external_order_submission_allowed": false,
+    "external_order_submission_performed": false,
+    "place_order_enabled": false,
+    "cancel_order_enabled": false,
+    "signed_order_executor_enabled": false
+  }
+}

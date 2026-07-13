@@ -38,21 +38,9 @@ from crypto_ai_system.feedback.candidate_profile_registry import run_candidate_p
 from crypto_ai_system.registry.prompt_profile_library import run_prompt_profile_library_latest
 from crypto_ai_system.registry.approval_registry import run_approval_registry_latest
 from crypto_ai_system.reports.settings_write_preview_guard import run_settings_write_preview_guard_latest
-from crypto_ai_system.validation.phase4_outcome_candidate_feedback import persist_phase4_outcome_candidate_feedback_report
-from crypto_ai_system.validation.phase4_1_paper_outcome_sample_accumulation import persist_phase4_1_paper_outcome_sample_accumulation_report
-from crypto_ai_system.validation.phase4_2_signal_drift_candidate_readiness import persist_phase4_2_signal_drift_candidate_readiness_report
-from crypto_ai_system.validation.phase4_3_research_signal_score_bucket_replay import persist_phase4_3_research_signal_score_bucket_replay_report
-from crypto_ai_system.validation.phase4_4_candidate_profile_review_packet import persist_phase4_4_candidate_profile_review_packet_report
-from crypto_ai_system.validation.phase5_manual_approval_intake_validation import persist_phase5_manual_approval_intake_validation_report
-from crypto_ai_system.validation.phase5_1_manual_approval_operator_handoff import persist_phase5_1_manual_approval_operator_handoff_report
-from crypto_ai_system.validation.phase5_2_manual_approval_submission_fixture_validator import persist_phase5_2_manual_approval_submission_fixture_validator_report
-from crypto_ai_system.validation.phase6_signed_testnet_preparation_preview import persist_phase6_signed_testnet_preparation_preview_report
-from crypto_ai_system.validation.phase6_1_signed_testnet_operator_unlock_request_template import persist_phase6_1_signed_testnet_operator_unlock_request_template_report
-from crypto_ai_system.validation.phase6_2_operator_unlock_request_fixture_validator import persist_phase6_2_operator_unlock_request_fixture_validator_report
-from crypto_ai_system.validation.phase6_3_signed_testnet_readiness_gate_review import persist_phase6_3_signed_testnet_readiness_gate_review_report
-from crypto_ai_system.validation.phase6_4_signed_testnet_readiness_review_packet import persist_phase6_4_signed_testnet_readiness_review_packet_report
-from crypto_ai_system.validation.phase6_5_actual_manual_approval_operator_unlock_intake_sandbox import persist_phase6_5_actual_manual_approval_operator_unlock_intake_sandbox_report
-from crypto_ai_system.validation.phase6_6_actual_intake_validation_bridge import persist_phase6_6_actual_intake_validation_bridge_report
+from crypto_ai_system.feedback.review import run_feedback_review_chain
+from crypto_ai_system.governance.approval import run_approval_review_chain
+from crypto_ai_system.governance.readiness import run_readiness_review_chain
 from crypto_ai_system.validation.phase7_signed_testnet_validation_design_guard import persist_phase7_signed_testnet_validation_design_guard_report
 from crypto_ai_system.validation.phase7_1_signed_testnet_pre_submit_payload_guard import persist_phase7_1_signed_testnet_pre_submit_payload_guard_report
 from crypto_ai_system.validation.review_chain_state_doctor import persist_phase7_1_review_chain_state_doctor_report
@@ -142,21 +130,30 @@ def run_full_cycle() -> dict:
     prompt_profile_library = run_prompt_profile_library_latest()
     approval_registry = run_approval_registry_latest()
     settings_write_preview = run_settings_write_preview_guard_latest()
-    phase4_1_paper_outcome_sample_accumulation = persist_phase4_1_paper_outcome_sample_accumulation_report()
-    phase4_outcome_candidate_feedback = persist_phase4_outcome_candidate_feedback_report()
-    phase4_2_signal_drift_candidate_readiness = persist_phase4_2_signal_drift_candidate_readiness_report()
-    phase4_3_research_signal_score_bucket_replay = persist_phase4_3_research_signal_score_bucket_replay_report()
-    phase4_4_candidate_profile_review_packet = persist_phase4_4_candidate_profile_review_packet_report()
-    phase5_manual_approval_intake_validation = persist_phase5_manual_approval_intake_validation_report()
-    phase5_1_manual_approval_operator_handoff = persist_phase5_1_manual_approval_operator_handoff_report()
-    phase5_2_manual_approval_submission_fixture_validator = persist_phase5_2_manual_approval_submission_fixture_validator_report()
-    phase6_signed_testnet_preparation_preview = persist_phase6_signed_testnet_preparation_preview_report()
-    phase6_1_signed_testnet_operator_unlock_request_template = persist_phase6_1_signed_testnet_operator_unlock_request_template_report()
-    phase6_2_operator_unlock_request_fixture_validator = persist_phase6_2_operator_unlock_request_fixture_validator_report()
-    phase6_3_signed_testnet_readiness_gate_review = persist_phase6_3_signed_testnet_readiness_gate_review_report()
-    phase6_4_signed_testnet_readiness_review_packet = persist_phase6_4_signed_testnet_readiness_review_packet_report()
-    phase6_5_actual_manual_approval_operator_unlock_intake_sandbox = persist_phase6_5_actual_manual_approval_operator_unlock_intake_sandbox_report()
-    phase6_6_actual_intake_validation_bridge = persist_phase6_6_actual_intake_validation_bridge_report()
+    feedback_review_bundle = run_feedback_review_chain()
+    feedback_review = feedback_review_bundle["report"]
+    feedback_legacy = feedback_review_bundle["legacy_outputs"]
+    phase4_1_paper_outcome_sample_accumulation = feedback_legacy["sample_accumulation"]
+    phase4_outcome_candidate_feedback = feedback_legacy["outcome_candidate_feedback"]
+    phase4_2_signal_drift_candidate_readiness = feedback_legacy["signal_drift_readiness"]
+    phase4_3_research_signal_score_bucket_replay = feedback_legacy["signal_score_replay"]
+    phase4_4_candidate_profile_review_packet = feedback_legacy["candidate_review_packet"]
+    approval_review_bundle = run_approval_review_chain()
+    approval_review = approval_review_bundle["report"]
+    approval_legacy = approval_review_bundle["legacy_outputs"]
+    phase5_manual_approval_intake_validation = approval_legacy["intake_validation"]
+    phase5_1_manual_approval_operator_handoff = approval_legacy["operator_handoff"]
+    phase5_2_manual_approval_submission_fixture_validator = approval_legacy["fixture_validation"]
+    readiness_review_bundle = run_readiness_review_chain()
+    readiness_review = readiness_review_bundle["report"]
+    readiness_legacy = readiness_review_bundle["legacy_outputs"]
+    phase6_signed_testnet_preparation_preview = readiness_legacy["preparation_preview"]
+    phase6_1_signed_testnet_operator_unlock_request_template = readiness_legacy["operator_unlock_template"]
+    phase6_2_operator_unlock_request_fixture_validator = readiness_legacy["operator_unlock_fixtures"]
+    phase6_3_signed_testnet_readiness_gate_review = readiness_legacy["readiness_gate"]
+    phase6_4_signed_testnet_readiness_review_packet = readiness_legacy["readiness_packet"]
+    phase6_5_actual_manual_approval_operator_unlock_intake_sandbox = readiness_legacy["actual_intake_sandbox"]
+    phase6_6_actual_intake_validation_bridge = readiness_legacy["actual_intake_bridge"]
     phase7_signed_testnet_validation_design_guard = persist_phase7_signed_testnet_validation_design_guard_report()
     phase7_1_signed_testnet_pre_submit_payload_guard = persist_phase7_1_signed_testnet_pre_submit_payload_guard_report()
     phase7_1_1_review_chain_state_doctor = persist_phase7_1_review_chain_state_doctor_report()
@@ -252,14 +249,17 @@ def run_full_cycle() -> dict:
         "prompt_profile_library": prompt_profile_library,
         "approval_registry": approval_registry,
         "settings_write_preview": settings_write_preview,
+        "feedback_review": feedback_review,
         "phase4_outcome_candidate_feedback": phase4_outcome_candidate_feedback,
         "phase4_1_paper_outcome_sample_accumulation": phase4_1_paper_outcome_sample_accumulation,
         "phase4_2_signal_drift_candidate_readiness": phase4_2_signal_drift_candidate_readiness,
         "phase4_3_research_signal_score_bucket_replay": phase4_3_research_signal_score_bucket_replay,
         "phase4_4_candidate_profile_review_packet": phase4_4_candidate_profile_review_packet,
+        "approval_review": approval_review,
         "phase5_manual_approval_intake_validation": phase5_manual_approval_intake_validation,
         "phase5_1_manual_approval_operator_handoff": phase5_1_manual_approval_operator_handoff,
         "phase5_2_manual_approval_submission_fixture_validator": phase5_2_manual_approval_submission_fixture_validator,
+        "readiness_review": readiness_review,
         "phase6_signed_testnet_preparation_preview": phase6_signed_testnet_preparation_preview,
         "phase6_1_signed_testnet_operator_unlock_request_template": phase6_1_signed_testnet_operator_unlock_request_template,
         "phase6_2_operator_unlock_request_fixture_validator": phase6_2_operator_unlock_request_fixture_validator,

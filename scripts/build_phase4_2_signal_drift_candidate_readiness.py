@@ -4,7 +4,10 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase4_2_signal_drift_candidate_readiness import persist_phase4_2_signal_drift_candidate_readiness_report
+# Historical command compatibility. Active implementation is semantic, not phase-bound.
+from crypto_ai_system.feedback.signal_drift_readiness import (
+    persist_phase4_2_signal_drift_candidate_readiness_report,
+)
 
 
 def main() -> None:

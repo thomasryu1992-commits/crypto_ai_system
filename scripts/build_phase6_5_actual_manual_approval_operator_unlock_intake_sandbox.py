@@ -4,7 +4,7 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase6_5_actual_manual_approval_operator_unlock_intake_sandbox import persist_phase6_5_actual_manual_approval_operator_unlock_intake_sandbox_report
+from crypto_ai_system.governance.actual_intake_sandbox import persist_phase6_5_actual_manual_approval_operator_unlock_intake_sandbox_report
 
 
 def main() -> None:

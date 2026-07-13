@@ -4,7 +4,7 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase6_1_signed_testnet_operator_unlock_request_template import persist_phase6_1_signed_testnet_operator_unlock_request_template_report
+from crypto_ai_system.governance.operator_unlock_template import persist_phase6_1_signed_testnet_operator_unlock_request_template_report
 
 
 def main() -> None:

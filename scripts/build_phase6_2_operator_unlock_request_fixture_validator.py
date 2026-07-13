@@ -4,7 +4,7 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase6_2_operator_unlock_request_fixture_validator import persist_phase6_2_operator_unlock_request_fixture_validator_report
+from crypto_ai_system.governance.operator_unlock_fixtures import persist_phase6_2_operator_unlock_request_fixture_validator_report
 
 
 def main() -> None:

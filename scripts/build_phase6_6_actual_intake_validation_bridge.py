@@ -4,7 +4,7 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase6_6_actual_intake_validation_bridge import persist_phase6_6_actual_intake_validation_bridge_report
+from crypto_ai_system.governance.actual_intake_bridge import persist_phase6_6_actual_intake_validation_bridge_report
 
 
 def main() -> None:

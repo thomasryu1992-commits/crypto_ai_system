@@ -1,0 +1,34 @@
+{
+  "version": "lean_migration_state_v1",
+  "status": "LEAN_REFACTOR_IN_PROGRESS",
+  "completed": {
+    "phase4_feedback": {
+      "status": "CLOSED",
+      "closure_manifest": "config/lean/phase4_lean_closure.json",
+      "active_domain": "feedback"
+    },
+    "phase5_approval": {
+      "status": "CLOSED",
+      "closure_manifest": "config/lean/phase5_lean_closure.json",
+      "active_domain": "governance.approval"
+    },
+    "phase6_readiness": {
+      "status": "CLOSED",
+      "closure_manifest": "config/lean/phase6_lean_closure.json",
+      "active_domain": "governance.readiness"
+    }
+  },
+  "current": {
+    "target": "PHASE7_EXECUTOR_REVIEW_MERGE",
+    "active_domain": "governance.executor_review",
+    "status": "NOT_STARTED"
+  },
+  "deferred_global_compaction": [
+    "archive historical Phase 4-7 reports",
+    "remove compatibility wrappers after import usage reaches zero",
+    "remove historical build-script filenames after CI migration",
+    "delete obsolete phase-number status checker contracts",
+    "rebuild lean CI"
+  ],
+  "execution_permissions_changed": false
+}

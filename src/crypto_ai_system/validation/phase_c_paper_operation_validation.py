@@ -15,15 +15,15 @@ from crypto_ai_system.validation.paper_strategy_validation import (
     STATUS_PAPER_STRATEGY_VALIDATION_RECORDED_REVIEW_ONLY,
     persist_paper_strategy_validation_report,
 )
-from crypto_ai_system.validation.phase4_1_paper_outcome_sample_accumulation import (
+from crypto_ai_system.feedback.paper_sample_accumulation import (
     STATUS_RECORDED_REVIEW_ONLY as STATUS_PHASE4_1_RECORDED_REVIEW_ONLY,
     persist_phase4_1_paper_outcome_sample_accumulation_report,
 )
-from crypto_ai_system.validation.phase4_3_research_signal_score_bucket_replay import (
+from crypto_ai_system.feedback.signal_score_replay import (
     STATUS_RECORDED_REVIEW_ONLY as STATUS_PHASE4_3_RECORDED_REVIEW_ONLY,
     persist_phase4_3_research_signal_score_bucket_replay_report,
 )
-from crypto_ai_system.validation.phase4_4_candidate_profile_review_packet import (
+from crypto_ai_system.feedback.candidate_review import (
     STATUS_RECORDED_REVIEW_ONLY as STATUS_PHASE4_4_RECORDED_REVIEW_ONLY,
     persist_phase4_4_candidate_profile_review_packet_report,
 )

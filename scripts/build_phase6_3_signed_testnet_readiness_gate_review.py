@@ -4,7 +4,7 @@ from scripts.common import bootstrap
 
 bootstrap()
 
-from crypto_ai_system.validation.phase6_3_signed_testnet_readiness_gate_review import persist_phase6_3_signed_testnet_readiness_gate_review_report
+from crypto_ai_system.governance.readiness_gate import persist_phase6_3_signed_testnet_readiness_gate_review_report
 
 
 def main() -> None:
