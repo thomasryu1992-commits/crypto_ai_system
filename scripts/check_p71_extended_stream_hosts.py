@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from typing import Any
 
@@ -101,6 +102,54 @@ def check_public_v2_rpc(url: str) -> dict[str, Any]:
     return result
 
 
+async def _check_public_official_sdk_orderbook_async() -> dict[str, Any]:
+    try:
+        from x10.clients.stream.stream_client import StreamClient
+        from x10.config import TESTNET_CONFIG
+    except Exception as exc:
+        return {
+            "mode": "public_official_sdk_orderbook",
+            "host": None,
+            "ok": False,
+            "sdk_imported": False,
+            **_error_summary(exc),
+        }
+
+    stream_url = str(TESTNET_CONFIG.endpoints.stream_url)
+    result: dict[str, Any] = {
+        "mode": "public_official_sdk_orderbook",
+        "host": _host(stream_url),
+        "ok": False,
+        "sdk_imported": True,
+        "sdk_stream_url": stream_url,
+    }
+    try:
+        client = StreamClient(api_url=stream_url, close_timeout=2)
+        async with client.subscribe_to_orderbooks("BTC-USD", depth=1) as stream:
+            message = await asyncio.wait_for(stream.recv(), timeout=15)
+            payload = message.model_dump() if hasattr(message, "model_dump") else dict(message)
+            data = payload.get("data") if isinstance(payload, dict) else {}
+            if not isinstance(data, dict):
+                data = {}
+            result.update(
+                {
+                    "ok": True,
+                    "message_type": payload.get("type"),
+                    "seq": payload.get("seq"),
+                    "market": data.get("m") or data.get("market"),
+                    "has_best_bid": bool(data.get("b")),
+                    "has_best_ask": bool(data.get("a")),
+                }
+            )
+    except Exception as exc:
+        result.update(_error_summary(exc))
+    return result
+
+
+def check_public_official_sdk_orderbook() -> dict[str, Any]:
+    return asyncio.run(_check_public_official_sdk_orderbook_async())
+
+
 def check_private_v1(url: str, api_key: str) -> dict[str, Any]:
     result: dict[str, Any] = {"mode": "private_v1_account", "host": _host(url), "ok": False}
     try:
@@ -139,6 +188,7 @@ def main() -> int:
     results: list[dict[str, Any]] = []
     results.extend(check_public_v1(url) for url in PUBLIC_V1_URLS)
     results.extend(check_public_v2_rpc(url) for url in PUBLIC_V2_RPC_URLS)
+    results.append(check_public_official_sdk_orderbook())
 
     if args.credential_target:
         from external_runtime_packages.extended_read_only_probe.windows_credential_provider import (

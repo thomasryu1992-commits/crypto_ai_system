@@ -90,6 +90,7 @@ For host/path diagnosis, run:
 ```powershell
 python scripts/check_p71_extended_stream_hosts.py
 python scripts/check_p71_extended_stream_hosts.py --credential-target p71_extended_read_only
+python scripts/probe_p71_official_sdk_stream.py
 ```
 
 The checker is redacted and read-only. It distinguishes:
@@ -97,6 +98,7 @@ The checker is redacted and read-only. It distinguishes:
 - pinned v1 path stream returning HTTP 502/503
 - documented non-api testnet host returning HTTP 403
 - SDK v2 RPC candidate returning HTTP 404
+- installed official SDK public orderbook stream returning HTTP 503
 
 If all WebSocket candidates are blocked before the first snapshot, do not treat
 the failure as missing local evidence. Keep P71 blocked and rerun after the

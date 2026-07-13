@@ -62,11 +62,18 @@ jobs:
           python scripts/generate_agent_index.py
           python scripts/build_agent_library_contract_review.py
 
+      - name: Baseline prerequisite review-only evidence
+        run: |
+          set -euo pipefail
+          python scripts/build_valid_price_lineage_artifacts.py
+          python scripts/build_review_only_export_packet.py
+          python scripts/build_canary_outcome_report.py
+          python scripts/build_live_scaled_readiness_gate.py
+
       - name: Phase 1-6 review-only evidence chain
         run: |
           set -euo pipefail
           python scripts/build_baseline_integrity_freeze.py
-          python scripts/build_valid_price_lineage_artifacts.py
           python scripts/build_paper_data_quality_gate.py
           python scripts/build_paper_strategy_validation.py
           python scripts/build_phase4_outcome_candidate_feedback.py
