@@ -8,6 +8,9 @@ jobs:
   p71-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PYTHONPATH: src:.
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +34,9 @@ jobs:
 
   validate:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src:.
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,12 +68,24 @@ jobs:
           python scripts/generate_agent_index.py
           python scripts/build_agent_library_contract_review.py
 
-      - name: Baseline prerequisite review-only evidence
+      - name: Baseline prerequisite price lineage evidence
         run: |
           set -euo pipefail
           python scripts/build_valid_price_lineage_artifacts.py
+
+      - name: Baseline prerequisite export packet evidence
+        run: |
+          set -euo pipefail
           python scripts/build_review_only_export_packet.py
+
+      - name: Baseline prerequisite canary outcome evidence
+        run: |
+          set -euo pipefail
           python scripts/build_canary_outcome_report.py
+
+      - name: Baseline prerequisite live scaled readiness evidence
+        run: |
+          set -euo pipefail
           python scripts/build_live_scaled_readiness_gate.py
 
       - name: Phase 1-6 review-only evidence chain
