@@ -5,13 +5,7 @@ from typing import Any, Mapping
 
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import AppConfig, load_config
-from crypto_ai_system.execution.runtime_disabled_flags import (
-    default_execution_flag_state,
-    truthy_execution_flags,
-)
-from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
-from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
-from external_runtime_packages.binance_futures_testnet_adapter import (
+from crypto_ai_system.execution.external_adapter_review_contracts import (
     P62EvidenceExportPolicy,
     P62OperatorExecutionActivation,
     P62OperatorExecutionKitManifest,
@@ -22,6 +16,12 @@ from external_runtime_packages.binance_futures_testnet_adapter import (
     build_p62_no_network_self_test,
     build_p62_operator_execution_kit_package_report,
 )
+from crypto_ai_system.execution.runtime_disabled_flags import (
+    default_execution_flag_state,
+    truthy_execution_flags,
+)
+from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
+from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 P62_OPERATOR_SIDE_EXTERNAL_ORDER_TEST_EXECUTION_KIT_VERSION = (
     "p62_operator_side_external_order_test_execution_kit_v1"

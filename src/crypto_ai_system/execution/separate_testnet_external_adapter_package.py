@@ -5,22 +5,20 @@ from typing import Any, Mapping
 
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import AppConfig, load_config
-from crypto_ai_system.execution.runtime_disabled_flags import default_execution_flag_state, truthy_execution_flags
-from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
-from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
-from external_runtime_packages.binance_futures_testnet_adapter import (
+from crypto_ai_system.execution.external_adapter_review_contracts import (
     STATUS_PACKAGE_VALIDATED_ADAPTER_DISABLED,
+    BinanceFuturesTestnetEndpointPolicy,
+    DisabledExternalAdapterRunnerConfig,
     ExternalAdapterPackageManifest,
+    MetadataOnlyKeyBinding,
     build_p59_adapter_package_report,
     build_p59_negative_fixture_results,
     build_p59_no_network_package_self_test,
     calculate_package_source_sha256,
 )
-from external_runtime_packages.binance_futures_testnet_adapter.adapter_package import (
-    BinanceFuturesTestnetEndpointPolicy,
-    DisabledExternalAdapterRunnerConfig,
-    MetadataOnlyKeyBinding,
-)
+from crypto_ai_system.execution.runtime_disabled_flags import default_execution_flag_state, truthy_execution_flags
+from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
+from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 P59_SEPARATE_TESTNET_EXTERNAL_ADAPTER_PACKAGE_VERSION = "p59_separate_testnet_external_adapter_package_v1"
 P59_REGISTRY_NAME = "p59_separate_testnet_external_adapter_package_registry"

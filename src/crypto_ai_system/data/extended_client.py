@@ -53,10 +53,7 @@ class ExtendedClient:
         )
 
     def _headers(self) -> Dict[str, str]:
-        headers = {'User-Agent': self.user_agent}
-        if self.api_key:
-            headers['X-Api-Key'] = self.api_key
-        return headers
+        return {'User-Agent': self.user_agent}
 
     def _get(self, path: str, params: Dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"

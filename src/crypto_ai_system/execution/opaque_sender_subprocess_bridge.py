@@ -5,13 +5,7 @@ from typing import Any, Mapping
 
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import AppConfig, load_config
-from crypto_ai_system.execution.runtime_disabled_flags import (
-    default_execution_flag_state,
-    truthy_execution_flags,
-)
-from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
-from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
-from external_runtime_packages.binance_futures_testnet_adapter import (
+from crypto_ai_system.execution.external_adapter_review_contracts import (
     P64SubprocessBridgeActivation,
     P64SubprocessBridgePackageManifest,
     P64SubprocessBridgePolicy,
@@ -22,6 +16,12 @@ from external_runtime_packages.binance_futures_testnet_adapter import (
     build_p64_no_network_subprocess_bridge_self_test,
     build_p64_subprocess_bridge_package_report,
 )
+from crypto_ai_system.execution.runtime_disabled_flags import (
+    default_execution_flag_state,
+    truthy_execution_flags,
+)
+from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
+from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 P64_OPAQUE_SENDER_SUBPROCESS_BRIDGE_INTEGRATION_VERSION = (
     "p64_opaque_sender_subprocess_bridge_integration_v1"

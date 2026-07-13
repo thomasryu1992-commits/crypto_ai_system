@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from core.json_io import atomic_write_json
-from external_runtime_packages.binance_futures_testnet_adapter import (
+from crypto_ai_system.execution.external_adapter_review_contracts import (
     STATUS_P65_VALIDATED_DISABLED,
     build_p65_negative_fixture_results,
     build_p65_operator_installed_sender_executable_report,
