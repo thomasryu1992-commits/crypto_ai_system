@@ -168,6 +168,29 @@ def export_spreadsheet_schema_v3() -> dict:
     return SpreadsheetWriter().batch_append(rows)
 
 
+def export_latest_results_to_csv() -> dict:
+    """Compatibility wrapper that exports schema v3 rows to local CSV backup."""
+    result = export_spreadsheet_schema_v3()
+    return {
+        "created_at": result.get("created_at"),
+        "status": "EXPORTED_LOCAL_CSV",
+        "base_status": result.get("status"),
+        "rows": result.get("rows", 0),
+        "local_backup_paths": result.get("local_backup_paths", []),
+    }
+
+
+def export_latest_results() -> dict:
+    """Compatibility wrapper for older tests and runners."""
+    local_csv = export_latest_results_to_csv()
+    return {
+        "created_at": local_csv.get("created_at"),
+        "status": "EXPORTED",
+        "local_csv": local_csv,
+        "google_sheets": {"status": "SKIPPED_OR_QUEUED_BY_CONFIG"},
+    }
+
+
 def main() -> None:
     result = export_spreadsheet_schema_v3()
     print(f"Spreadsheet export: {result['status']} rows={result['rows']}")

@@ -1,0 +1,2 @@
+timestamp,symbol,open,high,low,close,volume,sample_flag
+2026-01-01T00:00:00Z,BTC,100000,101000,99000,100500,123.45,true

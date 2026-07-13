@@ -1,0 +1,35 @@
+{
+  "artifacts": {
+    "candidate_yaml": "data/reports/step267_settings_write_preview_candidate_settings.yaml",
+    "diff": "data/reports/step267_settings_write_preview.diff",
+    "latest": "storage/latest/step267_researchsignal_profile_disabled_settings_write_preview_latest.json",
+    "report": "data/reports/step267_researchsignal_profile_disabled_settings_write_preview_report.json"
+  },
+  "compileall": "passed",
+  "focused_regression": "5 passed",
+  "operational_runner_smoke": {
+    "run_full_cycle.py": "passed",
+    "run_operational_dry_run.py": "passed",
+    "run_stable_pipeline.py": "passed"
+  },
+  "project_version": "step267_disabled_settings_write_preview_export",
+  "safety": {
+    "config_mutated": false,
+    "external_order_submission_performed": false,
+    "live_trading_allowed": false,
+    "missing_canonical_module_count": 2,
+    "order_routing_enabled": false,
+    "real_telegram_send_allowed": false,
+    "root_package_deletion_deferred": true,
+    "runtime_score_weights_mutated": false,
+    "settings_file_written": false,
+    "settings_score_weights_mutated": false
+  },
+  "status": "validated",
+  "step": 267,
+  "step240_to_244_regression": "11 passed",
+  "step245_to_251_regression": "19 passed",
+  "step252_to_257_regression": "24 passed",
+  "step258_to_267_regression": "52 passed",
+  "version": "step267_researchsignal_profile_disabled_settings_write_preview_export_v1"
+}

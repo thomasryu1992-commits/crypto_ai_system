@@ -10,7 +10,9 @@ except Exception:
     def load_dotenv(*args: Any, **kwargs: Any) -> bool:
         return False
 
-load_dotenv()
+# Dotenv loading is explicit; importing this module must not mutate process state.
+def load_project_dotenv(path: str | Path | None = None) -> bool:
+    return load_dotenv(path) if path is not None else load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STORAGE_DIR = PROJECT_ROOT / os.getenv("STORAGE_DIR", "storage")
@@ -22,8 +24,13 @@ DATA_DIR = PROJECT_ROOT / os.getenv("DATA_DIR", "data")
 REPORTS_DIR = PROJECT_ROOT / os.getenv("REPORTS_DIR", "reports")
 SECRETS_DIR = PROJECT_ROOT / os.getenv("SECRETS_DIR", "secrets")
 
-for _d in [STORAGE_DIR, LATEST_DIR, BACKUP_DIR, QUEUE_DIR, LOGS_DIR, DATA_DIR, REPORTS_DIR, SECRETS_DIR]:
-    _d.mkdir(parents=True, exist_ok=True)
+RUNTIME_DIRECTORIES = [STORAGE_DIR, LATEST_DIR, BACKUP_DIR, QUEUE_DIR, LOGS_DIR, DATA_DIR, REPORTS_DIR, SECRETS_DIR]
+
+def ensure_runtime_directories() -> list[Path]:
+    """Create runtime directories explicitly from runner/bootstrap code, not at import time."""
+    for directory in RUNTIME_DIRECTORIES:
+        directory.mkdir(parents=True, exist_ok=True)
+    return list(RUNTIME_DIRECTORIES)
 
 
 def _first_env(names: list[str], default: str = "") -> str:
@@ -72,14 +79,14 @@ TRADING_MODE = env_str("TRADING_MODE", "paper").lower()
 DRY_RUN = env_bool("DRY_RUN", True)
 LOG_LEVEL = env_str("LOG_LEVEL", "INFO")
 
-SYMBOL = env_str(["SYMBOL", "DEFAULT_SYMBOL"], "BTCUSDT")
-TIMEFRAME = env_str(["TIMEFRAME", "DEFAULT_TIMEFRAME"], "1h")
-DEFAULT_EXCHANGE = env_str("DEFAULT_EXCHANGE", "binance")
+SYMBOL = env_str(["SYMBOL", "DEFAULT_SYMBOL", "DEFAULT_CANONICAL_SYMBOL"], "BTC-PERP")
+TIMEFRAME = env_str(["TIMEFRAME", "DEFAULT_TIMEFRAME"], "PT1H")
+DEFAULT_EXCHANGE = env_str("DEFAULT_EXCHANGE", "extended")
 
 # Data source
 COINALYZE_ENABLED = env_bool(["COINALYZE_ENABLED", "ENABLE_COINALYZE", "USE_COINALYZE"], False)
 COINALYZE_API_KEY = env_str("COINALYZE_API_KEY", "")
-BINANCE_MARKET_DATA_ENABLED = env_bool("BINANCE_MARKET_DATA_ENABLED", False)
+BINANCE_MARKET_DATA_ENABLED = env_bool("BINANCE_MARKET_DATA_ENABLED", False)  # legacy-only; Extended is default
 BINANCE_PUBLIC_BASE_URL = env_str("BINANCE_PUBLIC_BASE_URL", "https://api.binance.com")
 
 # Spreadsheet-first storage
@@ -107,6 +114,9 @@ BLOCK_FALLBACK_DATA_FOR_TRADING = env_bool("BLOCK_FALLBACK_DATA_FOR_TRADING", Tr
 # Paper/risk
 PAPER_ENGINE_ENABLED = env_bool("PAPER_ENGINE_ENABLED", True)
 PAPER_TRADING_ENABLED = env_bool("PAPER_TRADING_ENABLED", True)
+USE_RESEARCH_SIGNAL_GATE = env_bool("USE_RESEARCH_SIGNAL_GATE", True)
+RISK_LEVEL_REDUCED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_REDUCED_POSITION_MULTIPLIER", 0.5)
+RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER", 0.0)
 RISK_PER_TRADE = env_float("RISK_PER_TRADE", 0.01)
 MAX_OPEN_POSITIONS = env_int("MAX_OPEN_POSITIONS", 1)
 DAILY_MAX_LOSS_R = env_float(["DAILY_MAX_LOSS_R", "MAX_DAILY_LOSS_R"], -2.0)
@@ -121,6 +131,8 @@ MIN_STOP_LOSS_BPS = env_float("MIN_STOP_LOSS_BPS", 35.0)
 MAX_STOP_LOSS_BPS = env_float("MAX_STOP_LOSS_BPS", 250.0)
 POSITION_SIZE_ACCOUNT_EQUITY_USDT = env_float("POSITION_SIZE_ACCOUNT_EQUITY_USDT", 1000.0)
 MAX_POSITION_NOTIONAL_USDT = env_float("MAX_POSITION_NOTIONAL_USDT", 100.0)
+POSITION_SIZE_ACCOUNT_EQUITY_USDC = env_float("POSITION_SIZE_ACCOUNT_EQUITY_USDC", POSITION_SIZE_ACCOUNT_EQUITY_USDT)
+MAX_POSITION_NOTIONAL_USDC = env_float("MAX_POSITION_NOTIONAL_USDC", MAX_POSITION_NOTIONAL_USDT)
 
 # Live/testnet guard
 EXCHANGE_ORDER_ENABLED = env_bool("EXCHANGE_ORDER_ENABLED", False)
@@ -140,6 +152,18 @@ MAX_LIVE_POSITION_USDT = env_float("MAX_LIVE_POSITION_USDT", 20.0)
 MAX_ORDER_NOTIONAL_USDT = env_float("MAX_ORDER_NOTIONAL_USDT", 20.0)
 MAX_DAILY_LOSS_USDT = env_float("MAX_DAILY_LOSS_USDT", 10.0)
 MAX_WEEKLY_LOSS_USDT = env_float("MAX_WEEKLY_LOSS_USDT", 30.0)
+MAX_LIVE_POSITION_USDC = env_float("MAX_LIVE_POSITION_USDC", MAX_LIVE_POSITION_USDT)
+MAX_ORDER_NOTIONAL_USDC = env_float("MAX_ORDER_NOTIONAL_USDC", MAX_ORDER_NOTIONAL_USDT)
+MAX_DAILY_LOSS_USDC = env_float("MAX_DAILY_LOSS_USDC", MAX_DAILY_LOSS_USDT)
+MAX_WEEKLY_LOSS_USDC = env_float("MAX_WEEKLY_LOSS_USDC", MAX_WEEKLY_LOSS_USDT)
+TESTNET_SIGNED_ORDER_ENABLED = env_bool("TESTNET_SIGNED_ORDER_ENABLED", False)
+SIGNED_TESTNET_ADAPTER_CONTRACT_ENABLED = env_bool("SIGNED_TESTNET_ADAPTER_CONTRACT_ENABLED", False)
+SIGNED_TESTNET_PLACE_ORDER_ENABLED = env_bool("SIGNED_TESTNET_PLACE_ORDER_ENABLED", False)
+SIGNED_TESTNET_MANUAL_APPROVAL_REQUIRED = env_bool("SIGNED_TESTNET_MANUAL_APPROVAL_REQUIRED", True)
+SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE = env_bool("SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE", True)
+SIGNED_TESTNET_LIVE_KEY_ALLOWED = env_bool("SIGNED_TESTNET_LIVE_KEY_ALLOWED", False)
+SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT = env_float("SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT", 5.0)
+SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT = env_int("SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT", 3)
 MAX_LIVE_TRADES_PER_DAY = env_int("MAX_LIVE_TRADES_PER_DAY", 3)
 
 LIVE_SHADOW_MODE = env_bool("LIVE_SHADOW_MODE", True)
@@ -152,6 +176,7 @@ MARKET_DATA_PATH = LATEST_DIR / "coinalyze_market_data.json"
 MARKET_SNAPSHOT_PATH = LATEST_DIR / "market_snapshot.json"
 MARKET_CONTEXT_PATH = LATEST_DIR / "market_context.json"
 RESEARCH_RESULT_PATH = LATEST_DIR / "research_cycle_result.json"
+RESEARCH_SIGNAL_PATH = LATEST_DIR / "research_signal.json"
 RESEARCH_DECISION_PATH = LATEST_DIR / "research_decision_result.json"
 TRADING_CYCLE_PATH = LATEST_DIR / "trading_cycle_result.json"
 PAPER_STATE_PATH = LATEST_DIR / "paper_state.json"
@@ -165,6 +190,9 @@ LIVE_READINESS_PATH = LATEST_DIR / "live_readiness_check.json"
 LIVE_SHADOW_REPORT_PATH = LATEST_DIR / "live_shadow_report.json"
 LIMITED_LIVE_READINESS_REPORT_PATH = LATEST_DIR / "limited_live_readiness_report.json"
 SCHEDULER_HEALTH_PATH = LATEST_DIR / "scheduler_health_result.json"
+PERMISSION_GATE_AUDIT_PATH = LOGS_DIR / "permission_gate_audit.jsonl"
+LATEST_PERMISSION_GATE_AUDIT_PATH = LATEST_DIR / "permission_gate_audit_latest.json"
+PAPER_RISK_LEVEL_REPORT_PATH = LATEST_DIR / "paper_risk_level_report.json"
 
 # History / backup / queue
 EVENT_LOG_PATH = LOGS_DIR / "event_log.jsonl"
@@ -179,6 +207,71 @@ FORWARD_TEST_SUMMARY_PATH = LATEST_DIR / "forward_test_summary.json"
 TESTNET_ORDER_LOG_PATH = LOGS_DIR / "testnet_order_log.jsonl"
 STEP150_VALIDATION_PATH = LATEST_DIR / "step150_validation_result.json"
 
-if LIVE_TRADING_ENABLED and TRADING_MODE == "live":
-    if LIVE_TRADING_CONFIRMATION != LIVE_TRADING_CONFIRMATION_PHRASE:
-        raise RuntimeError("LIVE_TRADING_CONFIRMATION mismatch. Real live trading remains blocked.")
+
+
+class RuntimeSettings:
+    """Backward-compatible settings object for legacy modules."""
+
+    # Core paths
+    project_root = PROJECT_ROOT
+    storage_dir = STORAGE_DIR
+    latest_dir = LATEST_DIR
+    backup_dir = BACKUP_DIR
+    queue_dir = QUEUE_DIR
+    logs_dir = LOGS_DIR
+    data_dir = DATA_DIR
+    reports_dir = REPORTS_DIR
+    secrets_dir = SECRETS_DIR
+
+    # App/runtime
+    app_env = APP_ENV
+    timezone = TIMEZONE
+    report_timezone = REPORT_TIMEZONE
+    trading_mode = TRADING_MODE
+    dry_run = DRY_RUN
+    log_level = LOG_LEVEL
+    symbol = SYMBOL
+    timeframe = TIMEFRAME
+    default_exchange = DEFAULT_EXCHANGE
+
+    # Telegram
+    telegram_enabled = TELEGRAM_ENABLED
+    telegram_bot_token = TELEGRAM_BOT_TOKEN
+    telegram_chat_id = TELEGRAM_CHAT_ID
+
+    # Spreadsheet
+    spreadsheet_enabled = SPREADSHEET_ENABLED
+    spreadsheet_provider = SPREADSHEET_PROVIDER
+    spreadsheet_id = SPREADSHEET_ID
+    google_service_account_file = GOOGLE_SERVICE_ACCOUNT_FILE
+    google_service_account_json = GOOGLE_SERVICE_ACCOUNT_JSON
+
+    # Data sources
+    coinalyze_enabled = COINALYZE_ENABLED
+    coinalyze_api_key = COINALYZE_API_KEY
+    binance_market_data_enabled = BINANCE_MARKET_DATA_ENABLED
+
+    # Risk / execution safety
+    paper_engine_enabled = PAPER_ENGINE_ENABLED
+    paper_trading_enabled = PAPER_TRADING_ENABLED
+    risk_per_trade = RISK_PER_TRADE
+    max_open_positions = MAX_OPEN_POSITIONS
+    live_trading_enabled = LIVE_TRADING_ENABLED
+    enable_real_orders = ENABLE_REAL_ORDERS
+    testnet_signed_order_enabled = TESTNET_SIGNED_ORDER_ENABLED
+    signed_testnet_adapter_contract_enabled = SIGNED_TESTNET_ADAPTER_CONTRACT_ENABLED
+    signed_testnet_place_order_enabled = SIGNED_TESTNET_PLACE_ORDER_ENABLED
+    signed_testnet_manual_approval_required = SIGNED_TESTNET_MANUAL_APPROVAL_REQUIRED
+    signed_testnet_require_testnet_key_scope = SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE
+    signed_testnet_live_key_allowed = SIGNED_TESTNET_LIVE_KEY_ALLOWED
+    signed_testnet_max_order_notional_usdt = SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT
+    signed_testnet_max_daily_order_count = SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT
+
+
+settings = RuntimeSettings()
+
+def validate_live_trading_confirmation() -> None:
+    """Validate live-trading confirmation explicitly at runtime, not during import."""
+    if LIVE_TRADING_ENABLED and TRADING_MODE == "live":
+        if LIVE_TRADING_CONFIRMATION != LIVE_TRADING_CONFIRMATION_PHRASE:
+            raise RuntimeError("LIVE_TRADING_CONFIRMATION mismatch. Real live trading remains blocked.")

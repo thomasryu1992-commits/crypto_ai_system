@@ -1,0 +1,28 @@
+services:
+  crypto_ai_system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: thomas-agent-os/crypto-ai-system:0.286.0-agent.2
+    profiles: ["manual"]
+    environment:
+      PYTHONPATH: /app/crypto_ai_system/src:/app/crypto_ai_system
+      CRYPTO_AI_SYSTEM_CONTAINER_MODE: local_launcher
+    volumes:
+      - ./data/reports:/app/crypto_ai_system/data/reports
+      - ./storage:/app/crypto_ai_system/storage
+    command: ["--command", "daily", "--dry-run"]
+
+  crypto_ai_system_self_test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: thomas-agent-os/crypto-ai-system:0.286.0-agent.2
+    profiles: ["self-test"]
+    environment:
+      PYTHONPATH: /app/crypto_ai_system/src:/app/crypto_ai_system
+      CRYPTO_AI_SYSTEM_CONTAINER_MODE: local_launcher
+    volumes:
+      - ./data/reports:/app/crypto_ai_system/data/reports
+      - ./storage:/app/crypto_ai_system/storage
+    entrypoint: ["python", "scripts/self_test.py"]

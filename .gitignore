@@ -3,12 +3,23 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+.agents/
+.review/
 secrets/*
 !secrets/.gitkeep
-storage/*.json
-storage/*.csv
-storage/logs/*
+storage/**
 !storage/.gitkeep
-!storage/logs/.gitkeep
 reports/*.json
 reports/*.csv
+
+# Step238 generated/runtime artifacts
+.pytest_cache/
+__pycache__/
+*.pyc
+data/reports/
+data/stores/
+storage/latest/
+storage/logs/
+storage/tmp/
+dist/
+*.log

@@ -1,0 +1,52 @@
+{
+  "step": 266,
+  "status": "completed",
+  "scope": "researchsignal_v2_profile_final_manual_apply_approval_validator_disabled_apply_and_readme_update",
+  "focused_tests": {
+    "step266": "5 passed",
+    "step265_step266": "10 passed",
+    "step258_step266": "47 passed",
+    "step252_step266": "71 passed"
+  },
+  "regression_tests": {
+    "step240_step244": "11 passed",
+    "step245_step248": "10 passed",
+    "step249_step251": "9 passed",
+    "step209_step219": "37 passed",
+    "step220_step237": "54 passed",
+    "step130_step164": "37 passed"
+  },
+  "compile_validation": "passed",
+  "plain_checkout_disabled_execution_import": "passed",
+  "readme_updated_through_step": 266,
+  "default_report": {
+    "record_status": "more_data_requested",
+    "production_candidate_profile": null,
+    "candidate_profile_applied": false,
+    "runtime_score_weights_unchanged": true,
+    "application_stub_status": "DISABLED_STUB",
+    "external_order_submission_performed": false
+  },
+  "safety_boundaries": {
+    "auto_apply_approved_profile": false,
+    "runtime_score_weight_write_enabled": false,
+    "settings_score_weight_write_enabled": false,
+    "apply_approved_profile_enabled": false,
+    "candidate_profile_applied": false,
+    "runtime_score_weights_mutated": false,
+    "settings_score_weights_mutated": false,
+    "config_mutated": false,
+    "live_trading_allowed": false,
+    "order_routing_enabled": false,
+    "external_order_submission_performed": false,
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "root_package_deletion_performed": false,
+    "root_package_deletion_deferred": true,
+    "missing_canonical_module_count": 2
+  },
+  "next_step": {
+    "step": 267,
+    "goal": "disabled settings-write preview/export packet for approved dry-run path while keeping score_weights mutation blocked"
+  }
+}

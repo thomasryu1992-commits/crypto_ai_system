@@ -1,0 +1,865 @@
+project:
+  name: crypto_ai_system
+  version: step286_researchsignal_feature_lineage_fix
+safety:
+  live_trading_enabled: false
+  testnet_signed_order_enabled: false
+execution:
+  testnet_secret_intake:
+    enabled: false
+    metadata_only: true
+    api_key_value_allowed: false
+    api_secret_value_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    require_testnet_key_fingerprint_sha256: true
+    block_known_live_key_fingerprint: true
+    require_metadata_secret_reference: true
+  venue_capability_evidence:
+    enabled: false
+    evidence_artifact_required: true
+    balance_read_evidence_required: true
+    position_read_evidence_required: true
+    open_orders_read_evidence_required: true
+    orderbook_read_evidence_required: true
+    fee_estimate_evidence_required: true
+    slippage_estimate_evidence_required: true
+    min_order_size_evidence_required: true
+    place_order_probe_must_be_blocked: true
+    external_order_submission_allowed: false
+  signed_testnet_preflight_artifact:
+    enabled: false
+    persist_artifact: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_performed: false
+  signed_testnet_execution_readiness_packet:
+    enabled: false
+    review_only: true
+    require_step275_signed_testnet_gate_artifact: true
+    require_gate_artifact_hash: true
+    require_operator_signed_execution_readiness: true
+    require_testnet_execution_session_id: true
+    require_per_order_hard_cap: true
+    require_daily_hard_cap: true
+    require_manual_kill_switch_recheck: true
+    require_venue_evidence_freshness: true
+    venue_evidence_max_age_sec: 600
+    require_reconciliation_mismatch_zero: true
+    require_reconciliation_evidence_hash_valid: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    signed_order_executor_enabled: false
+  signed_testnet_gate:
+    enabled: false
+    review_only: true
+    require_step274_preflight_artifact: true
+    require_preflight_artifact_hash: true
+    require_testnet_key_metadata_intake_valid: true
+    require_venue_capability_evidence_valid: true
+    require_manual_signed_approval: true
+    require_risk_caps: true
+    max_order_notional_usdt: 5
+    max_daily_order_count: 3
+    max_daily_loss_usdt: 10
+    max_consecutive_losses: 2
+    manual_kill_switch_required: true
+    manual_kill_switch_active_blocks: true
+    reconciliation_mismatch_rate_must_be_zero: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    signed_order_executor_enabled: false
+  signed_testnet_adapter_contract:
+    enabled: false
+    contract_review_only: true
+    place_order_enabled: false
+    require_manual_signed_approval: true
+    require_testnet_only_key_scope: true
+    live_key_allowed: false
+    secret_metadata_only: true
+    api_key_access_allowed: false
+    secret_file_creation_allowed: false
+    max_order_notional_usdt: 5
+    max_daily_order_count: 3
+    min_order_size_check_required: true
+    fee_model_required: true
+    slippage_estimate_required: true
+    balance_read_required: true
+    position_read_required: true
+    open_orders_read_required: true
+    orderbook_read_required: true
+    manual_kill_switch_required: true
+  signed_testnet_probe_result_validator:
+    enabled: false
+    review_only: true
+    require_step278_read_only_venue_probe_session: true
+    require_probe_session_hash: true
+    require_probe_evidence_freshness: true
+    probe_evidence_max_age_sec: 600
+    require_all_read_probes_valid: true
+    require_place_cancel_disabled_evidence: true
+    require_probe_close_report_hash_valid: true
+    require_operator_acknowledgement_valid: true
+    require_probe_result_summary_artifact: true
+    require_signed_testnet_promotion_blocker: true
+    signed_testnet_promotion_allowed: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+  signed_testnet_read_only_venue_probe_session:
+    enabled: false
+    review_only: true
+    require_step277_dry_run_session_recorder: true
+    require_dry_run_session_hash: true
+    require_operator_read_only_probe_acknowledgement: true
+    require_balance_read_probe: true
+    require_position_read_probe: true
+    require_open_orders_read_probe: true
+    require_orderbook_read_probe: true
+    require_fee_estimate_probe: true
+    require_slippage_estimate_probe: true
+    require_min_order_validation_probe: true
+    require_fetch_order_probe: true
+    require_probe_event_log: true
+    require_probe_close_report: true
+    require_probe_evidence_freshness: true
+    probe_evidence_max_age_sec: 600
+    place_order_probe_method_call_allowed: false
+    cancel_order_probe_method_call_allowed: false
+    adapter_place_order_call_allowed: false
+    adapter_cancel_order_call_allowed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+  signed_testnet_dry_run_session_recorder:
+    enabled: false
+    review_only: true
+    require_step276_execution_readiness_packet: true
+    require_execution_readiness_packet_hash: true
+    require_operator_dry_run_acknowledgement: true
+    require_would_submit_order_payload: true
+    require_pre_submit_checklist: true
+    require_session_event_log: true
+    require_session_close_report: true
+    adapter_place_order_call_allowed: false
+    place_order_enabled: false
+    signed_order_executor_enabled: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+  explicit_signed_testnet_execution_approval_packet:
+    enabled: false
+    review_only: true
+    require_step279_probe_result_summary: true
+    require_probe_result_summary_hash: true
+    require_step280_full_regression_report: true
+    require_full_regression_report_hash: true
+    require_operator_signed_execution_approval: true
+    require_manual_risk_acceptance: true
+    require_testnet_execution_scope: true
+    require_manual_kill_switch_recheck: true
+    max_order_notional_usdt: 5
+    max_daily_order_count: 3
+    max_daily_loss_usdt: 10
+    max_consecutive_losses: 2
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    signed_testnet_promotion_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+  real_testnet_read_only_adapter:
+    enabled: false
+    review_only: true
+    read_only: true
+    network_enabled: false
+    default_adapter: binance_futures_testnet
+    supported_adapters:
+    - binance_futures_testnet
+    - extended_testnet
+    require_testnet_only_base_url: true
+    metadata_only_secret_policy: true
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    require_balance_read: true
+    require_positions_read: true
+    require_open_orders_read: true
+    require_orderbook_read: true
+    require_fee_estimate: true
+    require_slippage_estimate: true
+    require_min_order_validation: true
+    require_fetch_order: true
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    live_trading_allowed: false
+  real_read_only_venue_probe:
+    enabled: false
+    review_only: true
+    require_adapter_evidence: true
+    require_secret_metadata_validation: true
+    require_venue_match: true
+    require_environment_testnet: true
+    require_all_read_probes: true
+    require_probe_freshness: true
+    max_probe_age_sec: 600
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    live_trading_allowed: false
+  testnet_secret_metadata_intake_v2:
+    enabled: false
+    review_only: true
+    metadata_only: true
+    require_secret_reference_id: true
+    require_key_fingerprint_sha256: true
+    require_environment_testnet: true
+    require_approved_venue: true
+    require_operator_id: true
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    secret_value_read_allowed: false
+    block_live_key_fingerprint: true
+    block_mainnet_base_url: true
+    block_live_or_withdrawal_scope: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+  signed_testnet_pre_submit_validator:
+    enabled: false
+    review_only: true
+    create_would_submit_payload: true
+    require_order_intent: true
+    require_risk_gate_pass_signed_testnet: true
+    require_real_read_only_venue_probe_valid: true
+    require_probe_freshness: true
+    max_venue_probe_age_sec: 600
+    require_idempotency_key: true
+    require_metadata_only_secret: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    live_trading_allowed: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+  signed_testnet_execution_enablement_packet:
+    enabled: false
+    review_only: true
+    require_operator_unlock_request: true
+    require_operator_acknowledges_disabled_execution: true
+    require_approval_registry_valid: true
+    require_pre_submit_validated: true
+    require_pre_submit_payload: true
+    require_venue_probe_valid_and_fresh: true
+    max_venue_probe_age_sec: 600
+    require_manual_kill_switch_recheck: true
+    require_manual_kill_switch_inactive: true
+    require_hard_cap_recheck: true
+    max_order_notional_usdt_limit: 5
+    max_daily_order_count_limit: 3
+    max_daily_loss_usdt_limit: 10
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    live_trading_allowed: false
+    runtime_settings_mutated: false
+    score_weights_mutated: false
+    auto_promotion_allowed: false
+  signed_testnet_order_executor:
+    enabled: false
+    review_only: true
+    require_enablement_packet_valid: true
+    require_would_submit_payload: true
+    require_idempotency_key: true
+    require_canonical_id_chain: true
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    adapter_write_routing_enabled: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    live_trading_allowed: false
+    runtime_settings_mutated: false
+    score_weights_mutated: false
+    auto_promotion_allowed: false
+  signed_testnet_session_close_report:
+    enabled: false
+    review_only: true
+    require_reconciliation_record: true
+    require_execution_record: true
+    require_zero_reconciliation_mismatch_for_promotion: true
+    require_no_unsafe_side_effect: true
+    allow_signed_testnet_promotion: false
+    ready_for_signed_testnet_execution: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    signed_order_executor_enabled: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    live_trading_allowed: false
+    runtime_settings_mutated: false
+    score_weights_mutated: false
+    auto_promotion_allowed: false
+  live_read_only_adapter_probe:
+    enabled: false
+    review_only: true
+    read_only: true
+    network_enabled: false
+    venue: binance_futures_live
+    environment: live
+    base_url: https://fapi.binance.com
+    symbol: BTCUSDT
+    scope:
+      - read_only
+    require_live_environment: true
+    require_probe_freshness: true
+    max_probe_age_sec: 600
+    live_key_scope_validation_required: true
+    live_key_scope_validated: false
+    live_canary_ready: false
+    live_canary_approval_required: true
+    live_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    withdrawal_enabled: false
+    transfer_enabled: false
+    leverage_mutation_enabled: false
+    margin_mode_mutation_enabled: false
+    signed_order_executor_enabled: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    live_trading_allowed: false
+    runtime_settings_mutated: false
+    score_weights_mutated: false
+    auto_promotion_allowed: false
+  live_key_scope_validator:
+    enabled: false
+    review_only: true
+    metadata_only: true
+    require_live_environment: true
+    require_read_only_scope: true
+    require_no_trade_scope: true
+    require_withdrawal_disabled: true
+    require_transfer_disabled: true
+    require_admin_disabled: true
+    require_ip_whitelist_metadata: true
+    require_live_read_only_probe: true
+    max_probe_age_sec: 600
+    venue: binance_futures_live
+    environment: live
+    base_url: https://fapi.binance.com
+    scope:
+      - read_only
+    operator_id: operator_thomas_review_only
+    secret_reference_id: metadata_ref:live/binance_futures/read_only_reference
+    key_fingerprint_sha256: null
+    ip_whitelist_enabled: true
+    ip_whitelist_metadata_only: true
+    live_canary_ready: false
+    live_canary_approval_required: true
+    live_order_submission_allowed: false
+    external_order_submission_allowed: false
+    external_order_submission_performed: false
+    place_order_enabled: false
+    cancel_order_enabled: false
+    withdrawal_enabled: false
+    transfer_enabled: false
+    admin_enabled: false
+    write_enabled: false
+    trade_enabled: false
+    leverage_mutation_enabled: false
+    margin_mode_mutation_enabled: false
+    signed_order_executor_enabled: false
+    api_key_value_access_allowed: false
+    api_secret_value_access_allowed: false
+    secret_file_access_allowed: false
+    secret_file_creation_allowed: false
+    live_trading_allowed: false
+    runtime_settings_mutated: false
+    score_weights_mutated: false
+    auto_promotion_allowed: false
+data:
+  exchange: extended
+  canonical_symbol: BTC-PERP
+  exchange_market: BTC-USD
+  base_asset: BTC
+  quote_asset: USD
+  settlement_asset: USDC
+  contract_type: PERPETUAL
+  timeframe: PT1H
+  limit: 500
+  allow_sample_fallback: true
+  extended_candle_type: trades
+  collect_mark_index_candles: true
+  use_coinalyze_enrichment: true
+  source_priority:
+  - extended
+  - coinalyze
+  - price_data
+  - sample
+  source_policy:
+    live_execution_allowed_sources:
+    - extended
+    research_only_sources:
+    - price_data_binance_tradingview
+    - sample_extended
+extended:
+  environment: mainnet
+  mainnet_base_url: https://api.starknet.extended.exchange/api/v1
+  testnet_base_url: https://api.starknet.sepolia.extended.exchange/api/v1
+  timeout_seconds: 10
+  user_agent: crypto_ai_system_step157e/0.1
+  funding_lookback_hours: 500
+  oi_lookback_hours: 300
+  orderbook_spread_guard_bps: 10
+coinalyze:
+  enabled: true
+  symbol: BTCUSDT_PERP.A
+  interval: 1hour
+storage:
+  root_dir: storage
+  latest_dir: storage/latest
+  backup_dir: storage/backup/spreadsheet
+  queue_dir: storage/queue
+  log_dir: storage/logs
+  backtest_dir: storage/backtest
+  raw_dir: storage/raw
+  features_dir: storage/features
+  signals_dir: storage/signals
+  orders_dir: storage/orders
+features:
+  ma_fast: 20
+  ma_slow: 50
+  ema_fast: 20
+  ema_slow: 50
+  atr_period: 14
+  rsi_period: 14
+  adx_period: 14
+  atr_percentile_window: 100
+  funding_z_window: 100
+  oi_change_1h_window: 1
+  oi_change_4h_window: 4
+entry_policy:
+  bullish_threshold: 0.58
+  bearish_threshold: -0.58
+  adx_trend_threshold: 20
+  rsi_range_long: 35
+  rsi_range_short: 65
+  allow_trend_entry: true
+  allow_range_entry: true
+  allow_liquidation_reversal: false
+  funding_abs_block: 0.0008
+  funding_abs_reduce: 0.0005
+  oi_change_abs_block: 0.08
+  oi_change_abs_reduce: 0.04
+  spread_bps_block: 10
+  spread_bps_reduce: 6
+  exchange_flow_sell_pressure_block: 0.75
+  exchange_flow_sell_pressure_reduce: 0.4
+  binance_derivatives_crowding_block: 0.9
+  binance_derivatives_crowding_reduce: 0.65
+  etf_outflow_block: 0.85
+  etf_outflow_reduce: 0.45
+  stablecoin_liquidity_contraction_block: 0.85
+  stablecoin_liquidity_contraction_reduce: 0.45
+  risk_score_reduce: 0.45
+exit_policy:
+  atr_multiplier: 1.5
+  min_stop_bps: 30
+  max_stop_bps: 250
+  tp1_r: 1.5
+  tp1_size_pct: 0.5
+  tp2_r: 3.0
+  breakeven_enabled: true
+  breakeven_after_tp1: true
+  breakeven_fee_buffer_bps: 5
+  trailing_enabled: true
+  trailing_only_after_tp1: true
+  trailing_only_in_trend: true
+  trailing_atr_multiplier: 2.0
+  time_stop_enabled: true
+  time_stop_candles: 24
+  time_stop_min_mfe_r: 0.5
+backtest:
+  exchange: extended
+  initial_equity: 10000
+  risk_per_trade_pct: 0.01
+  maker_fee_bps: 0
+  taker_fee_bps: 2.5
+  slippage_bps: 3
+  use_funding_payment: true
+  funding_interval_hours: 1
+  entry_price_type: next_candle_open
+  liquidation_check_price_type: mark_price
+parameter_sweep:
+  atr_multipliers:
+  - 1.2
+  - 1.5
+  - 2.0
+  tp1_r_values:
+  - 1.0
+  - 1.2
+  - 1.5
+  - 2.0
+  tp1_size_values:
+  - 0.3
+  - 0.5
+  - 0.7
+  trailing_atr_multipliers:
+  - 1.5
+  - 2.0
+  - 2.5
+  time_stop_candles:
+  - 12
+  - 24
+  - 36
+  funding_filter_modes:
+  - 'off'
+  - normal
+  - strict
+  oi_filter_modes:
+  - 'off'
+  - normal
+  - strict
+  spread_filter_bps:
+  - 0
+  - 5
+  - 10
+research:
+  enabled: true
+  score_weights:
+    structure: 0.2
+    momentum: 0.1
+    derivatives: 0.25
+    exchange_flow: 0.15
+    etf_flow: 0.15
+    stablecoin_liquidity: 0.1
+    risk: 0.05
+    onchain: 0.0
+  calibration_review:
+    mode: review_only
+    auto_apply_selected_profile: false
+    selected_profile_write_enabled: false
+    min_rows: 24
+    min_entry_allowed_ratio: 0.03
+    max_entry_allowed_ratio: 0.8
+    max_blocked_ratio: 0.7
+    max_reduced_ratio: 0.6
+    target_entry_allowed_ratio: 0.25
+    target_blocked_ratio: 0.35
+  score_weight_profiles:
+    baseline_step258:
+      structure: 0.2
+      momentum: 0.1
+      derivatives: 0.25
+      exchange_flow: 0.15
+      etf_flow: 0.15
+      stablecoin_liquidity: 0.1
+      risk: 0.05
+      onchain: 0.0
+    price_structure_dominant:
+      structure: 0.35
+      momentum: 0.15
+      derivatives: 0.2
+      exchange_flow: 0.1
+      etf_flow: 0.1
+      stablecoin_liquidity: 0.05
+      risk: 0.05
+      onchain: 0.0
+    flow_confirmed:
+      structure: 0.18
+      momentum: 0.08
+      derivatives: 0.18
+      exchange_flow: 0.22
+      etf_flow: 0.2
+      stablecoin_liquidity: 0.09
+      risk: 0.05
+      onchain: 0.0
+    liquidity_risk_guarded:
+      structure: 0.18
+      momentum: 0.08
+      derivatives: 0.18
+      exchange_flow: 0.16
+      etf_flow: 0.16
+      stablecoin_liquidity: 0.14
+      risk: 0.1
+      onchain: 0.0
+  report_cadence:
+    daily: true
+    weekly: true
+    monthly: true
+  calibration_approval:
+    mode: manual_approval_packet_review_only
+    manual_approval_required: true
+    approval_packet_write_enabled: true
+    auto_apply_approved_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_approved_profile_enabled: false
+    accepted_decisions:
+    - APPROVE_FOR_REVIEW_ONLY_STAGING
+    - REJECT
+    - REQUEST_MORE_DATA
+  calibration_approval_intake:
+    mode: approval_intake_validator_review_only
+    approval_intake_write_enabled: true
+    manual_approval_required: true
+    auto_apply_approved_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_approved_profile_enabled: false
+    accepted_decisions:
+    - APPROVE_FOR_REVIEW_ONLY_STAGING
+    - REJECT
+    - REQUEST_MORE_DATA
+  calibration_staging_handoff:
+    mode: review_only_staging_handoff_pre_apply_checklist
+    staging_handoff_write_enabled: true
+    manual_pre_apply_review_required: true
+    pre_apply_checklist_required: true
+    auto_apply_approved_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_approved_profile_enabled: false
+    accepted_source_decisions:
+    - APPROVE_FOR_REVIEW_ONLY_STAGING
+  calibration_pre_apply_review:
+    mode: manual_pre_apply_review_record_validator_disabled_apply
+    pre_apply_review_record_write_enabled: true
+    manual_pre_apply_review_required: true
+    auto_apply_reviewed_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_reviewed_profile_enabled: false
+    accepted_decisions:
+    - READY
+    - REJECT
+    - REQUEST_MORE_DATA
+    canonical_ready_decision: READY_FOR_DISABLED_PRE_APPLY_REVIEW
+  calibration_apply_dry_run:
+    mode: disabled_apply_candidate_dry_run_packet
+    dry_run_packet_write_enabled: true
+    manual_apply_approval_required: true
+    auto_apply_candidate_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_candidate_profile_enabled: false
+    mutation_plan_write_enabled: true
+    diff_required: true
+    accepted_source_record_statuses:
+    - ready_for_disabled_pre_apply_review
+  calibration_final_apply_approval:
+    mode: final_manual_apply_approval_validator_disabled_apply
+    final_apply_approval_record_write_enabled: true
+    manual_final_apply_approval_required: true
+    auto_apply_approved_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    apply_approved_profile_enabled: false
+    accepted_decisions:
+    - APPROVE_DRY_RUN
+    - REJECT
+    - REQUEST_MORE_DATA
+    canonical_approve_decision: APPROVED_DISABLED_APPLY_DRY_RUN
+    accepted_source_dry_run_statuses:
+    - ready_disabled_apply_dry_run
+  calibration_settings_write_preview:
+    mode: disabled_settings_write_preview_export_only
+    settings_write_preview_export_enabled: true
+    manual_settings_write_review_required: true
+    auto_apply_approved_profile: false
+    runtime_score_weight_write_enabled: false
+    settings_score_weight_write_enabled: false
+    config_write_enabled: false
+    settings_file_write_enabled: false
+    apply_preview_enabled: false
+    accepted_source_record_statuses:
+    - approved_disabled_apply_dry_run
+    target_yaml_path: research.score_weights
+    target_settings_file: config/settings.yaml
+trading:
+  mode: paper
+  allow_live_orders: false
+  use_research_signal_gate: true
+  risk_level_reduced_position_multiplier: 0.5
+  risk_level_blocked_position_multiplier: 0.0
+  max_position_usdc: 1000
+  max_daily_loss_usdc: 100
+  max_consecutive_losses: 3
+telegram:
+  enabled: false
+  dry_run: true
+price_data:
+  enabled: true
+  directory: data/price_data/BINANCE_BTCUSDT_P
+  primary_timeframe: 1h
+  use_as_fallback_for_ohlcv: true
+  include_multi_timeframe_context: true
+  files:
+    15m: btcusdtp_15m.csv
+    1h: btcusdtp_1h.csv
+    4h: btcusdtp_4h.csv
+    1d: btcusdtp_1d.csv
+    3d: btcusdtp_3d.csv
+    1w: btcusdtp_1w.csv
+    1m: btcusdtp_1m.csv
+  timeframe_weights:
+    15m: 0.5
+    1h: 1.0
+    4h: 1.5
+    1d: 2.0
+    3d: 2.0
+    1w: 2.5
+    1m: 2.5
+additional_data:
+  enabled: true
+  network_enabled: false
+  health:
+    max_age_sec: 259200
+    binance_futures:
+      max_age_sec: 21600
+    coinmetrics_exchange_flow:
+      max_age_sec: 259200
+    farside_etf_flow:
+      max_age_sec: 604800
+    defillama_stablecoins:
+      max_age_sec: 259200
+  timeout_seconds: 1.5
+  binance_futures:
+    enabled: true
+    base_url: https://fapi.binance.com
+    symbol: BTCUSDT
+    pair: BTCUSDT
+    contract_type: PERPETUAL
+    period: 1h
+    kline_interval: 1h
+    limit: 100
+    depth_limit: 100
+    request_pause_seconds: 0
+    abort_after_errors: 2
+  coinmetrics:
+    enabled: true
+    base_url: https://community-api.coinmetrics.io/v4
+    asset: btc
+    frequency: 1d
+    page_size: 200
+    exchange_flow_metrics:
+      binance:
+        native: FlowNetBNBNtv
+        usd: FlowNetBNBUSD
+      coinbase:
+        native: FlowNetCBSNtv
+        usd: FlowNetCBSUSD
+      okx:
+        native: FlowNetOKXNtv
+        usd: FlowNetOKXUSD
+      bybit:
+        native: FlowNetBITNtv
+        usd: FlowNetBITUSD
+      kraken:
+        native: FlowNetKRKNtv
+        usd: FlowNetKRKUSD
+  farside:
+    enabled: false
+    csv_path: data/raw/etf/farside_btc_etf_flow.csv
+  defillama:
+    enabled: true
+    base_url: https://stablecoins.llama.fi
+feature_store:
+  extra_data_asof_tolerance: 3D
+  research_matrix_mode: live
+audit:
+  permission_gate_audit_enabled: true
+  permission_gate_audit_path: storage/logs/permission_gate_audit.jsonl
+  latest_permission_gate_audit_path: storage/latest/permission_gate_audit_latest.json
+paper_report:
+  risk_level_report_enabled: true
+  risk_level_report_path: storage/latest/paper_risk_level_report.json
+validation:
+  full_regression_runtime_hygiene:
+    step: 280
+    strategy: chunked_pytest_suites_with_progress_and_runtime_report
+    single_pytest_tests_command_replaced_in_ci: true
+    focused_regression_latest_step: 280
+    full_pytest_completed_green_required_before_signed_testnet_execution: true
+    live_trading_enabled: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    settings_write_enabled: false
+    score_weights_mutation_allowed: false
+  explicit_signed_testnet_execution_approval_packet:
+    step: 281
+    stage: review_only_explicit_signed_testnet_execution_approval_packet
+    require_step279_probe_result_summary: true
+    require_step280_full_regression_report: true
+    signed_testnet_execution_allowed: false
+    testnet_order_submission_allowed: false
+    external_order_submission_allowed: false
+    settings_write_enabled: false
+    score_weights_mutation_allowed: false

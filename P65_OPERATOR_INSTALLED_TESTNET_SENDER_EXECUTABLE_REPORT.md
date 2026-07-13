@@ -1,0 +1,1 @@
+"# P65 Operator-installed Testnet Sender Executable Package\n\nStatus: `P65_OPERATOR_INSTALLED_TESTNET_SENDER_EXECUTABLE_VALIDATED_REVIEW_ONLY_DISABLED`\n\nReview-only / disabled. No real /order/test call, no HTTP request, no signature, no secret access.\n\nReport SHA256: `23ce0b3e901ae29d530baf6aac3c6844b6d41a0f04a6e39b8b0c870e223ea2d4`\n"

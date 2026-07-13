@@ -1,0 +1,60 @@
+{
+  "candidate_policy": {
+    "accepted_matrix_source_types": [
+      "stored_feature_store_matrix",
+      "explicit_feature_store_matrix"
+    ],
+    "requires_real_feature_store_matrix": true,
+    "synthetic_fallback_can_select_candidate": false
+  },
+  "new_files": [
+    "scripts/report_step260_researchsignal_profile_review_only_calibration.py",
+    "tests/test_step260_researchsignal_profile_review_only_calibration.py",
+    "docs/STEP260_RESEARCHSIGNAL_PROFILE_REVIEW_ONLY_CALIBRATION.md",
+    "STEP260_RESEARCHSIGNAL_PROFILE_REVIEW_ONLY_CALIBRATION_REPORT.md",
+    "VALIDATION_REPORT_STEP260.md",
+    "VALIDATION_SUMMARY_STEP260.json",
+    "data/reports/step260_researchsignal_profile_review_only_calibration_report.json"
+  ],
+  "notes": [
+    "Clean source handoff excludes runtime storage and data/reports outputs.",
+    "Validation bundle carries reports under crypto_ai_system_validation/.",
+    "Synthetic fallback report is generated for CI shape validation only and does not select a production candidate."
+  ],
+  "review_only_policy": {
+    "auto_apply_selected_profile": false,
+    "config_mutated": false,
+    "production_profile_auto_applied": false,
+    "runtime_score_weights_mutated": false,
+    "selected_profile_written_to_settings": false
+  },
+  "safety_boundaries": {
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "external_order_submission_performed": false,
+    "live_trading_allowed": false,
+    "missing_canonical_module_count": 2,
+    "order_routing_enabled": false,
+    "root_package_deletion_deferred": true,
+    "root_package_deletion_performed": false
+  },
+  "scope": "ResearchSignal v2 profile review-only calibration against Feature Store matrices",
+  "source_handoff_root": "crypto_ai_system_source/",
+  "status": "validated",
+  "step": 260,
+  "validation": {
+    "step130_164": "40 passed",
+    "step209_219": "37 passed",
+    "step220_237": "59 passed",
+    "step240_244": "11 passed",
+    "step245_248": "10 passed",
+    "step249": "3 passed",
+    "step250": "3 passed",
+    "step251": "3 passed",
+    "step252_260": "38 passed",
+    "step258_259_260": "14 passed",
+    "step260_focused": "6 passed"
+  },
+  "validation_bundle_root": "crypto_ai_system_validation/",
+  "version": "step260_researchsignal_profile_review_only_calibration_v1"
+}

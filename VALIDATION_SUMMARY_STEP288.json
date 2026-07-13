@@ -1,0 +1,27 @@
+{
+  "compileall": "passed",
+  "external_order_submission_performed": false,
+  "live_trading_enabled": false,
+  "run_full_cycle": {
+    "decision": "BLOCK_DATA_HEALTH",
+    "order": "NO_ORDER"
+  },
+  "run_operational_dry_run": "passed",
+  "score_weights_mutation_allowed": false,
+  "settings_write_enabled": false,
+  "signed_order_executor_enabled": false,
+  "source_handoff_runtime_outputs_excluded": true,
+  "status": "passed_focused_regression_review_only",
+  "status_consistency_checker": "passed",
+  "step": "step288_research_signal_registry_v2",
+  "step258_to_288_focused_regression": {
+    "passed": 171
+  },
+  "step282_to_288_focused_tests": {
+    "passed": 25
+  },
+  "step288_tests": {
+    "passed": 4
+  },
+  "testnet_order_submission_allowed": false
+}

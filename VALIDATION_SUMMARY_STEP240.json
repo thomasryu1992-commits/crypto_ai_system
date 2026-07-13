@@ -1,0 +1,33 @@
+{
+  "timestamp_utc": "2026-06-29T08:05:12Z",
+  "step": "Step240 v5 Legacy Root Import Retirement Plan",
+  "base_zip": "/mnt/data/crypto_ai_system_step239_source_handoff_clean_v2.zip",
+  "scope": "legacy root import audit and retirement planning",
+  "not_production_live_validation": true,
+  "validation": {
+    "compileall_pass": true,
+    "pytest_pass": true,
+    "pytest_result": "140 passed",
+    "legacy_root_package_audit_pass": true,
+    "import_retirement_plan_pass": true,
+    "chain_smoke_pass": true,
+    "rewrite_performed": false,
+    "wrapper_conversion_performed": false,
+    "direct_root_import_finding_count": 29,
+    "findings_by_action": {
+      "MANUAL_MAPPING_REQUIRED": 25,
+      "READY_FOR_CANONICAL_IMPORT_REWRITE": 4
+    },
+    "findings_by_risk": {
+      "LOW": 4,
+      "MEDIUM": 25
+    }
+  },
+  "safety_boundary": {
+    "paper_execution_enabled": false,
+    "adapter_routing_enabled": false,
+    "external_api_call_performed": false,
+    "live_trading_allowed": false
+  },
+  "overall_pass": true
+}

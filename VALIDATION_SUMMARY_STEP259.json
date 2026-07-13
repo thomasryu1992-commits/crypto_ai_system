@@ -1,0 +1,27 @@
+{
+  "profiles_compared": 4,
+  "report_path": "data/reports/step259_researchsignal_weight_calibration_report.json",
+  "rows_evaluated": 48,
+  "safety_boundaries": {
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "external_order_submission_performed": false,
+    "live_trading_allowed": false,
+    "missing_canonical_module_count": 2,
+    "order_routing_enabled": false,
+    "root_package_deletion_deferred": true,
+    "root_package_deletion_performed": false
+  },
+  "scope": "researchsignal_weight_calibration_permission_distribution_telegram_extra_data_summary",
+  "status": "validated",
+  "step": 259,
+  "telegram_extra_data_summary_connected": true,
+  "tests": {
+    "step130_164_regression": "40 passed",
+    "step209_237_regression": "96 passed",
+    "step240_251_regression": "30 passed",
+    "step252_259_regression": "32 passed",
+    "step258_step259_focused": "8 passed",
+    "step259_focused": "5 passed"
+  }
+}

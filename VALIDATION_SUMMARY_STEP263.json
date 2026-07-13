@@ -1,0 +1,47 @@
+{
+  "application_stub_status": "DISABLED_STUB",
+  "candidate_available": false,
+  "handoff_status": "blocked_by_approval_intake",
+  "pre_apply_checklist_summary": {
+    "all_passed": false,
+    "failed": 4,
+    "passed": 5,
+    "total": 9
+  },
+  "production_candidate_profile": null,
+  "ready_for_pre_apply_review": false,
+  "runtime_score_weights_unchanged": true,
+  "safety_boundaries": {
+    "auto_apply_selected_profile": false,
+    "canonical_live_execution_port_performed": false,
+    "canonical_testnet_execution_port_performed": false,
+    "config_mutated": false,
+    "external_order_submission_performed": false,
+    "live_trading_allowed": false,
+    "manual_pre_apply_review_required": true,
+    "missing_canonical_module_count": 2,
+    "order_routing_enabled": false,
+    "production_profile_auto_applied": false,
+    "review_only": true,
+    "root_package_deletion_deferred": true,
+    "root_package_deletion_performed": false,
+    "runtime_score_weights_mutated": false,
+    "selected_profile_written_to_settings": false,
+    "settings_score_weights_mutated": false
+  },
+  "scope": "researchsignal_v2_profile_review_only_staging_handoff_pre_apply_checklist",
+  "status": "completed",
+  "step": 263,
+  "tests": {
+    "step130_164_regression": "40 passed",
+    "step209_219_regression": "37 passed",
+    "step220_237_regression": "59 passed",
+    "step240_244_regression": "11 passed",
+    "step245_248_regression": "10 passed",
+    "step249_251_regression": "9 passed",
+    "step252_263_regression": "55 passed",
+    "step258_263_regression": "31 passed",
+    "step263_focused": "6 passed"
+  },
+  "version": "step263_researchsignal_profile_review_only_staging_handoff_v1"
+}

@@ -1,0 +1,54 @@
+{
+  "step": 257,
+  "status": "validated",
+  "scope": "Lock execution.live_executor and execution.testnet_executor as explicit disabled compatibility surfaces without canonical live/testnet porting.",
+  "locked_modules": [
+    "execution.live_executor",
+    "execution.testnet_executor"
+  ],
+  "missing_canonical_module_count": 2,
+  "canonical_live_execution_port_performed": false,
+  "canonical_testnet_execution_port_performed": false,
+  "root_package_deletion_performed": false,
+  "root_package_deletion_deferred": true,
+  "live_trading_allowed": false,
+  "order_routing_enabled": false,
+  "external_order_submission_performed": false,
+  "test_results": [
+    {
+      "command": "pytest tests/test_step257_deferred_execution_stub_policy.py tests/test_step256_paper_research_v1_port.py tests/test_step254_missing_canonical_disposition_plan.py -q",
+      "result": "11 passed in 10.49s"
+    },
+    {
+      "command": "pytest tests/test_step252_thin_wrapper_conversion_plan.py tests/test_step253_thin_wrapper_batch1.py tests/test_step254_missing_canonical_disposition_plan.py tests/test_step255_execution_support_port.py tests/test_step256_paper_research_v1_port.py tests/test_step257_deferred_execution_stub_policy.py -q",
+      "result": "21 passed in 18.77s"
+    },
+    {
+      "command": "pytest tests/test_step130_safety.py ... tests/test_step219_v5_operator_approval_intake_validator.py -q",
+      "result": "77 passed in 3.36s"
+    },
+    {
+      "command": "pytest tests/test_step220_v5_paper_execution_enablement_plan_review_only.py ... tests/test_step239_legacy_root_package_boundary.py -q",
+      "result": "61 passed in 16.18s"
+    },
+    {
+      "command": "pytest tests/test_step240_legacy_root_import_retirement_plan.py ... tests/test_step251_trading_cycle_port.py -q",
+      "result": "30 passed in 28.38s"
+    },
+    {
+      "command": "pytest tests/test_step252_thin_wrapper_conversion_plan.py ... tests/test_step257_deferred_execution_stub_policy.py -q",
+      "result": "21 passed in 18.77s"
+    }
+  ],
+  "full_pytest_note": "pytest.ini was tightened to collect only tests/test_*.py so root runner scripts ending in *_test.py are not collected as pytest modules.",
+  "stale_test_updates": [
+    "Updated Step240~243 plan tests to reflect the current cumulative state after direct root imports/manual mappings/root-only port plan inputs were already retired by later steps."
+  ],
+  "artifacts": [
+    "docs/STEP257_DEFERRED_EXECUTION_STUB_POLICY.md",
+    "STEP257_DEFERRED_EXECUTION_STUB_POLICY_REPORT.md",
+    "scripts/report_step257_deferred_execution_stub_policy.py",
+    "tests/test_step257_deferred_execution_stub_policy.py",
+    "data/reports/step257_deferred_execution_stub_policy_report.json"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "package": "crypto_ai_system_step1_157e_extended_stable",
+  "created_at_utc": "2026-06-24T03:09:32Z",
+  "logical_file_count": 470,
+  "stable_entrypoint": "python run_stable_pipeline.py",
+  "telegram_entrypoint": "python run_stable_pipeline.py --send-telegram",
+  "health_profile": "stable",
+  "safety_flags": {
+    "LIVE_TRADING_ENABLED": "false",
+    "ENABLE_REAL_ORDERS": "false",
+    "TESTNET_SIGNED_ORDER_ENABLED": "false",
+    "EXCHANGE_ORDER_ENABLED": "false"
+  },
+  "stabilized_changes": [
+    "Added run_stable_pipeline.py as the primary stable execution entrypoint",
+    "Added run_system_health_check.py for local health validation without Telegram dependency",
+    "Changed scheduler health default profile to stable Step1~157E outputs",
+    "Made operational dry-run write failure details instead of crashing on traceback",
+    "Made Extended jsonl append helper tolerant of Windows read-only/locked log files",
+    "Kept legacy runners and old modules preserved but not recommended as main entrypoints"
+  ]
+}

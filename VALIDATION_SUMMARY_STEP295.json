@@ -1,0 +1,19 @@
+{
+  "compileall": "PASSED",
+  "direct_step295_promotion_blocked": false,
+  "direct_step295_reconciliation_id": "reconciliation_62a8509ee7286dca3a7b1f95",
+  "direct_step295_reconciliation_status": "RECONCILED",
+  "external_order_submission_performed": false,
+  "live_trading_enabled": false,
+  "run_full_cycle": "BLOCK_DATA_HEALTH / NO_ORDER",
+  "run_operational_dry_run": "PASSED",
+  "score_weights_mutation_allowed": false,
+  "settings_write_enabled": false,
+  "status": "passed",
+  "status_consistency_checker": "PASSED",
+  "step": "Step295 Paper Reconciliation v2",
+  "step258_step280_focused_tests": "138 passed",
+  "step281_step295_focused_tests": "82 passed",
+  "step282_step294_step295_tests": "18 passed",
+  "testnet_order_submission_allowed": false
+}

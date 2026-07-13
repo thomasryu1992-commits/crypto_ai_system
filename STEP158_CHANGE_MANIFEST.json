@@ -1,0 +1,34 @@
+{
+  "package": "crypto_ai_system_step158_price_unified",
+  "base_package": "crypto_ai_system_step1_157e_extended_stable",
+  "created_for": "Price Data restoration + unified pipeline hardening",
+  "embedded_price_timeframes": ["15m", "1h", "4h", "1d", "3d", "1w", "1m"],
+  "price_data_directory": "data/price_data/BINANCE_BTCUSDT_P",
+  "primary_price_timeframe": "1h",
+  "key_changes": [
+    "Added normalized TradingView/Binance BTCUSDT.P CSV loader",
+    "Added multi-timeframe price context into ResearchBot snapshot and markdown report",
+    "Added price-data fallback before synthetic sample fallback",
+    "Blocked non-live embedded price data from live/order-intent trading flow",
+    "Converted raw store to append-and-deduplicate behavior",
+    "Fixed spreadsheet_backup storage path alias",
+    "Fixed TradingBot position sizing tuple mismatch",
+    "Fixed target_price stop/risk argument mismatch",
+    "Restored legacy pytest compatibility wrappers"
+  ],
+  "validation": {
+    "pytest": "20 passed",
+    "run_daily_research_report": "passed",
+    "run_collect_raw_data": "passed",
+    "run_step157e_full_validation": "passed",
+    "run_operational_dry_run": "passed",
+    "run_spreadsheet_sync": "passed",
+    "run_system_health_check": "passed",
+    "combined_run_stable_pipeline": "timed out in this sandbox while waiting on Step157E subprocess; components passed individually"
+  },
+  "live_trading_policy": {
+    "allow_live_trading": false,
+    "allow_order_intent_from_embedded_price_data": false,
+    "only_extended_live_source_can_set_trading_allowed_by_data_source": true
+  }
+}

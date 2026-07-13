@@ -1,0 +1,64 @@
+{
+  "daily": {
+    "label": "Daily Crypto Report",
+    "internal_command": "daily_report",
+    "requires_symbol": false,
+    "enabled": true,
+    "safe_in_local_launcher": true
+  },
+  "scan": {
+    "label": "Market Scan",
+    "internal_command": "market_scan",
+    "requires_symbol": true,
+    "enabled": true,
+    "safe_in_local_launcher": true
+  },
+  "signal": {
+    "label": "Research Signal",
+    "internal_command": "research_signal",
+    "requires_symbol": true,
+    "enabled": true,
+    "safe_in_local_launcher": true
+  },
+  "backtest": {
+    "label": "Backtest",
+    "internal_command": "backtest",
+    "requires_symbol": false,
+    "enabled": true,
+    "safe_in_local_launcher": true
+  },
+  "paper": {
+    "label": "Paper Simulation Review",
+    "internal_command": "paper_trade",
+    "requires_symbol": false,
+    "enabled": true,
+    "requires_approval": true,
+    "safe_in_local_launcher": true,
+    "artifact_type": "paper_simulation",
+    "contract_version": "paper_simulation_review_v1"
+  },
+  "feedback": {
+    "label": "Feedback Review",
+    "internal_command": "feedback_review",
+    "requires_symbol": false,
+    "enabled": true,
+    "safe_in_local_launcher": true
+  },
+  "live": {
+    "label": "Live Trading",
+    "internal_command": "live_trade",
+    "requires_symbol": true,
+    "enabled": false,
+    "requires_approval": true,
+    "safe_in_local_launcher": false
+  },
+  "source-health": {
+    "label": "Source Health",
+    "internal_command": "source_health",
+    "requires_symbol": false,
+    "enabled": true,
+    "safe_in_local_launcher": true,
+    "artifact_type": "source_health",
+    "contract_version": "source_health_review_v1"
+  }
+}

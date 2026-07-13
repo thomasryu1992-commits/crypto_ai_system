@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from bridge.research_trading_bridge import decide_trade_action
-from trading.paper_engine import build_paper_position, update_position_conservative
-from execution.live_guard import run_live_readiness_check
+from crypto_ai_system.trading.paper_engine import build_paper_position, update_position_conservative
+from crypto_ai_system.execution.live_guard import run_live_readiness_check
 
 
 def test_synthetic_data_blocks_trading_policy():

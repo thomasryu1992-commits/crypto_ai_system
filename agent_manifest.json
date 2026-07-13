@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.0",
+  "agent_id": "crypto_ai_system",
+  "agent_name": "Crypto AI System",
+  "version": "0.286.0-agent.14",
+  "type": "crypto",
+  "description": "Crypto market data collection, research, signal generation, backtesting, paper trading, review-only execution readiness, and feedback agent for Thomas Agent OS.",
+  "entrypoint": "python scripts/run_command.py",
+  "self_test": "python scripts/self_test.py",
+  "python_package": "crypto_ai_system",
+  "commands": {
+    "daily": {
+      "description": "Generate daily crypto market report.",
+      "internal_command": "daily_report",
+      "requires_approval": false,
+      "artifact_type": "report"
+    },
+    "scan": {
+      "description": "Scan a specific crypto symbol.",
+      "internal_command": "market_scan",
+      "requires_approval": false,
+      "artifact_type": "report"
+    },
+    "signal": {
+      "description": "Generate ResearchSignal for a symbol.",
+      "internal_command": "research_signal",
+      "requires_approval": false,
+      "artifact_type": "signal"
+    },
+    "backtest": {
+      "description": "Run strategy backtest review artifact.",
+      "internal_command": "backtest",
+      "requires_approval": false,
+      "artifact_type": "backtest"
+    },
+    "paper": {
+      "description": "Run review-only paper simulation artifact with approval-required contract.",
+      "internal_command": "paper_trade",
+      "requires_approval": true,
+      "artifact_type": "paper_simulation"
+    },
+    "feedback": {
+      "description": "Analyze trading feedback and strategy performance.",
+      "internal_command": "feedback_review",
+      "requires_approval": false,
+      "artifact_type": "feedback"
+    },
+    "source-health": {
+      "description": "Generate review-only data source health artifact.",
+      "internal_command": "source_health",
+      "requires_approval": false,
+      "artifact_type": "source_health"
+    }
+  },
+  "env_required": [
+    "OPENAI_API_KEY"
+  ],
+  "env_optional": [
+    "COINALYZE_API_KEY",
+    "BINANCE_API_KEY",
+    "BINANCE_API_SECRET",
+    "OPENROUTER_API_KEY",
+    "GEMINI_API_KEY",
+    "GROQ_API_KEY"
+  ],
+  "artifact_rules": {
+    "base_dir": "data/reports",
+    "daily": "crypto_daily_{date}.md",
+    "scan": "crypto_scan_{symbol}_{datetime}.md",
+    "signal": "research_signal_{symbol}_{datetime}.json",
+    "backtest": "crypto_backtest_{datetime}.md",
+    "paper": "crypto_paper_{datetime}.md",
+    "feedback": "crypto_feedback_{datetime}.md",
+    "metadata_sidecar": "{artifact_filename}.metadata.json",
+    "index": "artifact_index.json",
+    "latest": "latest/latest_{command}.json",
+    "source-health": "source_health_{datetime}.json",
+    "price_csv_schema": "examples/data/sample_price_schema.csv"
+  },
+  "safe_defaults": {
+    "live_trading_enabled": false,
+    "order_execution_enabled": false,
+    "auto_position_open_enabled": false,
+    "paper_trading_enabled": true,
+    "withdrawal_enabled": false,
+    "fund_transfer_enabled": false,
+    "execution_permission_granted": false,
+    "stage_transition_allowed": false
+  },
+  "capabilities": [
+    "data_collection",
+    "data_validation",
+    "market_research",
+    "research_signal",
+    "daily_report",
+    "market_scan",
+    "backtest",
+    "paper_trading",
+    "feedback_review",
+    "source_health",
+    "data_source_health",
+    "source_health_report",
+    "local_price_csv_validation",
+    "price_data_snapshot",
+    "price_csv_schema_validation",
+    "price_feature_snapshot"
+  ],
+  "disabled_capabilities": [
+    "live_trading",
+    "real_order_execution",
+    "auto_leverage_change",
+    "auto_position_open",
+    "withdrawal",
+    "fund_transfer"
+  ],
+  "compatibility": {
+    "thomas_agent_os_min_version": "0.1.0",
+    "python_min_version": "3.10",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "runtime": "docker_compatible_python"
+  },
+  "created_by": "Thomas",
+  "created_at": "2026-07-05",
+  "docker": {
+    "supported": true,
+    "dockerfile": "Dockerfile",
+    "compose_file": "docker-compose.yml",
+    "default_service": "crypto_ai_system",
+    "self_test_service": "crypto_ai_system_self_test",
+    "image": "thomas-agent-os/crypto-ai-system:0.286.0-agent.14",
+    "entrypoint": "python scripts/run_command.py",
+    "self_test": "python scripts/self_test.py",
+    "container_mode": "local_launcher",
+    "volumes": [
+      "./data/reports:/app/crypto_ai_system/data/reports",
+      "./storage:/app/crypto_ai_system/storage"
+    ],
+    "safe_defaults": {
+      "live_trading_enabled": false,
+      "order_execution_enabled": false,
+      "auto_position_open_enabled": false,
+      "withdrawal_enabled": false,
+      "fund_transfer_enabled": false
+    }
+  },
+  "agent_os_import": {
+    "supported": true,
+    "scope": "package_contract_only",
+    "expected_zip_top_level_dir": "crypto_ai_system",
+    "entrypoint": "python scripts/run_command.py",
+    "self_test": "python scripts/self_test.py",
+    "validate_package": "python scripts/validate_package.py",
+    "release_builder": "python scripts/build_agent_os_release.py",
+    "validate_import_package": "python scripts/validate_agent_os_import_package.py",
+    "launcher_import_manager_implemented_here": false,
+    "telegram_router_implemented_here": false,
+    "execution_permission_granted": false,
+    "stage_transition_allowed": false
+  },
+  "agent_package_contract": {
+    "supported": true,
+    "boundary": "crypto_ai_system_zip_only",
+    "expected_zip_top_level_dir": "crypto_ai_system",
+    "entrypoint": "python scripts/run_command.py",
+    "self_test": "python scripts/self_test.py",
+    "validate_package": "python scripts/validate_package.py",
+    "release_builder": "python scripts/build_agent_os_release.py",
+    "validate_import_package": "python scripts/validate_agent_os_import_package.py",
+    "launcher_owned_responsibilities": [
+      "agents_zip_inbox_scan",
+      "0_IMPORT_ZIP.bat",
+      "agents_installed_current_switch",
+      "agent_registry_mutation",
+      "telegram_bot_routing",
+      "status_rendering",
+      "duplicate_import_policy",
+      "rollback_policy"
+    ],
+    "package_owned_responsibilities": [
+      "manifest_metadata",
+      "safe_defaults",
+      "command_map",
+      "standard_run_command_entrypoint",
+      "self_test",
+      "validate_package",
+      "final_line_json_output",
+      "docker_attach_files",
+      "artifact_sidecar_metadata",
+      "artifact_index",
+      "latest_artifact_pointers",
+      "research_signal_v2_artifacts",
+      "backtest_review_artifacts",
+      "feedback_review_artifacts",
+      "paper_simulation_review_artifacts",
+      "source_health_review_artifacts",
+      "local_price_csv_schema_validation",
+      "price_data_snapshot_hashing"
+    ],
+    "execution_permission_granted": false,
+    "stage_transition_allowed": false,
+    "daily_scan_report_quality_hardened": true,
+    "report_front_matter_required": true,
+    "report_safety_footer_required": true,
+    "signal_artifact_contract": "research_signal_v2_agent_package_contract",
+    "signal_live_eligibility_must_be_false": true,
+    "backtest_artifact_contract": "backtest_review_v1",
+    "feedback_artifact_contract": "feedback_review_v1",
+    "backtest_feedback_review_only_hardened": true,
+    "backtest_live_eligibility_must_be_false": true,
+    "feedback_runtime_mutation_must_be_false": true,
+    "artifact_registry_contract": "agent_artifact_registry_v1",
+    "artifact_metadata_sidecar_contract": "agent_artifact_metadata_v1",
+    "artifact_index_contract": "agent_artifact_index_v1",
+    "latest_pointer_contract": "agent_artifact_latest_pointer_v1",
+    "stdout_json_artifact_hash_required": true,
+    "paper_artifact_contract": "paper_simulation_review_v1",
+    "paper_command_requires_approval": true,
+    "paper_real_execution_allowed": false,
+    "paper_order_submission_performed": false,
+    "paper_exchange_adapter_called": false,
+    "source_health_artifact_contract": "source_health_review_v1",
+    "source_health_command_enabled": true,
+    "price_data_hard_required": true,
+    "optional_data_missing_policy": "neutral_due_to_missing",
+    "fallback_sample_synthetic_source_must_block": true,
+    "local_price_csv_dry_run_enabled": true,
+    "price_csv_schema_contract_version": "price_csv_ohlcv_v1",
+    "price_csv_required_columns": [
+      "timestamp",
+      "symbol",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "price_data_connected_requires_real_local_csv": true,
+    "price_csv_sample_blocks_candidates": true,
+    "price_csv_stale_blocks_candidates": true,
+    "price_feature_snapshot_contract": "price_feature_snapshot_v1",
+    "feature_snapshot_required_for_signal_lineage": true,
+    "feature_snapshot_blocks_sample_stale_invalid_csv": true
+  },
+  "artifact_contracts": {
+    "daily_scan_report": "agent_report_v2",
+    "source_health": "source_health_review_v1"
+  }
+}

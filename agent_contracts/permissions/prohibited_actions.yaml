@@ -1,0 +1,34 @@
+prohibited_actions:
+  - mutate_runtime
+  - mutate_settings_yaml
+  - mutate_score_weights
+  - apply_approval_to_runtime
+  - read_api_key_values
+  - read_api_secret_values
+  - read_secret_files
+  - create_secret_files
+  - enable_place_order
+  - enable_cancel_order
+  - enable_signed_order_executor
+  - submit_testnet_orders
+  - submit_live_orders
+  - auto_promote_signed_testnet
+  - auto_promote_live
+  - unlock_signed_testnet_execution
+  - unlock_live_canary_execution
+  - unlock_live_scaled_execution
+required_false_flags:
+  - can_modify_runtime
+  - can_submit_orders
+  - runtime_mutation_performed
+  - order_submission_performed
+  - ready_for_signed_testnet_execution
+  - testnet_order_submission_allowed
+  - signed_testnet_promotion_allowed
+  - live_canary_execution_enabled
+  - live_scaled_execution_enabled
+  - external_order_submission_allowed
+  - external_order_submission_performed
+  - place_order_enabled
+  - cancel_order_enabled
+  - signed_order_executor_enabled
