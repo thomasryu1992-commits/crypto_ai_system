@@ -24,6 +24,7 @@ from crypto_ai_system.execution.extended_read_only_connectivity import (
     build_p71_public_connectivity_evidence,
     run_p71_public_probe,
     validate_p71_private_account_evidence,
+    _websocket_error_diagnostic,
     websocket_public_snapshot_probe,
 )
 from external_runtime_packages.extended_read_only_probe import (
@@ -31,7 +32,10 @@ from external_runtime_packages.extended_read_only_probe import (
     PrivateReadOnlyProbePolicy,
     websocket_private_account_snapshot_probe,
 )
-from external_runtime_packages.extended_read_only_probe.probe import _requests_get
+from external_runtime_packages.extended_read_only_probe.probe import (
+    _requests_get,
+    _websocket_error_diagnostic as _private_websocket_error_diagnostic,
+)
 
 BASE_EPOCH_MS = 1_783_810_000_000
 
@@ -720,3 +724,10 @@ def test_p71_private_transport_disables_redirect_and_sanitizes_non_json(monkeypa
     assert payload["body_length"] == len(Response.content)
     assert "opaque intermediary response" not in str(payload)
     assert headers["content-type"] == "text/html"
+
+
+def test_p71_websocket_diagnostic_parses_http_status_from_invalid_status_message():
+    exc = RuntimeError("server rejected WebSocket connection: HTTP 503")
+
+    assert _websocket_error_diagnostic(exc)["http_status"] == 503
+    assert _private_websocket_error_diagnostic(exc)["http_status"] == 503

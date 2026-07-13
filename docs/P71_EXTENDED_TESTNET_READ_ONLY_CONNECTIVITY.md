@@ -40,6 +40,10 @@ Endpoint:
 
 `wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/orderbooks/BTC-USD?depth=1`
 
+The v1 stream is path-based; no post-connect subscribe payload is sent. This
+matches the Extended orderbook stream contract documented as
+`GET /stream.extended.exchange/v1/orderbooks/{market}?depth=1`.
+
 The client requires:
 
 - first application message is `SNAPSHOT`
@@ -97,7 +101,10 @@ Endpoint:
 
 `wss://api.starknet.sepolia.extended.exchange/stream.extended.exchange/v1/account`
 
-Only the external credential-bearing process may set `X-Api-Key`. The initial account snapshot must include the balance, positions, and orders keys. P71 validates:
+The v1 private stream is also path-based; no post-connect subscribe payload is
+sent. Only the external credential-bearing process may set `X-Api-Key`. The
+initial account snapshot must include the balance, positions, and orders keys.
+P71 validates:
 
 - first application message is `SNAPSHOT`
 - first sequence is `1`
@@ -111,6 +118,32 @@ Only the external credential-bearing process may set `X-Api-Key`. The initial ac
 - REST/stream balance-presence, position-count, and open-order-count consistency
 
 Order updates, fills, fee changes, post-submit position/balance deltas, ambiguous submit recovery, and execution reconciliation remain P76/P78 work.
+
+## Stream host diagnostic
+
+Use the redacted host matrix when a WebSocket attempt is blocked before the
+first snapshot:
+
+```powershell
+python scripts/check_p71_extended_stream_hosts.py
+python scripts/check_p71_extended_stream_hosts.py --credential-target p71_extended_read_only
+```
+
+The diagnostic checks the pinned `api.starknet.sepolia.extended.exchange` v1
+path stream, the documented non-api testnet host, and the SDK-provided v2 RPC
+candidate. It prints only host, mode, HTTP status, and redacted success fields.
+It never sends an order, creates a signature, or prints an API key.
+
+As of the latest local operator check, the path and no-subscribe contract were
+correct, but Extended testnet WebSocket handshakes were blocked before the first
+snapshot:
+
+- `api.starknet.sepolia.extended.exchange` v1 public/private path streams: HTTP 503
+- `starknet.sepolia.extended.exchange` v1 public/private path streams: HTTP 403
+- `api.starknet.sepolia.extended.exchange` v2 RPC candidate: HTTP 404
+
+In that state P71 must remain blocked, because there is no valid WebSocket
+snapshot evidence to seal.
 
 ## Evidence freshness, integrity, and replay protection
 

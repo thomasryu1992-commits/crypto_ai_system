@@ -85,6 +85,23 @@ P71 closure is connectivity evidence, not execution permission.
 
 A blocked closure report is expected when the upstream WebSocket endpoint returns 503, a sequence gap cannot resynchronize, the heartbeat-survival window is incomplete, evidence is stale, hashes are invalid, source evidence is replayed, REST/WS state mismatches, or the public and private source times differ by more than 180 seconds.
 
+For host/path diagnosis, run:
+
+```powershell
+python scripts/check_p71_extended_stream_hosts.py
+python scripts/check_p71_extended_stream_hosts.py --credential-target p71_extended_read_only
+```
+
+The checker is redacted and read-only. It distinguishes:
+
+- pinned v1 path stream returning HTTP 502/503
+- documented non-api testnet host returning HTTP 403
+- SDK v2 RPC candidate returning HTTP 404
+
+If all WebSocket candidates are blocked before the first snapshot, do not treat
+the failure as missing local evidence. Keep P71 blocked and rerun after the
+upstream stream endpoint becomes available.
+
 Do not manually edit evidence files to force completion. Generate a new operator session and rerun.
 
 ## Public-only GitHub Actions probe

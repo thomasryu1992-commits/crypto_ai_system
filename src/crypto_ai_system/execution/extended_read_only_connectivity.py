@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -262,7 +263,13 @@ def _websocket_error_diagnostic(exc: Exception) -> dict[str, Any]:
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
     if status_code is None:
+        status_code = getattr(response, "status", None)
+    if status_code is None:
         status_code = getattr(exc, "status_code", None)
+    if status_code is None:
+        match = re.search(r"\bHTTP\s+(\d{3})\b", str(exc), flags=re.IGNORECASE)
+        if match:
+            status_code = match.group(1)
     return {
         "error_type": exc.__class__.__name__,
         "http_status": _as_int(status_code),

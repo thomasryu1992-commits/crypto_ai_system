@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -234,6 +235,24 @@ def _private_snapshot_state(data: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _websocket_error_diagnostic(exc: Exception) -> dict[str, Any]:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code is None:
+        status_code = getattr(response, "status", None)
+    if status_code is None:
+        status_code = getattr(exc, "status_code", None)
+    if status_code is None:
+        match = re.search(r"\bHTTP\s+(\d{3})\b", str(exc), flags=re.IGNORECASE)
+        if match:
+            status_code = match.group(1)
+    return {
+        "error_type": exc.__class__.__name__,
+        "http_status": _as_int(status_code),
+        "error": str(exc)[:500],
+    }
+
+
 def websocket_private_account_snapshot_probe(
     url: str,
     headers: Mapping[str, str],
@@ -365,8 +384,7 @@ def websocket_private_account_snapshot_probe(
             diagnostics.append(
                 {
                     "attempt": attempt,
-                    "error_type": exc.__class__.__name__,
-                    "error": str(exc)[:500],
+                    **_websocket_error_diagnostic(exc),
                     "reconnect_required": True,
                 }
             )
@@ -375,7 +393,10 @@ def websocket_private_account_snapshot_probe(
                 continue
 
     last = diagnostics[-1] if diagnostics else {}
-    raise RuntimeError(f"Extended private account stream unavailable after bounded attempts: {last.get('error_type')} {last.get('error')}")
+    raise RuntimeError(
+        "Extended private account stream unavailable after bounded attempts: "
+        f"{last.get('error_type')} status={last.get('http_status')} {last.get('error')}"
+    )
 
 
 @dataclass(frozen=True)
