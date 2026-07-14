@@ -255,10 +255,10 @@ def test_step276_packet_hash_validation_fails_when_tampered() -> None:
 
 def test_step276_version_and_config_safety_flags() -> None:
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.286.0"' in pyproject
+    assert 'version = "0.286.2"' in pyproject
 
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     readiness = settings["execution"]["signed_testnet_execution_readiness_packet"]
     assert readiness["enabled"] is False
     assert readiness["review_only"] is True

@@ -26,8 +26,6 @@ def _prepare_phase5_1_state() -> None:
     latest_submission = Path("storage/latest/manual_approval_intake_submission.json")
     if latest_submission.exists():
         latest_submission.unlink()
-    if Path("storage/latest/phase5_1_manual_approval_operator_handoff_report.json").exists():
-        return
     persist_valid_price_lineage_artifacts()
     persist_paper_data_quality_gate_report()
     persist_paper_strategy_validation_report()

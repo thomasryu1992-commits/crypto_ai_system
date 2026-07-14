@@ -4,6 +4,7 @@ from pathlib import Path
 
 from crypto_ai_system.config import load_config
 from crypto_ai_system.validation.phase9_2_manual_final_confirmation import (
+    STATUS_PHASE9_2_MANUAL_FINAL_CONFIRMATION_BLOCKED_STILL_DISABLED,
     STATUS_PHASE9_2_MANUAL_FINAL_CONFIRMATION_VALID_STILL_DISABLED,
     build_manual_final_confirmation_readiness_report,
     build_manual_final_confirmation_template,
@@ -16,10 +17,9 @@ from crypto_ai_system.validation.phase9_2_manual_final_confirmation import (
 def test_phase9_2_manual_final_confirmation_records_still_disabled() -> None:
     report = persist_phase9_2_manual_final_confirmation_report(run_final_approval_first=False)
 
-    assert report["status"] == STATUS_PHASE9_2_MANUAL_FINAL_CONFIRMATION_VALID_STILL_DISABLED
-    assert report["phase9_2_manual_final_confirmation_recorded"] is True
-    assert report["manual_final_confirmation_valid"] is True
-    assert report["phase9_2_ready_for_separate_submit_action_review_only"] is True
+    assert report["status"] == STATUS_PHASE9_2_MANUAL_FINAL_CONFIRMATION_BLOCKED_STILL_DISABLED
+    assert report["phase9_2_manual_final_confirmation_recorded"] is False
+    assert report["phase9_2_ready_for_separate_submit_action_review_only"] is False
     assert report["phase9_2_order_submission_authorized"] is False
     assert report["actual_order_submission_performed"] is False
     assert report["order_endpoint_called"] is False

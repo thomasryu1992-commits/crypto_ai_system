@@ -41,7 +41,7 @@ def test_approval_and_execution_permission_states_remain_all_false() -> None:
     assert not any(execution_state.values())
 
 
-def test_cumulative_lean_migration_state_advances_to_phase7_without_permission_change() -> None:
+def test_cumulative_lean_migration_state_advances_to_phase8_without_permission_change() -> None:
     root = Path(__file__).resolve().parents[1]
 
     payload = json.loads(
@@ -63,7 +63,7 @@ def test_cumulative_lean_migration_state_advances_to_phase7_without_permission_c
     )
     assert (
         payload["current"]["target"]
-            == "PHASE7_EXECUTOR_REVIEW_MERGE"
+            == "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION"
     )
     assert payload["execution_permissions_changed"] is False
 

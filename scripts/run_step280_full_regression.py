@@ -188,15 +188,25 @@ STEP280_FULL_REGRESSION_SUITES: list[dict[str, object]] = [
 def _expand_patterns(patterns: Iterable[str]) -> list[str]:
     files: list[str] = []
     for pattern in patterns:
-        files.extend(str(path.relative_to(ROOT)) for path in sorted(ROOT.glob(pattern)))
+        files.extend(path.relative_to(ROOT).as_posix() for path in sorted(ROOT.glob(pattern)))
     return sorted(dict.fromkeys(files))
 
 
 def build_suite_plan() -> list[dict[str, object]]:
     plan: list[dict[str, object]] = []
+    assigned: set[str] = set()
     for suite in STEP280_FULL_REGRESSION_SUITES:
         files = _expand_patterns(suite["patterns"])  # type: ignore[arg-type]
+        assigned.update(files)
         plan.append({"name": suite["name"], "patterns": suite["patterns"], "files": files})
+    all_root_tests = _expand_patterns(["tests/test_*.py"])
+    unassigned = [path for path in all_root_tests if path not in assigned]
+    if unassigned:
+        plan.append({
+            "name": "non_step_regressions",
+            "patterns": ["tests/test_*.py"],
+            "files": unassigned,
+        })
     return plan
 
 

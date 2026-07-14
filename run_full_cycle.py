@@ -41,22 +41,12 @@ from crypto_ai_system.reports.settings_write_preview_guard import run_settings_w
 from crypto_ai_system.feedback.review import run_feedback_review_chain
 from crypto_ai_system.governance.approval import run_approval_review_chain
 from crypto_ai_system.governance.readiness import run_readiness_review_chain
-from crypto_ai_system.validation.phase7_signed_testnet_validation_design_guard import persist_phase7_signed_testnet_validation_design_guard_report
-from crypto_ai_system.validation.phase7_1_signed_testnet_pre_submit_payload_guard import persist_phase7_1_signed_testnet_pre_submit_payload_guard_report
-from crypto_ai_system.validation.review_chain_state_doctor import persist_phase7_1_review_chain_state_doctor_report
-from crypto_ai_system.validation.phase7_2_executor_enablement_review_packet import persist_phase7_2_executor_enablement_review_packet_report
-from crypto_ai_system.validation.phase7_3_disabled_signed_testnet_executor_review import persist_phase7_3_disabled_signed_testnet_executor_review_report
-from crypto_ai_system.validation.phase7_4_disabled_execution_reconciliation_session_close import persist_phase7_4_disabled_execution_reconciliation_session_close_report
-from crypto_ai_system.validation.phase7_5_reconciliation_session_close_review_packet import persist_phase7_5_reconciliation_session_close_review_packet_report
-from crypto_ai_system.validation.phase7_6_disabled_signed_testnet_session_operator_handoff import persist_phase7_6_disabled_signed_testnet_session_operator_handoff_report
-from crypto_ai_system.validation.phase7_7_future_executor_review_prerequisite_design import persist_phase7_7_future_executor_review_prerequisite_design_report
-from crypto_ai_system.validation.phase7_8_future_executor_approval_packet_template import persist_phase7_8_future_executor_approval_packet_template_report
-from crypto_ai_system.validation.phase7_9_future_executor_approval_intake_validator import persist_phase7_9_future_executor_approval_intake_validator_report
-from crypto_ai_system.validation.phase7_10_future_executor_approval_review_packet import persist_phase7_10_future_executor_approval_review_packet_report
-from crypto_ai_system.validation.phase7_11_future_executor_enablement_design_review import persist_phase7_11_future_executor_enablement_design_review_report
-from crypto_ai_system.validation.phase7_12_future_executor_enablement_guard_fixture import persist_phase7_12_future_executor_enablement_guard_fixture_report
-from crypto_ai_system.validation.phase7_13_future_executor_enablement_review_packet import persist_phase7_13_future_executor_enablement_review_packet_report
-from crypto_ai_system.validation.phase7_14_future_executor_operator_decision_packet import persist_phase7_14_future_executor_operator_decision_packet_report
+from crypto_ai_system.governance.executor_review import run_executor_review_chain
+from crypto_ai_system.governance.session_review import run_session_review_chain
+from crypto_ai_system.governance.executor_approval import run_executor_approval_chain
+from crypto_ai_system.governance.stage_transition import run_stage_transition_chain
+from crypto_ai_system.governance.pre_executor_review import run_pre_executor_review_chain
+from crypto_ai_system.governance.signed_testnet_execution_preparation import run_signed_testnet_execution_preparation_chain
 from crypto_ai_system.reports.review_only_export_packet import run_review_only_export_packet_latest
 from crypto_ai_system.execution.real_testnet_read_only_adapter import run_real_testnet_read_only_adapter_latest
 from crypto_ai_system.execution.testnet_secret_metadata_intake_v2 import run_testnet_secret_metadata_intake_latest
@@ -154,22 +144,50 @@ def run_full_cycle() -> dict:
     phase6_4_signed_testnet_readiness_review_packet = readiness_legacy["readiness_packet"]
     phase6_5_actual_manual_approval_operator_unlock_intake_sandbox = readiness_legacy["actual_intake_sandbox"]
     phase6_6_actual_intake_validation_bridge = readiness_legacy["actual_intake_bridge"]
-    phase7_signed_testnet_validation_design_guard = persist_phase7_signed_testnet_validation_design_guard_report()
-    phase7_1_signed_testnet_pre_submit_payload_guard = persist_phase7_1_signed_testnet_pre_submit_payload_guard_report()
-    phase7_1_1_review_chain_state_doctor = persist_phase7_1_review_chain_state_doctor_report()
-    phase7_2_executor_enablement_review_packet = persist_phase7_2_executor_enablement_review_packet_report()
-    phase7_3_disabled_signed_testnet_executor_review = persist_phase7_3_disabled_signed_testnet_executor_review_report()
-    phase7_4_disabled_execution_reconciliation_session_close = persist_phase7_4_disabled_execution_reconciliation_session_close_report()
-    phase7_5_reconciliation_session_close_review_packet = persist_phase7_5_reconciliation_session_close_review_packet_report()
-    phase7_6_disabled_signed_testnet_session_operator_handoff = persist_phase7_6_disabled_signed_testnet_session_operator_handoff_report()
-    phase7_7_future_executor_review_prerequisite_design = persist_phase7_7_future_executor_review_prerequisite_design_report()
-    phase7_8_future_executor_approval_packet_template = persist_phase7_8_future_executor_approval_packet_template_report()
-    phase7_9_future_executor_approval_intake_validator = persist_phase7_9_future_executor_approval_intake_validator_report()
-    phase7_10_future_executor_approval_review_packet = persist_phase7_10_future_executor_approval_review_packet_report()
-    phase7_11_future_executor_enablement_design_review = persist_phase7_11_future_executor_enablement_design_review_report()
-    phase7_12_future_executor_enablement_guard_fixture = persist_phase7_12_future_executor_enablement_guard_fixture_report()
-    phase7_13_future_executor_enablement_review_packet = persist_phase7_13_future_executor_enablement_review_packet_report()
-    phase7_14_future_executor_operator_decision_packet = persist_phase7_14_future_executor_operator_decision_packet_report()
+    executor_review_bundle = run_executor_review_chain()
+    executor_review = executor_review_bundle["report"]
+    executor_review_legacy = executor_review_bundle["legacy_outputs"]
+    phase7_signed_testnet_validation_design_guard = executor_review_legacy["validation_design"]
+    phase7_1_signed_testnet_pre_submit_payload_guard = executor_review_legacy["pre_submit_payload_guard"]
+    phase7_1_1_review_chain_state_doctor = executor_review_legacy["review_chain_doctor"]
+    phase7_2_executor_enablement_review_packet = executor_review_legacy["enablement_review_packet"]
+    phase7_3_disabled_signed_testnet_executor_review = executor_review_legacy["disabled_executor_review"]
+    session_review_bundle = run_session_review_chain(
+        run_executor_review_first=False,
+    )
+    session_review = session_review_bundle["report"]
+    session_review_legacy = session_review_bundle["legacy_outputs"]
+    phase7_4_disabled_execution_reconciliation_session_close = session_review_legacy["disabled_reconciliation_session_close"]
+    phase7_5_reconciliation_session_close_review_packet = session_review_legacy["reconciliation_session_close_review_packet"]
+    phase7_6_disabled_signed_testnet_session_operator_handoff = session_review_legacy["disabled_session_operator_handoff"]
+    executor_approval_bundle = run_executor_approval_chain(
+        run_session_review_first=False,
+    )
+    executor_approval_review = executor_approval_bundle["report"]
+    executor_approval_legacy = executor_approval_bundle["legacy_outputs"]
+    phase7_7_future_executor_review_prerequisite_design = executor_approval_legacy["future_executor_prerequisite_design"]
+    phase7_8_future_executor_approval_packet_template = executor_approval_legacy["future_executor_approval_template"]
+    phase7_9_future_executor_approval_intake_validator = executor_approval_legacy["future_executor_approval_intake"]
+    phase7_10_future_executor_approval_review_packet = executor_approval_legacy["future_executor_approval_review_packet"]
+    stage_transition_bundle = run_stage_transition_chain(
+        run_executor_approval_first=False,
+    )
+    stage_transition_review = stage_transition_bundle["report"]
+    stage_transition_legacy = stage_transition_bundle["legacy_outputs"]
+    phase7_11_future_executor_enablement_design_review = stage_transition_legacy["enablement_design_review"]
+    phase7_12_future_executor_enablement_guard_fixture = stage_transition_legacy["enablement_guard_fixture"]
+    phase7_13_future_executor_enablement_review_packet = stage_transition_legacy["enablement_review_packet"]
+    phase7_14_future_executor_operator_decision_packet = stage_transition_legacy["operator_decision_packet"]
+    pre_executor_review_bundle = run_pre_executor_review_chain(
+        run_stage_transition_first=False,
+    )
+    pre_executor_review = pre_executor_review_bundle["report"]
+    pre_executor_review_legacy = pre_executor_review_bundle["legacy_outputs"]
+    phase7_15_operator_decision_intake_template = pre_executor_review_legacy["operator_decision_intake_template"]
+    phase7_16_operator_decision_intake_validation = pre_executor_review_legacy["operator_decision_intake_validation"]
+    phase7_17_final_pre_executor_review_packet = pre_executor_review_legacy["final_pre_executor_review_packet"]
+    phase8_execution_preparation_bundle = run_signed_testnet_execution_preparation_chain()
+    signed_testnet_execution_preparation = phase8_execution_preparation_bundle["report"]
     agent_library = _run_agent_library_review_chain()
     review_only_export_packet = run_review_only_export_packet_latest()
     real_testnet_read_only_adapter = run_real_testnet_read_only_adapter_latest()
@@ -267,14 +285,17 @@ def run_full_cycle() -> dict:
         "phase6_4_signed_testnet_readiness_review_packet": phase6_4_signed_testnet_readiness_review_packet,
         "phase6_5_actual_manual_approval_operator_unlock_intake_sandbox": phase6_5_actual_manual_approval_operator_unlock_intake_sandbox,
         "phase6_6_actual_intake_validation_bridge": phase6_6_actual_intake_validation_bridge,
+        "executor_review": executor_review,
         "phase7_signed_testnet_validation_design_guard": phase7_signed_testnet_validation_design_guard,
         "phase7_1_signed_testnet_pre_submit_payload_guard": phase7_1_signed_testnet_pre_submit_payload_guard,
         "phase7_1_1_review_chain_state_doctor": phase7_1_1_review_chain_state_doctor,
         "phase7_2_executor_enablement_review_packet": phase7_2_executor_enablement_review_packet,
         "phase7_3_disabled_signed_testnet_executor_review": phase7_3_disabled_signed_testnet_executor_review,
+        "session_review": session_review,
         "phase7_4_disabled_execution_reconciliation_session_close": phase7_4_disabled_execution_reconciliation_session_close,
         "phase7_5_reconciliation_session_close_review_packet": phase7_5_reconciliation_session_close_review_packet,
         "phase7_6_disabled_signed_testnet_session_operator_handoff": phase7_6_disabled_signed_testnet_session_operator_handoff,
+        "executor_approval_review": executor_approval_review,
         "phase7_7_future_executor_review_prerequisite_design": phase7_7_future_executor_review_prerequisite_design,
         "phase7_8_future_executor_approval_packet_template": phase7_8_future_executor_approval_packet_template,
         "phase7_9_future_executor_approval_intake_validator": phase7_9_future_executor_approval_intake_validator,
@@ -283,6 +304,12 @@ def run_full_cycle() -> dict:
         "phase7_12_future_executor_enablement_guard_fixture": phase7_12_future_executor_enablement_guard_fixture,
         "phase7_13_future_executor_enablement_review_packet": phase7_13_future_executor_enablement_review_packet,
         "phase7_14_future_executor_operator_decision_packet": phase7_14_future_executor_operator_decision_packet,
+        "stage_transition_review": stage_transition_review,
+        "phase7_15_operator_decision_intake_template": phase7_15_operator_decision_intake_template,
+        "phase7_16_operator_decision_intake_validation": phase7_16_operator_decision_intake_validation,
+        "phase7_17_final_pre_executor_review_packet": phase7_17_final_pre_executor_review_packet,
+        "pre_executor_review": pre_executor_review,
+        "signed_testnet_execution_preparation": signed_testnet_execution_preparation,
         "agent_library": agent_library,
         "review_only_export_packet": review_only_export_packet,
         "real_testnet_read_only_adapter": real_testnet_read_only_adapter,

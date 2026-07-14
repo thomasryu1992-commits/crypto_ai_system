@@ -647,10 +647,41 @@ def _valid_candidate_fixture() -> dict[str, Any]:
     }
 
 
+def _valid_p50_source_fixture() -> dict[str, Any]:
+    payload = {
+        "artifact_type": "p50_external_evidence_import_validator_report",
+        "status": _EXPECTED_P50_STATUS,
+        "review_only": True,
+        "external_runtime_only": True,
+        "review_package_default_no_submit": True,
+        "p7_input_preview_only": True,
+        "runtime_authority_source": False,
+        "p7_intake_execution_performed": False,
+        "p7_valid_status_written_by_p50": False,
+        "actual_order_submission_performed": False,
+        "order_endpoint_called": False,
+        "http_request_sent": False,
+        "signature_created": False,
+        "secret_value_accessed": False,
+        "candidate_import_payload_supplied": True,
+        "candidate_bundle_validation": {
+            "redacted_submit_response_bundle_import_valid": True,
+        },
+        "candidate_transcript_validation": {
+            "execution_transcript_import_valid": True,
+        },
+        "candidate_no_secret_log_scan_validation": {
+            "no_secret_log_scan_report_valid": True,
+        },
+    }
+    payload["p50_external_evidence_import_validator_sha256"] = sha256_json(payload)
+    return payload
+
+
 def build_p51_negative_fixture_results(*, cfg: AppConfig | None = None) -> dict[str, Any]:
     cfg = cfg or load_config()
     valid = _valid_candidate_fixture()
-    source = _read_latest_json(cfg, "p50_external_evidence_import_validator_report.json")
+    source = _valid_p50_source_fixture()
     cases: dict[str, Mapping[str, Any] | None] = {
         "missing_status_polling_events": {k: v for k, v in valid.items() if k != "status_polling_events"},
         "mock_exchange_order_id": {

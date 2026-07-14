@@ -20,7 +20,13 @@ from crypto_ai_system.execution.real_order_test_redacted_evidence_receipt import
     validate_p67_receipt_files,
     validate_p67_redacted_evidence_receipt,
 )
+from crypto_ai_system.execution.operator_activation_intake_for_real_order_test import (
+    build_p66_operator_activation_intake_report,
+)
 from crypto_ai_system.utils.audit import sha256_json
+from external_runtime_packages.binance_futures_testnet_adapter import (
+    build_p65_operator_installed_sender_executable_report,
+)
 
 NOW = datetime(2026, 7, 12, 5, 0, 0, tzinfo=timezone.utc)
 
@@ -30,8 +36,9 @@ def _root() -> Path:
 
 
 def _p66_report() -> dict:
-    import json
-    return json.loads((_root() / "storage/latest/p66_operator_activation_intake_for_real_order_test_report.json").read_text())
+    return build_p66_operator_activation_intake_report(
+        build_p65_operator_installed_sender_executable_report(), now=NOW
+    )
 
 
 def _fixture_chain(report: dict) -> tuple[dict, dict]:

@@ -13,7 +13,10 @@ from crypto_ai_system.execution.p7_accepted_evidence_import_packet_staging impor
     build_p52_p7_accepted_evidence_import_packet_staging_report,
     validate_staged_p7_import_packet,
 )
-from crypto_ai_system.execution.p7_import_bridge_dry_run import build_p51_p7_import_bridge_dry_run_report
+from crypto_ai_system.execution.p7_import_bridge_dry_run import (
+    _valid_p50_source_fixture,
+    build_p51_p7_import_bridge_dry_run_report,
+)
 from crypto_ai_system.execution.runtime_disabled_flags import default_execution_flag_state, truthy_execution_flags
 from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
 from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
@@ -643,7 +646,11 @@ def build_p53_operator_controlled_p7_import_action_boundary_report(
 def _valid_p52_source_fixture(*, cfg: AppConfig | None = None) -> dict[str, Any]:
     cfg = cfg or load_config()
     candidate = _valid_candidate_fixture()
-    p51 = build_p51_p7_import_bridge_dry_run_report(cfg=cfg, candidate=candidate)
+    p51 = build_p51_p7_import_bridge_dry_run_report(
+        cfg=cfg,
+        p50_report=_valid_p50_source_fixture(),
+        candidate=candidate,
+    )
     return build_p52_p7_accepted_evidence_import_packet_staging_report(cfg=cfg, p51_report=p51, candidate=candidate)
 
 

@@ -24,9 +24,7 @@ def _probe_result_summary() -> dict:
 
 
 def _full_regression_report() -> dict:
-    report_path = Path("data/reports/step280_full_regression_runtime_hygiene_report.json")
-    if not report_path.exists():
-        report_path = Path("tests/fixtures/step280_full_regression_runtime_hygiene_report.json")
+    report_path = Path("tests/fixtures/step280_full_regression_runtime_hygiene_report.json")
     return json.loads(report_path.read_text(encoding="utf-8"))
 
 
@@ -230,7 +228,7 @@ def test_step281_detects_packet_hash_and_invariant_tampering() -> None:
 
 def test_step281_config_version_and_safety_flags() -> None:
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     cfg = settings["execution"]["explicit_signed_testnet_execution_approval_packet"]
     assert cfg["enabled"] is False
     assert cfg["review_only"] is True

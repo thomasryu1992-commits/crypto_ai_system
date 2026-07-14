@@ -172,10 +172,10 @@ def test_step273_preflight_blocks_if_testnet_order_flag_enabled() -> None:
 
 def test_step273_version_and_config_safety_flags() -> None:
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.286.0"' in pyproject
+    assert 'version = "0.286.2"' in pyproject
 
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     contract = settings["execution"]["signed_testnet_adapter_contract"]
     assert contract["contract_review_only"] is True
     assert contract["place_order_enabled"] is False

@@ -1,0 +1,50 @@
+{
+  "version": "phase7_m1_executor_review_v1",
+  "status": "PHASE7_M1_EXECUTOR_REVIEW_MERGED",
+  "active_domain": "governance.executor_review",
+  "runtime_authority": false,
+  "canonical_entry_point": "crypto_ai_system.governance.executor_review.run_executor_review_chain",
+  "scope": [
+    "phase7_validation_design_guard",
+    "phase7_1_pre_submit_payload_guard",
+    "phase7_1_1_review_chain_state_doctor",
+    "phase7_2_executor_enablement_review_packet",
+    "phase7_3_disabled_executor_review"
+  ],
+  "states": [
+    "DISABLED_EXECUTOR_REVIEW_ONLY",
+    "REVIEW_CHAIN_REPAIR_REQUIRED",
+    "BLOCKED"
+  ],
+  "next_work": "PHASE7_M2_SESSION_REVIEW_MERGE",
+  "safety": {
+    "runtime_permission_source": false,
+    "signed_testnet_unlock_authority": false,
+    "phase7_execution_authority": false,
+    "phase7_order_submission_authority": false,
+    "signed_testnet_executor_enablement_authority": false,
+    "signed_testnet_order_submission_authority": false,
+    "actual_executor_enablement_performed": false,
+    "actual_order_submission_performed": false,
+    "actual_cancel_performed": false,
+    "api_key_value_access_allowed": false,
+    "api_secret_value_access_allowed": false,
+    "secret_file_access_allowed": false,
+    "secret_file_creation_allowed": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "signed_testnet_promotion_allowed": false,
+    "live_canary_execution_enabled": false,
+    "live_scaled_execution_enabled": false,
+    "external_order_submission_allowed": false,
+    "external_order_submission_performed": false,
+    "place_order_enabled": false,
+    "cancel_order_enabled": false,
+    "signed_order_executor_enabled": false,
+    "runtime_settings_mutated": false,
+    "score_weights_mutated": false,
+    "candidate_profile_applied": false,
+    "settings_write_preview_applied": false,
+    "auto_promotion_allowed": false
+  }
+}

@@ -11,7 +11,7 @@ from crypto_ai_system.execution.transactional_evidence_store import (
     SQLiteTransactionalEvidenceStore,
 )
 from crypto_ai_system.execution.transactional_p7_importer_integration import (
-    STATUS_INTEGRATION_VALIDATED_REVIEW_ONLY_IMPORTER_DISABLED,
+    STATUS_BLOCKED_FAIL_CLOSED,
     P57ImporterIntegrationRequest,
     TransactionalP7ImporterIntegration,
     TransactionalP7ImporterIntegrationConfig,
@@ -138,10 +138,10 @@ def test_p57_negative_fixtures_all_fail_closed():
     assert len(report["fixture_results"]) == 10
 
 
-def test_p57_report_validates_integration_but_keeps_real_import_disabled():
+def test_p57_report_blocks_without_real_evidence_but_keeps_integration_validation():
     report = build_p57_transactional_p7_importer_integration_report()
-    assert report["status"] == STATUS_INTEGRATION_VALIDATED_REVIEW_ONLY_IMPORTER_DISABLED
-    assert report["blocked"] is False
+    assert report["status"] == STATUS_BLOCKED_FAIL_CLOSED
+    assert report["blocked"] is True
     assert report["p54_final_guard_connected_to_p56_transaction_backend"] is True
     assert report["transactional_importer_orchestration_implemented"] is True
     assert report["integration_self_test_passed"] is True

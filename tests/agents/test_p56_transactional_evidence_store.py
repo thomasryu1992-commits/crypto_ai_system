@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 
 from crypto_ai_system.execution.transactional_evidence_store import (
-    STATUS_BACKEND_VALIDATED_REVIEW_ONLY_IMPORTER_DISABLED,
+    STATUS_BLOCKED_FAIL_CLOSED,
     DuplicateImportError,
     EvidenceIntegrityError,
     InjectedTransactionFailure,
@@ -141,16 +141,16 @@ def test_p56_rejects_secret_or_raw_payload_fields(tmp_path):
     assert store.row_counts()["import_records"] == 0
 
 
-def test_p56_report_marks_backend_ready_but_real_import_disabled():
+def test_p56_report_blocks_without_real_evidence_and_withholds_readiness_flags():
     report = build_p56_transactional_evidence_store_report()
-    assert report["status"] == STATUS_BACKEND_VALIDATED_REVIEW_ONLY_IMPORTER_DISABLED
-    assert report["blocked"] is False
+    assert report["status"] == STATUS_BLOCKED_FAIL_CLOSED
+    assert report["blocked"] is True
     assert report["backend_implementation_added"] is True
-    assert report["backend_transaction_ready"] is True
-    assert report["backend_atomic_lock_nonce_append_commit_proven"] is True
-    assert report["backend_rollback_proven"] is True
-    assert report["backend_duplicate_prevention_proven"] is True
-    assert report["backend_append_only_guards_proven"] is True
+    assert report["backend_transaction_ready"] is False
+    assert report["backend_atomic_lock_nonce_append_commit_proven"] is False
+    assert report["backend_rollback_proven"] is False
+    assert report["backend_duplicate_prevention_proven"] is False
+    assert report["backend_append_only_guards_proven"] is False
     assert report["backend_self_test_database_persisted"] is False
     assert report["real_signed_testnet_evidence_present"] is False
     assert report["real_p7_import_integrated"] is False
