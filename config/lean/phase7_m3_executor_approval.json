@@ -1,0 +1,61 @@
+{
+  "version": "phase7_m3_executor_approval_v1",
+  "status": "PHASE7_M3_EXECUTOR_APPROVAL_MERGED",
+  "active_domain": "governance.executor_approval",
+  "runtime_authority": false,
+  "canonical_entry_point": "crypto_ai_system.governance.executor_approval.run_executor_approval_chain",
+  "scope": [
+    "phase7_7_future_executor_review_prerequisite_design",
+    "phase7_8_future_executor_approval_packet_template",
+    "phase7_9_future_executor_approval_intake_validator",
+    "phase7_10_future_executor_approval_review_packet"
+  ],
+  "states": [
+    "FUTURE_EXECUTOR_APPROVAL_FIXTURE_REVIEW_ONLY",
+    "OPERATOR_SUBMISSION_VALIDATED_REVIEW_ONLY",
+    "APPROVAL_EVIDENCE_REPAIR_REQUIRED",
+    "BLOCKED"
+  ],
+  "fixture_policy": {
+    "fixture_validation_is_executor_approval": false,
+    "fixture_validation_is_runtime_authority": false,
+    "fixture_validation_can_unlock_signed_testnet": false,
+    "fixture_validation_can_unlock_live": false
+  },
+  "next_work": "PHASE7_M4_STAGE_TRANSITION_MERGE",
+  "safety": {
+    "runtime_permission_source": false,
+    "executor_approval_runtime_authority": false,
+    "signed_testnet_unlock_authority": false,
+    "phase7_execution_authority": false,
+    "phase7_order_submission_authority": false,
+    "signed_testnet_executor_approval_authority": false,
+    "signed_testnet_execution_authority": false,
+    "signed_testnet_order_submission_authority": false,
+    "signed_testnet_promotion_authority": false,
+    "actual_executor_approval_created": false,
+    "actual_executor_enablement_performed": false,
+    "actual_order_submission_performed": false,
+    "actual_cancel_performed": false,
+    "api_key_value_access_allowed": false,
+    "api_secret_value_access_allowed": false,
+    "secret_file_access_allowed": false,
+    "secret_file_creation_allowed": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "signed_testnet_promotion_allowed": false,
+    "live_canary_execution_enabled": false,
+    "live_scaled_execution_enabled": false,
+    "external_order_submission_allowed": false,
+    "external_order_submission_performed": false,
+    "exchange_endpoint_called": false,
+    "place_order_enabled": false,
+    "cancel_order_enabled": false,
+    "signed_order_executor_enabled": false,
+    "runtime_settings_mutated": false,
+    "score_weights_mutated": false,
+    "candidate_profile_applied": false,
+    "settings_write_preview_applied": false,
+    "auto_promotion_allowed": false
+  }
+}

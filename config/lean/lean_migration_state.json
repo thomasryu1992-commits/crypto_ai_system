@@ -16,19 +16,23 @@
       "status": "CLOSED",
       "closure_manifest": "config/lean/phase6_lean_closure.json",
       "active_domain": "governance.readiness"
+    },
+    "phase7_pre_executor": {
+      "status": "CLOSED",
+      "closure_manifest": "config/lean/phase7_lean_closure.json",
+      "active_domain": "governance"
     }
   },
   "current": {
-    "target": "PHASE7_EXECUTOR_REVIEW_MERGE",
-    "active_domain": "governance.executor_review",
-    "status": "NOT_STARTED"
+    "target": "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION",
+    "active_domain": "governance.signed_testnet_execution_preparation",
+    "status": "PHASE8_M1_EXECUTION_PREPARATION_DESIGN_COMPLETE",
+    "next_step": "PHASE8_M2_METADATA_KEY_SCOPE_AND_WRITE_PATH_DRY_VALIDATION"
   },
   "deferred_global_compaction": [
-    "archive historical Phase 4-7 reports",
-    "remove compatibility wrappers after import usage reaches zero",
-    "remove historical build-script filenames after CI migration",
-    "delete obsolete phase-number status checker contracts",
-    "rebuild lean CI"
+    "archive historical Phase 4-7 reports after one stable release",
+    "remove compatibility wrappers only after external import usage reaches zero",
+    "rebuild lean CI into domain-focused jobs"
   ],
   "execution_permissions_changed": false
 }
