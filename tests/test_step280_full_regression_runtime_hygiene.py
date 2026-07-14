@@ -13,8 +13,8 @@ def test_step280_versions_and_config_safety_flags():
     pyproject = root / "pyproject.toml"
     settings = yaml.safe_load((root / "config" / "settings.yaml").read_text(encoding="utf-8"))
 
-    assert 'version = "0.286.0"' in pyproject.read_text(encoding="utf-8")
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert 'version = "0.286.2"' in pyproject.read_text(encoding="utf-8")
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
 
     hygiene = settings["validation"]["full_regression_runtime_hygiene"]
     assert hygiene["step"] == 280

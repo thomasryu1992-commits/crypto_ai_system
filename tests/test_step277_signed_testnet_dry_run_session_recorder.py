@@ -296,10 +296,10 @@ def test_step277_recorder_hash_tampering_is_detected() -> None:
 
 def test_step277_version_and_config_safety_flags() -> None:
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.286.0"' in pyproject
+    assert 'version = "0.286.2"' in pyproject
 
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     cfg = settings["execution"]["signed_testnet_dry_run_session_recorder"]
     assert cfg["enabled"] is False
     assert cfg["review_only"] is True

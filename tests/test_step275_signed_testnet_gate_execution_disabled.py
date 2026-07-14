@@ -178,10 +178,10 @@ def test_step275_gate_hash_validation_fails_when_tampered() -> None:
 
 def test_step275_version_and_config_safety_flags() -> None:
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.286.0"' in pyproject
+    assert 'version = "0.286.2"' in pyproject
 
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     gate = settings["execution"]["signed_testnet_gate"]
     assert gate["enabled"] is False
     assert gate["review_only"] is True

@@ -135,9 +135,9 @@ def test_step257_testnet_executor_imports_from_plain_checkout_without_src_python
 
     script = f"""
 import json
-import sys
+import os
 from pathlib import Path
-assert not any(str(p).endswith('/src') or str(p).endswith('\\\\src') for p in sys.path if p)
+assert "PYTHONPATH" not in os.environ
 import execution.testnet_executor as testnet_executor
 testnet_executor.TESTNET_ORDER_LOG_PATH = Path({str(log_path)!r})
 status = testnet_executor.compatibility_status()

@@ -162,7 +162,7 @@ def test_step278_detects_session_event_hash_tampering() -> None:
 
 def test_step278_config_version_and_safety_flags() -> None:
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     probe_cfg = settings["execution"]["signed_testnet_read_only_venue_probe_session"]
     assert probe_cfg["enabled"] is False
     assert probe_cfg["review_only"] is True

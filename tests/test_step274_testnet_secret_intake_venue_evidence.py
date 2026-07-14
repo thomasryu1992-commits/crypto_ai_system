@@ -189,10 +189,10 @@ def test_step274_preflight_artifact_hash_validation_fails_when_tampered() -> Non
 
 def test_step274_version_and_safety_config_flags() -> None:
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.286.0"' in pyproject
+    assert 'version = "0.286.2"' in pyproject
 
     settings = yaml.safe_load(Path("config/settings.yaml").read_text(encoding="utf-8"))
-    assert settings["project"]["version"] == "step286_researchsignal_feature_lineage_fix"
+    assert settings["project"]["version"] == "p70_venue_neutral_execution_contract"
     step274 = settings["execution"]["testnet_secret_intake"]
     assert step274["enabled"] is False
     assert step274["metadata_only"] is True
