@@ -77,5 +77,25 @@
     "settings_write_preview_applied": false,
     "live_trading_allowed": false,
     "auto_promotion_allowed": false
+  },
+  "compatibility_migration": {
+    "phase7_15_numbered_module_is_thin_wrapper": true,
+    "phase7_15_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.operator_decision_intake",
+    "phase7_15_public_surface_preserved": true,
+    "phase7_16_imports_semantic_phase7_15_contract": true,
+    "phase7_16_numbered_business_logic_retirement_pending": true,
+    "phase7_17_numbered_business_logic_retirement_pending": true,
+    "runtime_authority": false,
+    "execution_permissions_changed": false,
+    "phase7_16_numbered_module_is_thin_wrapper": true,
+    "phase7_16_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.operator_decision_validation",
+    "phase7_16_public_surface_preserved": true,
+    "phase7_17_imports_semantic_phase7_16_contract": true,
+    "phase7_17_numbered_module_is_thin_wrapper": true,
+    "phase7_17_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.final_pre_executor_review",
+    "phase7_17_public_surface_preserved": true,
+    "all_phase7_15_17_numbered_modules_are_thin_wrappers": true,
+    "numbered_business_logic_still_present": false,
+    "numbered_business_logic_retirement_complete": true
   }
 }

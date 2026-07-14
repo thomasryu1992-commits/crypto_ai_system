@@ -20,6 +20,305 @@ from crypto_ai_system.governance.common import (
 
 EXECUTOR_APPROVAL_VERSION = "lean_executor_approval_v1"
 
+PHASE9_SINGLE_ORDER_REVIEW_VERSION = (
+    "phase9_single_signed_testnet_order_approval_review_v1"
+)
+
+PHASE9_SINGLE_ORDER_REQUIRED_SCOPE_FIELDS: tuple[str, ...] = (
+    "venue",
+    "symbol",
+    "side",
+    "order_type",
+    "max_notional_cap",
+    "approval_expires_at_utc",
+)
+
+
+def _phase9_positive_number(
+    value: Any,
+) -> bool:
+    if isinstance(value, bool):
+        return False
+
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _phase9_hash_without(
+    payload: Mapping[str, Any],
+    field: str,
+) -> str:
+    body = dict(payload)
+    body.pop(field, None)
+    return sha256_json(body)
+
+
+def build_phase9_single_order_approval_review_packet(
+    *,
+    phase8_report: Mapping[str, Any] | None,
+    proposed_order_scope: Mapping[str, Any] | None = None,
+    created_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build a review-only Phase 9 packet on the existing approval framework.
+
+    This packet never creates approval authority, enables an executor, signs a
+    request, or grants order submission permission.
+    """
+
+    created = created_at_utc or utc_now_canonical()
+    phase8 = dict(phase8_report or {})
+    scope = dict(proposed_order_scope or {})
+    blockers: list[str] = []
+
+    phase8_hash = str(
+        phase8.get("signed_testnet_execution_preparation_sha256")
+        or ""
+    )
+
+    if not phase8:
+        blockers.append("PHASE9_PHASE8_REPORT_MISSING")
+    elif (
+        not phase8_hash
+        or phase8_hash
+        != _phase9_hash_without(
+            phase8,
+            "signed_testnet_execution_preparation_sha256",
+        )
+    ):
+        blockers.append("PHASE9_PHASE8_REPORT_HASH_INVALID")
+
+    phase8_fresh_evidence_valid = (
+        phase8.get("phase8_fresh_runtime_evidence_validated")
+        is True
+        and phase8.get(
+            "phase8_integrated_runtime_validation_complete"
+        )
+        is True
+        and phase8.get("phase8_completion_review_allowed")
+        is True
+        and phase8.get("phase9_approval_review_allowed")
+        is True
+        and phase8.get("phase8_execution_preparation_ready")
+        is False
+        and phase8.get("ready_for_signed_testnet_execution")
+        is False
+        and phase8.get("testnet_order_submission_allowed")
+        is False
+    )
+
+    if not phase8_fresh_evidence_valid:
+        blockers.append(
+            "PHASE9_FRESH_PHASE8_RUNTIME_EVIDENCE_NOT_VALIDATED"
+        )
+
+    if not scope:
+        blockers.append("PHASE9_SINGLE_ORDER_SCOPE_MISSING")
+
+    if (
+        str(scope.get("stage") or "").strip().lower()
+        != "signed_testnet"
+    ):
+        blockers.append("PHASE9_SCOPE_STAGE_NOT_SIGNED_TESTNET")
+
+    if scope.get("payload_frozen") is not True:
+        blockers.append("PHASE9_SCOPE_ORDER_PAYLOAD_NOT_FROZEN")
+
+    missing_scope_fields = sorted(
+        field
+        for field in PHASE9_SINGLE_ORDER_REQUIRED_SCOPE_FIELDS
+        if not str(scope.get(field) or "").strip()
+    )
+
+    if missing_scope_fields:
+        blockers.append(
+            "PHASE9_SINGLE_ORDER_SCOPE_FIELD_MISSING:"
+            + ",".join(missing_scope_fields)
+        )
+
+    if not _phase9_positive_number(
+        scope.get("max_notional_cap")
+    ):
+        blockers.append("PHASE9_MAX_NOTIONAL_CAP_INVALID")
+
+    maximum_order_count = scope.get(
+        "maximum_order_count",
+        1,
+    )
+
+    if maximum_order_count != 1:
+        blockers.append(
+            "PHASE9_MAXIMUM_ORDER_COUNT_MUST_EQUAL_ONE"
+        )
+
+    phase8_m3 = dict(
+        phase8.get(
+            "hot_path_pre_order_risk_gate_validation"
+        )
+        or {}
+    )
+
+    if (
+        str(scope.get("order_intent_id") or "")
+        != str(phase8_m3.get("final_order_intent_id") or "")
+    ):
+        blockers.append(
+            "PHASE9_SCOPE_ORDER_INTENT_ID_MISMATCH"
+        )
+
+    if (
+        str(scope.get("final_order_intent_sha256") or "")
+        != str(phase8_m3.get("final_order_intent_sha256") or "")
+    ):
+        blockers.append(
+            "PHASE9_SCOPE_ORDER_INTENT_HASH_MISMATCH"
+        )
+
+    if (
+        str(scope.get("risk_gate_id") or "")
+        != str(phase8_m3.get("risk_gate_id") or "")
+    ):
+        blockers.append("PHASE9_SCOPE_RISK_GATE_ID_MISMATCH")
+
+    unsafe_scope_fields = _unsafe_true_fields(scope)
+
+    if unsafe_scope_fields:
+        blockers.append(
+            "PHASE9_SCOPE_UNSAFE_PERMISSION_FIELD:"
+            + ",".join(unsafe_scope_fields)
+        )
+
+    blockers = sorted(set(blockers))
+    review_ready = not blockers
+
+    if review_ready:
+        status = (
+            "PHASE9_SINGLE_ORDER_APPROVAL_REVIEW_"
+            "PACKET_RECORDED_REVIEW_ONLY"
+        )
+        next_action = (
+            "collect_explicit_operator_approval_for_exact_"
+            "single_order_scope_keep_executor_disabled"
+        )
+    elif not phase8_fresh_evidence_valid:
+        status = (
+            "PHASE9_SINGLE_ORDER_APPROVAL_REVIEW_"
+            "WAITING_FOR_FRESH_PHASE8_EVIDENCE"
+        )
+        next_action = (
+            "collect_and_validate_fresh_phase8_runtime_"
+            "evidence_keep_executor_disabled"
+        )
+    else:
+        status = (
+            "PHASE9_SINGLE_ORDER_APPROVAL_REVIEW_"
+            "SCOPE_REPAIR_REQUIRED"
+        )
+        next_action = (
+            "complete_exact_single_order_scope_and_"
+            "rerun_review_keep_executor_disabled"
+        )
+
+    packet: dict[str, Any] = {
+        "phase9_single_order_approval_review_packet_id": stable_id(
+            "phase9_single_order_approval_review_packet",
+            {
+                "version": PHASE9_SINGLE_ORDER_REVIEW_VERSION,
+                "phase8_report_sha256": phase8_hash,
+                "order_intent_id": scope.get("order_intent_id"),
+                "created_at_utc": created,
+                "blockers": blockers,
+            },
+            24,
+        ),
+        "version": PHASE9_SINGLE_ORDER_REVIEW_VERSION,
+        "status": status,
+        "review_only": True,
+        "blocked": bool(blockers),
+        "fail_closed": bool(blockers),
+        "approval_scope": "single_signed_testnet_order",
+        "single_order_only": True,
+        "maximum_order_count": 1,
+        "phase8_fresh_runtime_evidence_validated": (
+            phase8_fresh_evidence_valid
+        ),
+        "source_phase8_report_id": phase8.get(
+            "signed_testnet_execution_preparation_id"
+        ),
+        "source_phase8_report_sha256": phase8_hash or None,
+        "source_phase8_runtime_evidence_validation_id": (
+            phase8.get("phase8_runtime_evidence_validation_id")
+        ),
+        "proposed_order_scope": {
+            "stage": scope.get("stage"),
+            "order_intent_id": scope.get("order_intent_id"),
+            "final_order_intent_sha256": scope.get(
+                "final_order_intent_sha256"
+            ),
+            "risk_gate_id": scope.get("risk_gate_id"),
+            "venue": scope.get("venue"),
+            "symbol": scope.get("symbol"),
+            "side": scope.get("side"),
+            "order_type": scope.get("order_type"),
+            "max_notional_cap": scope.get("max_notional_cap"),
+            "approval_expires_at_utc": scope.get(
+                "approval_expires_at_utc"
+            ),
+        },
+        "required_operator_fields": list(
+            PHASE9_SINGLE_ORDER_REQUIRED_SCOPE_FIELDS
+        ),
+        "phase9_single_order_approval_review_packet_ready": (
+            review_ready
+        ),
+        "phase9_approval_review_allowed": review_ready,
+        "explicit_operator_approval_required": True,
+        "exact_order_scope_hash_required": True,
+        "approval_expiry_required": True,
+        "approval_reuse_allowed": False,
+        "approval_scope_expansion_allowed": False,
+        "actual_phase9_approval_created": False,
+        "phase9_approval_runtime_authority": False,
+        "phase9_executor_enablement_allowed": False,
+        "phase9_request_signing_allowed": False,
+        "phase9_order_submission_permission_granted": False,
+        "phase9_order_submission_performed": False,
+        "phase9_cancel_permission_granted": False,
+        "phase9_cancel_performed": False,
+        "blockers": blockers,
+        "next_action": next_action,
+        "runtime_permission_source": False,
+        "ready_for_signed_testnet_execution": False,
+        "testnet_order_submission_allowed": False,
+        "signed_testnet_promotion_allowed": False,
+        "live_canary_execution_enabled": False,
+        "live_scaled_execution_enabled": False,
+        "external_order_submission_allowed": False,
+        "external_order_submission_performed": False,
+        "exchange_endpoint_called": False,
+        "place_order_enabled": False,
+        "cancel_order_enabled": False,
+        "signed_order_executor_enabled": False,
+        "api_key_value_access_allowed": False,
+        "api_secret_value_access_allowed": False,
+        "secret_file_access_allowed": False,
+        "secret_file_creation_allowed": False,
+        "runtime_settings_mutated": False,
+        "score_weights_mutated": False,
+        "candidate_profile_applied": False,
+        "settings_write_preview_applied": False,
+        "auto_promotion_allowed": False,
+        "created_at_utc": created,
+    }
+
+    packet[
+        "phase9_single_order_approval_review_packet_sha256"
+    ] = sha256_json(packet)
+
+    return packet
+
+
 STATE_FIXTURE_REVIEW_ONLY = (
     "FUTURE_EXECUTOR_APPROVAL_FIXTURE_REVIEW_ONLY"
 )
@@ -1238,6 +1537,9 @@ __all__ = [
     "STATUS_OPERATOR_SUBMISSION_RECORDED_REVIEW_ONLY",
     "STATUS_REPAIR_REQUIRED_REVIEW_ONLY",
     "STATUS_BLOCKED_REVIEW_ONLY",
+    "PHASE9_SINGLE_ORDER_REVIEW_VERSION",
+    "PHASE9_SINGLE_ORDER_REQUIRED_SCOPE_FIELDS",
+    "build_phase9_single_order_approval_review_packet",
     "build_executor_approval_report",
     "run_executor_approval_chain",
     "run_executor_approval_latest",

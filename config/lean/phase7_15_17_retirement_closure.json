@@ -1,0 +1,48 @@
+{
+  "version": "phase7_15_17_retirement_closure_v1",
+  "status": "PHASE7_15_17_NUMBERED_BUSINESS_LOGIC_RETIRED",
+  "scope": [
+    "phase7_15_operator_decision_intake_template",
+    "phase7_16_operator_decision_intake_validator",
+    "phase7_17_final_pre_executor_review_packet"
+  ],
+  "active_canonical_orchestration": "crypto_ai_system.governance.pre_executor_review",
+  "semantic_compatibility_modules": [
+    "crypto_ai_system.governance.pre_executor_compat.operator_decision_intake",
+    "crypto_ai_system.governance.pre_executor_compat.operator_decision_validation",
+    "crypto_ai_system.governance.pre_executor_compat.final_pre_executor_review"
+  ],
+  "historical_imports_preserved": true,
+  "all_numbered_modules_are_thin_wrappers": true,
+  "numbered_business_logic_still_present": false,
+  "numbered_business_logic_retirement_complete": true,
+  "compatibility_modules_are_runtime_authority": false,
+  "active_orchestration_uses_compatibility_modules": false,
+  "runtime_authority": false,
+  "execution_permissions_changed": false,
+  "safety": {
+    "runtime_permission_source": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "signed_testnet_promotion_allowed": false,
+    "live_canary_execution_enabled": false,
+    "live_scaled_execution_enabled": false,
+    "external_order_submission_allowed": false,
+    "external_order_submission_performed": false,
+    "exchange_endpoint_called": false,
+    "place_order_enabled": false,
+    "cancel_order_enabled": false,
+    "signed_order_executor_enabled": false,
+    "api_key_value_access_allowed": false,
+    "api_secret_value_access_allowed": false,
+    "secret_file_access_allowed": false,
+    "secret_file_creation_allowed": false,
+    "runtime_settings_mutated": false,
+    "score_weights_mutated": false,
+    "candidate_profile_applied": false,
+    "settings_write_preview_applied": false,
+    "live_trading_allowed": false,
+    "auto_promotion_allowed": false
+  },
+  "next_allowed_scope": "phase8_m2_metadata_key_scope_and_write_path_dry_validation"
+}

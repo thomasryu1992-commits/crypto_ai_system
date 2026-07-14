@@ -15,7 +15,9 @@
     "historical_imports_preserved": true,
     "legacy_files_are_thin_wrappers": true,
     "wrapper_max_lines": 12,
-    "active_orchestration_uses_legacy_phase_imports": false
+    "active_orchestration_uses_legacy_phase_imports": false,
+    "thin_wrapper_scope": "semantic_step_mappings_phase7_through_phase7_14",
+    "phase7_15_17_excluded_pending_retirement": true
   },
   "semantic_step_mappings": {
     "phase7_signed_testnet_validation_design_guard.py": "validation_design.py",
@@ -47,11 +49,36 @@
     "shared_review_only_permission_state": true
   },
   "phase7_15_17_policy": {
-    "semantic_only_implementation": true,
-    "numbered_implementation_files_created": false,
     "manual_submission_auto_created": false,
     "valid_fixture_substitutes_for_manual_submission": false,
-    "approved_decision_opens_only_phase8_preparation_review": true
+    "approved_decision_opens_only_phase8_preparation_review": true,
+    "semantic_implementation_is_canonical": true,
+    "new_numbered_business_logic_created": false,
+    "legacy_numbered_compatibility_paths_preserved": true,
+    "active_orchestration_uses_legacy_numbered_paths": false,
+    "legacy_numbered_business_logic_still_present": false,
+    "legacy_numbered_business_logic_retirement_pending": false,
+    "legacy_numbered_business_logic_files": [
+      "phase7_15_operator_decision_intake_template.py",
+      "phase7_16_operator_decision_intake_validator.py",
+      "phase7_17_final_pre_executor_review_packet.py"
+    ],
+    "phase7_15_numbered_module_is_thin_wrapper": true,
+    "phase7_15_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.operator_decision_intake",
+    "phase7_15_public_surface_manifest": "config\\lean\\phase7_15_public_surface.json",
+    "phase7_15_business_logic_relocated_without_contract_change": true,
+    "phase7_16_numbered_business_logic_retirement_pending": true,
+    "phase7_17_numbered_business_logic_retirement_pending": true,
+    "phase7_16_numbered_module_is_thin_wrapper": true,
+    "phase7_16_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.operator_decision_validation",
+    "phase7_16_public_surface_manifest": "config\\lean\\phase7_16_public_surface.json",
+    "phase7_16_business_logic_relocated_without_contract_change": true,
+    "phase7_17_numbered_module_is_thin_wrapper": true,
+    "phase7_17_semantic_compat_module": "crypto_ai_system.governance.pre_executor_compat.final_pre_executor_review",
+    "phase7_17_public_surface_manifest": "config\\lean\\phase7_17_public_surface.json",
+    "phase7_17_business_logic_relocated_without_contract_change": true,
+    "all_phase7_15_17_numbered_modules_are_thin_wrappers": true,
+    "legacy_numbered_business_logic_retirement_complete": true
   },
   "next_work": "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION",
   "safety": {

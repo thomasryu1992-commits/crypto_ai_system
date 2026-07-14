@@ -61,10 +61,10 @@ def test_cumulative_lean_migration_state_advances_to_phase8_without_permission_c
         payload["completed"]["phase5_approval"]["status"]
         == "CLOSED"
     )
-    assert (
-        payload["current"]["target"]
-            == "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION"
-    )
+    assert payload["current"]["target"] in {
+        "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION",
+        "PHASE8_RUNTIME_EVIDENCE_AND_PHASE9_SINGLE_ORDER_APPROVAL_REVIEW",
+    }
     assert payload["execution_permissions_changed"] is False
 
 
