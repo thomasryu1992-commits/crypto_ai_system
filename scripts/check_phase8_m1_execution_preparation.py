@@ -430,34 +430,24 @@ def main() -> int:
         / "lean_migration_state.json"
     )
 
-    if (
-        migration.get(
-            "current",
-            {},
-        ).get(
-            "status"
-        )
-        != (
-            "PHASE8_M1_EXECUTION_PREPARATION_"
-            "DESIGN_COMPLETE"
-        )
-    ):
+    if migration.get("current", {}).get("status") not in {
+        "PHASE8_M1_EXECUTION_PREPARATION_DESIGN_COMPLETE",
+        (
+            "PHASE8_FRESH_RUNTIME_EVIDENCE_AND_"
+            "PHASE9_SINGLE_ORDER_REVIEW_IMPLEMENTED_REVIEW_ONLY"
+        ),
+    }:
         blockers.append(
             "PHASE8_M1_MIGRATION_STATUS_INVALID"
         )
 
-    if (
-        migration.get(
-            "current",
-            {},
-        ).get(
-            "next_step"
-        )
-        != (
-            "PHASE8_M2_METADATA_KEY_SCOPE_"
-            "AND_WRITE_PATH_DRY_VALIDATION"
-        )
-    ):
+    if migration.get("current", {}).get("next_step") not in {
+        "PHASE8_M2_METADATA_KEY_SCOPE_AND_WRITE_PATH_DRY_VALIDATION",
+        (
+            "COLLECT_FRESH_PHASE8_RUNTIME_EVIDENCE_AND_"
+            "COMPLETE_PHASE9_SINGLE_ORDER_REVIEW"
+        ),
+    }:
         blockers.append(
             "PHASE8_M1_MIGRATION_NEXT_STEP_INVALID"
         )
