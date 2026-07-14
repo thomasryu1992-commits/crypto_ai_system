@@ -1,0 +1,31 @@
+{
+  "version": "phase7_17_public_surface_v1",
+  "legacy_import_path": "crypto_ai_system.validation.phase7_17_final_pre_executor_review_packet",
+  "semantic_compat_import_path": "crypto_ai_system.governance.pre_executor_compat.final_pre_executor_review",
+  "export_surface_source": "__all__",
+  "exported_public_symbols": [
+    "PHASE7_17_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY",
+    "validate_final_pre_executor_review_packet",
+    "build_phase7_17_final_pre_executor_review_packet_report",
+    "persist_phase7_17_final_pre_executor_review_packet_report"
+  ],
+  "exported_public_functions": [
+    "validate_final_pre_executor_review_packet",
+    "build_phase7_17_final_pre_executor_review_packet_report",
+    "persist_phase7_17_final_pre_executor_review_packet_report"
+  ],
+  "exported_public_constants": [
+    "PHASE7_17_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY"
+  ],
+  "legacy_numbered_module_is_thin_wrapper": true,
+  "business_logic_relocated_without_contract_change": true,
+  "active_orchestration_uses_compat_module": false,
+  "runtime_authority": false,
+  "execution_permissions_changed": false,
+  "source_sha256_before_relocation": "288bc7e913c3d0657d70bfc4da70f6df30a12e93094b0cf23325038b3baf0f83",
+  "semantic_sha256_after_dependency_rewrite": "288bc7e913c3d0657d70bfc4da70f6df30a12e93094b0cf23325038b3baf0f83"
+}

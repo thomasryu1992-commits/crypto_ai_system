@@ -350,9 +350,13 @@ def validate_status_consistency(root: str | Path = ".") -> StatusCheckResult:
     for command in AGENT_LIBRARY_WORKFLOW_COMMANDS:
         if command not in workflow:
             failed.append(f"workflow_missing_agent_library_command:{command}")
-    for pattern in ["tests/test_step282_*.py", "tests/test_step283_*.py", "tests/test_step284_*.py", "tests/test_step285_*.py", "tests/test_step286_*.py", "tests/test_step287_*.py", "tests/test_step288_*.py", "tests/test_step289_*.py", "tests/test_step290_*.py", "tests/test_step291_*.py", "tests/test_step292_*.py", "tests/test_step293_*.py", "tests/test_step294_*.py", "tests/test_step295_*.py", "tests/test_step296_*.py", "tests/test_step297_*.py", "tests/test_step298_*.py", "tests/test_step299_*.py", "tests/test_step300_*.py", "tests/test_step301_*.py", "tests/test_step302_*.py", "tests/test_step303_*.py", "tests/test_step304_*.py", "tests/test_step305_*.py", "tests/test_step306_*.py", "tests/test_step307_*.py", "tests/test_step308_*.py", "tests/test_step309_*.py", "tests/test_step310_*.py", "tests/test_step311_*.py", "tests/test_step312_*.py", "tests/test_step313_*.py", "tests/test_step314_*.py", "tests/test_step315_*.py", "tests/test_step316_*.py", "tests/test_step317_*.py", "tests/test_step318_*.py", "tests/test_step319_*.py", "tests/agents/"]:
-        if pattern not in workflow:
-            failed.append(f"workflow_missing_focused_regression_pattern:{pattern}")
+    authoritative_regression = (
+        "python scripts/run_step280_full_regression.py --durations 10"
+    )
+    if authoritative_regression not in workflow:
+        for pattern in ["tests/test_step282_*.py", "tests/test_step283_*.py", "tests/test_step284_*.py", "tests/test_step285_*.py", "tests/test_step286_*.py", "tests/test_step287_*.py", "tests/test_step288_*.py", "tests/test_step289_*.py", "tests/test_step290_*.py", "tests/test_step291_*.py", "tests/test_step292_*.py", "tests/test_step293_*.py", "tests/test_step294_*.py", "tests/test_step295_*.py", "tests/test_step296_*.py", "tests/test_step297_*.py", "tests/test_step298_*.py", "tests/test_step299_*.py", "tests/test_step300_*.py", "tests/test_step301_*.py", "tests/test_step302_*.py", "tests/test_step303_*.py", "tests/test_step304_*.py", "tests/test_step305_*.py", "tests/test_step306_*.py", "tests/test_step307_*.py", "tests/test_step308_*.py", "tests/test_step309_*.py", "tests/test_step310_*.py", "tests/test_step311_*.py", "tests/test_step312_*.py", "tests/test_step313_*.py", "tests/test_step314_*.py", "tests/test_step315_*.py", "tests/test_step316_*.py", "tests/test_step317_*.py", "tests/test_step318_*.py", "tests/test_step319_*.py", "tests/agents/"]:
+            if pattern not in workflow:
+                failed.append(f"workflow_missing_focused_regression_pattern:{pattern}")
     source_prefixes = _source_prefixes_from_script(source_package_script)
     if not SOURCE_EXCLUDED_PREFIXES.issubset(source_prefixes):
         failed.append("source_package_missing_runtime_exclusions")

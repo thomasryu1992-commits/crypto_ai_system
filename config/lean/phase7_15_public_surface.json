@@ -1,0 +1,50 @@
+{
+  "version": "phase7_15_public_surface_v1",
+  "legacy_import_path": "crypto_ai_system.validation.phase7_15_operator_decision_intake_template",
+  "semantic_compat_import_path": "crypto_ai_system.governance.pre_executor_compat.operator_decision_intake",
+  "critical_public_symbols": [
+    "ALLOWED_DECISION_OPTIONS",
+    "OPERATOR_DECISION_INTAKE_REQUIRED_FIELDS",
+    "persist_phase7_15_operator_decision_intake_template_report",
+    "validate_operator_decision_intake_template"
+  ],
+  "legacy_numbered_module_is_thin_wrapper": true,
+  "business_logic_relocated_without_contract_change": true,
+  "active_orchestration_uses_compat_module": false,
+  "runtime_authority": false,
+  "execution_permissions_changed": false,
+  "source_sha256_before_relocation": "2db02b2a2453c9074ad8be7ca4f300cd26da76edcee09c11265e20a2fec87ae3",
+  "semantic_sha256_after_dependency_rewrite": "ee661e4d2e22d87905b8af39fc5de99b4b5d5a3f212f50bdc34b6d6dc377fcb7",
+  "export_surface_source": "__all__",
+  "exported_public_symbols": [
+    "PHASE7_15_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY",
+    "OPERATOR_DECISION_INTAKE_REQUIRED_FIELDS",
+    "ALLOWED_DECISION_OPTIONS",
+    "validate_operator_decision_intake_template",
+    "build_phase7_15_negative_fixtures",
+    "validate_phase7_15_negative_fixtures",
+    "build_phase7_15_template_validation_report",
+    "scan_phase7_15_package_boundary",
+    "build_phase7_15_operator_decision_intake_template_report",
+    "persist_phase7_15_operator_decision_intake_template_report"
+  ],
+  "exported_public_functions": [
+    "validate_operator_decision_intake_template",
+    "build_phase7_15_negative_fixtures",
+    "validate_phase7_15_negative_fixtures",
+    "build_phase7_15_template_validation_report",
+    "scan_phase7_15_package_boundary",
+    "build_phase7_15_operator_decision_intake_template_report",
+    "persist_phase7_15_operator_decision_intake_template_report"
+  ],
+  "exported_public_constants": [
+    "PHASE7_15_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY",
+    "OPERATOR_DECISION_INTAKE_REQUIRED_FIELDS",
+    "ALLOWED_DECISION_OPTIONS"
+  ],
+  "public_surface_normalized_during_phase7_16_migration": true
+}

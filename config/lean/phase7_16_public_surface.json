@@ -1,0 +1,35 @@
+{
+  "version": "phase7_16_public_surface_v1",
+  "legacy_import_path": "crypto_ai_system.validation.phase7_16_operator_decision_intake_validator",
+  "semantic_compat_import_path": "crypto_ai_system.governance.pre_executor_compat.operator_decision_validation",
+  "export_surface_source": "__all__",
+  "exported_public_symbols": [
+    "PHASE7_16_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY",
+    "build_operator_decision_intake_submission_fixture",
+    "validate_operator_decision_intake_submission",
+    "validate_operator_decision_intake_validation_report",
+    "build_phase7_16_operator_decision_intake_validator_report",
+    "persist_phase7_16_operator_decision_intake_validator_report"
+  ],
+  "exported_public_functions": [
+    "build_operator_decision_intake_submission_fixture",
+    "validate_operator_decision_intake_submission",
+    "validate_operator_decision_intake_validation_report",
+    "build_phase7_16_operator_decision_intake_validator_report",
+    "persist_phase7_16_operator_decision_intake_validator_report"
+  ],
+  "exported_public_constants": [
+    "PHASE7_16_VERSION",
+    "STATUS_RECORDED_REVIEW_ONLY",
+    "STATUS_BLOCKED_REVIEW_ONLY"
+  ],
+  "legacy_numbered_module_is_thin_wrapper": true,
+  "business_logic_relocated_without_contract_change": true,
+  "active_orchestration_uses_compat_module": false,
+  "runtime_authority": false,
+  "execution_permissions_changed": false,
+  "source_sha256_before_relocation": "1347195c504b502900e4478f58560c02cd6adb5cd75daf07c3d2d053c42ba68a",
+  "semantic_sha256_after_dependency_rewrite": "1347195c504b502900e4478f58560c02cd6adb5cd75daf07c3d2d053c42ba68a"
+}

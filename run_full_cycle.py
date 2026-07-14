@@ -186,12 +186,12 @@ def run_full_cycle() -> dict:
     phase7_15_operator_decision_intake_template = pre_executor_review_legacy["operator_decision_intake_template"]
     phase7_16_operator_decision_intake_validation = pre_executor_review_legacy["operator_decision_intake_validation"]
     phase7_17_final_pre_executor_review_packet = pre_executor_review_legacy["final_pre_executor_review_packet"]
+    testnet_secret_metadata_intake = run_testnet_secret_metadata_intake_latest()
     phase8_execution_preparation_bundle = run_signed_testnet_execution_preparation_chain()
     signed_testnet_execution_preparation = phase8_execution_preparation_bundle["report"]
     agent_library = _run_agent_library_review_chain()
     review_only_export_packet = run_review_only_export_packet_latest()
     real_testnet_read_only_adapter = run_real_testnet_read_only_adapter_latest()
-    testnet_secret_metadata_intake = run_testnet_secret_metadata_intake_latest()
     real_read_only_venue_probe = run_real_read_only_venue_probe_latest()
     signed_testnet_pre_submit = run_signed_testnet_pre_submit_validator_latest(venue_probe=real_read_only_venue_probe)
     signed_testnet_execution_enablement = run_signed_testnet_execution_enablement_packet_latest(

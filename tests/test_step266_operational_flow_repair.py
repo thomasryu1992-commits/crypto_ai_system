@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _run_python(args: list[str], timeout: int = 180) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env['PYTHONPATH'] = 'src:.'
+    env['PYTHONPATH'] = os.pathsep.join((str(ROOT / 'src'), str(ROOT)))
     return subprocess.run(
         [sys.executable, *args],
         cwd=ROOT,

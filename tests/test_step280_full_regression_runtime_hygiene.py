@@ -47,14 +47,20 @@ def test_step280_chunked_regression_runner_lists_all_test_files():
     assert any(suite["name"] == "data_id_reconciliation_testnet_prep_status_lineage_270_286" for suite in suites)
 
 
-def test_step280_workflow_uses_chunked_runner_instead_of_single_pytest_tests():
+def test_step280_workflow_uses_one_authoritative_chunked_runner():
     root = Path(__file__).resolve().parents[1]
-    workflow = (root / ".github" / "workflows" / "review_only_chain_validation.yml").read_text(encoding="utf-8")
-    assert "python scripts/run_step280_full_regression.py --durations 10" in workflow
+    workflow = (
+        root / ".github" / "workflows" / "review_only_chain_validation.yml"
+    ).read_text(encoding="utf-8")
+
+    authoritative = "python scripts/run_step280_full_regression.py --durations 10"
+    assert workflow.count(authoritative) == 1
     assert "python -m pytest -q tests\n" not in workflow
-    assert "Step258-282 and Step286 focused regression" in workflow
-    assert "tests/test_step280_*.py tests/test_step281_*.py tests/test_step282_*.py tests/test_step286_*.py" in workflow
-    assert "tests/test_step290_*.py" in workflow
+
+    # Step280 already enumerates every tests/test_*.py file. Re-running the
+    # Step258-319 range in the same job is redundant and must not return.
+    assert "Step258-282 and Step286 focused regression" not in workflow
+    assert "python -m pytest -q tests/test_step258_*.py" not in workflow
 
 
 def test_step280_research_decision_ignores_unrelated_latest_signal_permission(tmp_path, monkeypatch):

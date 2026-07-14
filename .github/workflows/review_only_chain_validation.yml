@@ -52,6 +52,9 @@ jobs:
       - name: Compile
         run: python -m compileall -q src config tests scripts
 
+      - name: Phase 7.17 / Phase 8-M1 test isolation gate
+        run: python scripts/check_phase7_17_phase8_m1_test_isolation.py
+
       - name: P69 Extended venue alignment consistency
         run: python scripts/check_venue_alignment.py
 
@@ -131,6 +134,18 @@ jobs:
           python scripts/build_phase7_13_future_executor_enablement_review_packet.py
           python scripts/build_phase7_14_future_executor_operator_decision_packet.py
 
+      - name: Phase 7.15 compatibility migration contract
+        run: python scripts/check_phase7_15_compatibility_migration.py
+
+      - name: Phase 7.16 compatibility migration contract
+        run: python scripts/check_phase7_16_compatibility_migration.py
+
+      - name: Phase 7.17 compatibility migration contract
+        run: python scripts/check_phase7_17_compatibility_migration.py
+
+      - name: Phase 7.15-7.17 numbered logic retirement closure
+        run: python scripts/check_phase7_15_17_retirement_closure.py
+
       - name: Agent Library review-only regression
         run: python -m pytest -q tests/agents/
 
@@ -139,11 +154,6 @@ jobs:
 
       - name: Step280 chunked full regression
         run: python scripts/run_step280_full_regression.py --durations 10
-
-      - name: Step258-282 and Step286 focused regression + Step287/288 registry + Step289 Signal QA + Step290 legacy fallback blocker + Step291 decision pipeline registry + Step293 pre-order risk gate full policy expansion + Step294 paper execution engine v2 + Step295 paper reconciliation v2 + Step296 outcome analytics v2 + Step297 performance report generator + Step298 candidate profile registry + Step299 prompt/profile library + Step300 approval registry hardening + Step301 review-only export packet v2 + Step302 settings write preview guard v2 + Step303 real testnet read-only adapter + Step304 metadata intake + Step305 read-only venue probe + Step306 pre-submit validator + Step307 execution enablement packet + Step308 signed testnet order executor + Step309 signed testnet reconciliation + Step310 session close report + Step311 live read-only adapter probe + Step312 live key scope validator + Step313 live canary approval packet + Step314 live canary executor + Step315 live canary reconciliation + Step316 monitoring alerting + Step317 deployment runbook + Step318 canary outcome report + Step319 live scaled readiness gate regression
-        run: |
-          # Compatibility marker: tests/test_step280_*.py tests/test_step281_*.py tests/test_step282_*.py tests/test_step286_*.py tests/test_step287_*.py tests/test_step288_*.py tests/test_step289_*.py tests/test_step290_*.py tests/test_step291_*.py tests/test_step292_*.py tests/test_step293_*.py tests/test_step294_*.py tests/test_step295_*.py tests/test_step296_*.py tests/test_step297_*.py tests/test_step298_*.py tests/test_step299_*.py tests/test_step300_*.py tests/test_step301_*.py tests/test_step302_*.py tests/test_step303_*.py tests/test_step304_*.py tests/test_step305_*.py tests/test_step306_*.py tests/test_step307_*.py tests/test_step308_*.py tests/test_step309_*.py tests/test_step310_*.py tests/test_step311_*.py tests/test_step312_*.py tests/test_step313_*.py tests/test_step314_*.py tests/test_step315_*.py tests/test_step316_*.py tests/test_step317_*.py tests/test_step318_*.py tests/test_step319_*.py
-          python -m pytest -q tests/test_step258_*.py tests/test_step259_*.py tests/test_step260_*.py tests/test_step261_*.py tests/test_step262_*.py tests/test_step263_*.py tests/test_step264_*.py tests/test_step265_*.py tests/test_step266_*.py tests/test_step267_*.py tests/test_step268_*.py tests/test_step269_*.py tests/test_step270_*.py tests/test_step271_*.py tests/test_step272_*.py tests/test_step273_*.py tests/test_step274_*.py tests/test_step275_*.py tests/test_step276_*.py tests/test_step277_*.py tests/test_step278_*.py tests/test_step279_*.py tests/test_step280_*.py tests/test_step281_*.py tests/test_step282_*.py tests/test_step283_*.py tests/test_step284_*.py tests/test_step285_*.py tests/test_step286_*.py tests/test_step287_*.py tests/test_step288_*.py tests/test_step289_*.py tests/test_step290_*.py tests/test_step291_*.py tests/test_step292_*.py tests/test_step293_*.py tests/test_step294_*.py tests/test_step295_*.py tests/test_step296_*.py tests/test_step297_*.py tests/test_step298_*.py tests/test_step299_*.py tests/test_step300_*.py tests/test_step301_*.py tests/test_step302_*.py tests/test_step303_*.py tests/test_step304_*.py tests/test_step305_*.py tests/test_step306_*.py tests/test_step307_*.py tests/test_step308_*.py tests/test_step309_*.py tests/test_step310_*.py tests/test_step311_*.py tests/test_step312_*.py tests/test_step313_*.py tests/test_step314_*.py tests/test_step315_*.py tests/test_step316_*.py tests/test_step317_*.py tests/test_step318_*.py tests/test_step319_*.py
 
       - name: Step209-237 chain smoke
         run: python run_step209_237_v5_chain_bootstrap.py

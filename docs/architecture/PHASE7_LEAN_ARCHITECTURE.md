@@ -189,3 +189,83 @@ Phase 8 may design and dry-validate the final execution boundary.
 It still must not submit an order.
 
 The first signed-testnet order remains a separate Phase 9 action after explicit approval.
+
+## Phase 7.15 compatibility migration
+
+Phase 7.15 historical imports remain supported, but the numbered validation
+module is now a thin compatibility wrapper.
+
+```text
+Historical import:
+crypto_ai_system.validation.phase7_15_operator_decision_intake_template
+
+↓
+
+Semantic compatibility contract:
+crypto_ai_system.governance.pre_executor_compat.operator_decision_intake
+```
+
+`run_full_cycle.py` continues to use only the canonical active orchestration:
+
+```text
+crypto_ai_system.governance.pre_executor_review
+```
+
+This relocation preserves the Phase 7.15 public API and artifact contract. It
+does not grant runtime authority, enable an executor, read secret values, sign
+requests, or submit orders.
+
+Phase 7.16 and Phase 7.17 numbered business logic remain temporarily present
+and must be migrated in separate reviewed changes.
+
+## Phase 7.16 compatibility migration
+
+Phase 7.16 historical imports remain supported, but the numbered validation
+module is now a thin compatibility wrapper.
+
+```text
+Historical import:
+crypto_ai_system.validation.phase7_16_operator_decision_intake_validator
+
+↓
+
+Semantic compatibility contract:
+crypto_ai_system.governance.pre_executor_compat.operator_decision_validation
+```
+
+Phase 7.17 consumes the semantic Phase 7.16 contract directly. Active
+orchestration remains `crypto_ai_system.governance.pre_executor_review` and
+does not import the compatibility package.
+
+The Phase 7.16 export surface is frozen from the module's explicit `__all__`.
+This relocation does not change artifact schemas, grant runtime authority,
+enable an executor, access secret values, sign requests, or submit orders.
+
+Phase 7.17 numbered business logic remains temporarily present and is the next
+migration target.
+
+## Phase 7.15-7.17 numbered business logic retirement
+
+The historical Phase 7.15, 7.16, and 7.17 validation import paths remain
+available as thin compatibility wrappers. Their business logic now lives under
+the governance compatibility domain:
+
+```text
+pre_executor_compat/
+├── operator_decision_intake.py
+├── operator_decision_validation.py
+└── final_pre_executor_review.py
+```
+
+Active orchestration continues to use only:
+
+```text
+crypto_ai_system.governance.pre_executor_review
+```
+
+The compatibility package preserves historical public APIs and artifact
+contracts; it is not a runtime authority and is not an alternate orchestration
+path.
+
+The numbered business-logic retirement does not enable execution, read secret
+values, sign requests, call exchange write endpoints, or submit orders.

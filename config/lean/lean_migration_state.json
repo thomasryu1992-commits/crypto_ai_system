@@ -24,10 +24,10 @@
     }
   },
   "current": {
-    "target": "PHASE8_SIGNED_TESTNET_EXECUTION_PREPARATION",
+    "target": "PHASE8_RUNTIME_EVIDENCE_AND_PHASE9_SINGLE_ORDER_APPROVAL_REVIEW",
     "active_domain": "governance.signed_testnet_execution_preparation",
-    "status": "PHASE8_M1_EXECUTION_PREPARATION_DESIGN_COMPLETE",
-    "next_step": "PHASE8_M2_METADATA_KEY_SCOPE_AND_WRITE_PATH_DRY_VALIDATION"
+    "status": "PHASE8_FRESH_RUNTIME_EVIDENCE_AND_PHASE9_SINGLE_ORDER_REVIEW_IMPLEMENTED_REVIEW_ONLY",
+    "next_step": "COLLECT_FRESH_PHASE8_RUNTIME_EVIDENCE_AND_COMPLETE_PHASE9_SINGLE_ORDER_REVIEW"
   },
   "deferred_global_compaction": [
     "archive historical Phase 4-7 reports after one stable release",
