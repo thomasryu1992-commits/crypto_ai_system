@@ -333,6 +333,61 @@ def main() -> int:
                 "PHASE8_M1_FULL_CYCLE_OUTPUT_MISSING"
             )
 
+    phase9_runner_path = (
+        root
+        / "scripts"
+        / "build_phase9_single_order_review.py"
+    )
+
+    if not phase9_runner_path.exists():
+        blockers.append(
+            "PHASE9_CANONICAL_HANDOFF_RUNNER_MISSING"
+        )
+    else:
+        phase9_runner_source = (
+            phase9_runner_path.read_text(
+                encoding="utf-8"
+            )
+        )
+
+        for literal in (
+            "MODE_PREPARE_TEMPLATE",
+            "MODE_VALIDATE_SUBMISSION",
+            "run_pre_executor_review_chain",
+            "run_stage_transition_first=True",
+            "run_stage_transition_first=False",
+            "--operator-submission-file",
+            "--strict-phase9-review-ready",
+            "operator_submission_written_automatically",
+            "source_phase7_14_report_id",
+            "source_phase7_14_report_hash",
+            "phase7_final_pre_executor_review_ready",
+            "phase8_fresh_runtime_evidence_validated",
+            "phase9_review_packet_ready",
+            '"actual_phase9_approval_created": False',
+            '"phase9_order_submission_permission_granted": False',
+            '"ready_for_signed_testnet_execution": False',
+            '"testnet_order_submission_allowed": False',
+        ):
+            if literal not in phase9_runner_source:
+                blockers.append(
+                    "PHASE9_CANONICAL_HANDOFF_RUNNER_INVALID:"
+                    + literal
+                )
+
+        for forbidden in (
+            ".place_order(",
+            ".cancel_order(",
+            "request_signing(",
+            "api_secret",
+            "private_key",
+        ):
+            if forbidden in phase9_runner_source:
+                blockers.append(
+                    "PHASE9_CANONICAL_HANDOFF_RUNNER_UNSAFE:"
+                    + forbidden
+                )
+
     phase7_closure = _load_json(
         root
         / "config"

@@ -188,5 +188,25 @@
     "phase9_order_submission_permission_granted": false,
     "phase8_execution_preparation_ready": false,
     "execution_permissions_changed": false
+  },
+  "canonical_operator_decision_handoff": {
+    "runner_implemented_in_existing_script": true,
+    "prepare_template_mode": true,
+    "validate_submission_mode": true,
+    "prepare_mode_refreshes_phase7_14_sources": true,
+    "validate_mode_preserves_prepared_source_ids_and_hashes": true,
+    "manual_submission_written_automatically": false,
+    "uses_existing_pre_executor_review_chain": true,
+    "uses_existing_phase8_chain": true,
+    "uses_existing_phase9_review_builder": true,
+    "new_runtime_module_created": false,
+    "new_test_file_created": false,
+    "new_checker_created": false,
+    "new_manifest_created": false,
+    "actual_phase9_approval_created": false,
+    "phase9_order_submission_permission_granted": false,
+    "ready_for_signed_testnet_execution": false,
+    "testnet_order_submission_allowed": false,
+    "execution_permissions_changed": false
   }
 }
