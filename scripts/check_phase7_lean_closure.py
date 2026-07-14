@@ -582,6 +582,10 @@ def main() -> int:
                 "PHASE8_M1_EXECUTION_PREPARATION_"
                 "DESIGN_COMPLETE"
             ),
+            (
+                "PHASE8_FRESH_RUNTIME_EVIDENCE_AND_"
+                "PHASE9_SINGLE_ORDER_REVIEW_IMPLEMENTED_REVIEW_ONLY"
+            ),
         }
     ):
         blockers.append(
@@ -600,6 +604,10 @@ def main() -> int:
             (
                 "PHASE8_M2_METADATA_KEY_SCOPE_"
                 "AND_WRITE_PATH_DRY_VALIDATION"
+            ),
+            (
+                "COLLECT_FRESH_PHASE8_RUNTIME_EVIDENCE_AND_"
+                "COMPLETE_PHASE9_SINGLE_ORDER_REVIEW"
             ),
         }
     ):
