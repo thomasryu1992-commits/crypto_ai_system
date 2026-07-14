@@ -54,7 +54,10 @@ def test_step250_canonical_research_decision_is_generation_only(tmp_path, monkey
     input_path = tmp_path / "research_result.json"
     output_path = tmp_path / "research_decision.json"
     input_path.write_text(json.dumps(research_result), encoding="utf-8")
+    monkeypatch.setattr(decision_engine, "USE_RESEARCH_SIGNAL_GATE", True)
     monkeypatch.setattr(decision_engine, "RESEARCH_RESULT_PATH", input_path)
+    monkeypatch.setattr(decision_engine, "RESEARCH_SIGNAL_PATH", tmp_path / "missing_research_signal.json")
+    monkeypatch.setattr(decision_engine, "SIGNAL_QA_REPORT_PATH", tmp_path / "missing_signal_qa.json")
     monkeypatch.setattr(decision_engine, "RESEARCH_DECISION_PATH", output_path)
 
     decision = decision_engine.run_research_decision()
