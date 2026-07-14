@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -220,8 +221,10 @@ class SQLiteTransactionalEvidenceStore:
     def __init__(self, db_path: str | Path, *, config: TransactionalEvidenceStoreConfig | None = None):
         self.db_path = Path(db_path)
         self.config = config or TransactionalEvidenceStoreConfig()
+        self._schema_lock = threading.Lock()
+        self._schema_initialized = False
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self, *, configure_journal: bool = False) -> sqlite3.Connection:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(
             str(self.db_path),
@@ -231,11 +234,14 @@ class SQLiteTransactionalEvidenceStore:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute(f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}")
-        conn.execute("PRAGMA journal_mode = WAL")
+        if configure_journal:
+            conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = FULL")
         return conn
 
     def initialize_schema(self) -> None:
+        if self._schema_initialized:
+            return
         schema = """
         CREATE TABLE IF NOT EXISTS p56_store_metadata (
             schema_version TEXT PRIMARY KEY,
@@ -295,27 +301,31 @@ class SQLiteTransactionalEvidenceStore:
                 DEFERRABLE INITIALLY DEFERRED
         );
         """
-        with self._connect() as conn:
-            conn.executescript(schema)
-            conn.execute(
-                "INSERT OR IGNORE INTO p56_store_metadata(schema_version, backend_name, created_at_utc) "
-                "VALUES (?, ?, ?)",
-                (self.config.schema_version, self.config.backend_name, utc_now_canonical()),
-            )
-            for table in (
-                "p56_import_records",
-                "p56_import_locks",
-                "p56_consumed_nonces",
-                "p56_transaction_receipts",
-            ):
+        with self._schema_lock:
+            if self._schema_initialized:
+                return
+            with self._connect(configure_journal=True) as conn:
+                conn.executescript(schema)
                 conn.execute(
-                    f"CREATE TRIGGER IF NOT EXISTS {table}_block_update "
-                    f"BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT, 'P56_APPEND_ONLY_UPDATE_BLOCKED'); END"
+                    "INSERT OR IGNORE INTO p56_store_metadata(schema_version, backend_name, created_at_utc) "
+                    "VALUES (?, ?, ?)",
+                    (self.config.schema_version, self.config.backend_name, utc_now_canonical()),
                 )
-                conn.execute(
-                    f"CREATE TRIGGER IF NOT EXISTS {table}_block_delete "
-                    f"BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT, 'P56_APPEND_ONLY_DELETE_BLOCKED'); END"
-                )
+                for table in (
+                    "p56_import_records",
+                    "p56_import_locks",
+                    "p56_consumed_nonces",
+                    "p56_transaction_receipts",
+                ):
+                    conn.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS {table}_block_update "
+                        f"BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT, 'P56_APPEND_ONLY_UPDATE_BLOCKED'); END"
+                    )
+                    conn.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS {table}_block_delete "
+                        f"BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT, 'P56_APPEND_ONLY_DELETE_BLOCKED'); END"
+                    )
+            self._schema_initialized = True
 
     def capability_snapshot(self) -> dict[str, Any]:
         self.initialize_schema()
