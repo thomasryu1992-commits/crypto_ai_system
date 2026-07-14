@@ -1117,3 +1117,118 @@ def test_phase9_single_order_scope_cannot_expand_order_count() -> None:
         "PHASE9_MAXIMUM_ORDER_COUNT_MUST_EQUAL_ONE"
         in packet["blockers"]
     )
+def test_phase9_runner_summary_preserves_review_only_boundary(
+    tmp_path,
+) -> None:
+    from scripts.build_phase9_single_order_review import (
+        _build_summary,
+    )
+
+    phase7_result = {
+        "report": {
+            "status": "PRE_EXECUTOR_REVIEW_WAITING_FOR_OPERATOR_DECISION_REVIEW_ONLY",
+            "pre_executor_review_state": "WAITING_FOR_OPERATOR_DECISION",
+            "operator_decision_intake_validated": False,
+            "actual_operator_decision_recorded": False,
+            "final_pre_executor_review_ready": False,
+            "blockers": [],
+            "next_action": "record_manual_operator_decision",
+        },
+        "legacy_outputs": {
+            "operator_decision_intake_template": {
+                "source_phase7_14_report_id": "phase7_14_report",
+                "source_phase7_14_report_hash": "a" * 64,
+                "source_stage_transition_review_id": "stage_transition",
+                "source_stage_transition_review_hash": "b" * 64,
+            },
+        },
+    }
+
+    phase8_result = {
+        "report": {
+            "status": "PHASE8_M1_WAITING_FOR_PHASE7_OPERATOR_DECISION_REVIEW_ONLY",
+            "phase8_fresh_runtime_evidence_validated": False,
+            "blockers": [],
+            "next_action": "complete_phase7_manual_operator_decision_intake",
+        },
+        "phase9_single_order_approval_review_packet": {
+            "status": (
+                "PHASE9_SINGLE_ORDER_APPROVAL_REVIEW_"
+                "WAITING_FOR_FRESH_PHASE8_EVIDENCE"
+            ),
+            "phase9_single_order_approval_review_packet_ready": False,
+            "blockers": [
+                "PHASE9_FRESH_PHASE8_RUNTIME_EVIDENCE_NOT_VALIDATED"
+            ],
+            "next_action": "collect_fresh_phase8_runtime_evidence",
+        },
+    }
+
+    summary = _build_summary(
+        mode="prepare-template",
+        project_root=tmp_path,
+        phase7_result=phase7_result,
+        phase8_result=phase8_result,
+    )
+
+    assert summary["canonical_handoff_runner"] is True
+    assert summary["operator_submission_written_automatically"] is False
+    assert summary["source_phase7_14_report_id"] == "phase7_14_report"
+    assert summary["source_phase7_14_report_hash"] == "a" * 64
+    assert summary["phase7_final_pre_executor_review_ready"] is False
+    assert summary["phase8_fresh_runtime_evidence_validated"] is False
+    assert summary["phase9_review_packet_ready"] is False
+    assert summary["actual_phase9_approval_created"] is False
+    assert summary["phase9_order_submission_permission_granted"] is False
+    assert summary["ready_for_signed_testnet_execution"] is False
+    assert summary["testnet_order_submission_allowed"] is False
+    assert summary["external_order_submission_performed"] is False
+
+
+def test_phase9_runner_loads_only_json_object_submission(
+    tmp_path,
+) -> None:
+    from scripts.build_phase9_single_order_review import (
+        _load_json_object,
+    )
+
+    valid = (
+        tmp_path
+        / "valid.json"
+    )
+
+    valid.write_text(
+        '{"decision_option":"APPROVE"}',
+        encoding="utf-8",
+    )
+
+    assert (
+        _load_json_object(
+            valid
+        )["decision_option"]
+        == "APPROVE"
+    )
+
+    invalid = (
+        tmp_path
+        / "invalid.json"
+    )
+
+    invalid.write_text(
+        '["not","an","object"]',
+        encoding="utf-8",
+    )
+
+    try:
+        _load_json_object(
+            invalid
+        )
+    except ValueError as exc:
+        assert (
+            "Expected a JSON object"
+            in str(exc)
+        )
+    else:
+        raise AssertionError(
+            "Non-object operator submission must fail closed."
+        )
