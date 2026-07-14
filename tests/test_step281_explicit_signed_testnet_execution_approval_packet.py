@@ -24,9 +24,7 @@ def _probe_result_summary() -> dict:
 
 
 def _full_regression_report() -> dict:
-    report_path = Path("data/reports/step280_full_regression_runtime_hygiene_report.json")
-    if not report_path.exists():
-        report_path = Path("tests/fixtures/step280_full_regression_runtime_hygiene_report.json")
+    report_path = Path("tests/fixtures/step280_full_regression_runtime_hygiene_report.json")
     return json.loads(report_path.read_text(encoding="utf-8"))
 
 

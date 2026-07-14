@@ -40,7 +40,7 @@ def test_step280_chunked_regression_runner_lists_all_test_files():
     assert result.returncode == 0, result.stdout + result.stderr
     suites = json.loads(result.stdout)
     files = {file for suite in suites for file in suite["files"]}
-    expected = {str(path.relative_to(root)) for path in sorted((root / "tests").glob("test_*.py"))}
+    expected = {path.relative_to(root).as_posix() for path in sorted((root / "tests").glob("test_*.py"))}
     assert expected <= files
     assert "tests/test_step286_researchsignal_lineage_fix.py" in files
     assert "tests/test_step290_legacy_signal_fallback_blocker.py" in files
