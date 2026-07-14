@@ -4,6 +4,7 @@ from pathlib import Path
 
 from crypto_ai_system.config import load_config
 from crypto_ai_system.validation.phase9_2_final_approval_package_minimal import (
+    STATUS_PHASE9_2_FINAL_APPROVAL_PACKAGE_BLOCKED_STILL_DISABLED,
     STATUS_PHASE9_2_FINAL_APPROVAL_PACKAGE_VALID_STILL_DISABLED,
     build_final_approval_packet_template,
     build_final_submit_readiness_report,
@@ -16,10 +17,9 @@ from crypto_ai_system.validation.phase9_2_final_approval_package_minimal import 
 def test_phase9_2_final_approval_package_records_still_disabled() -> None:
     report = persist_phase9_2_final_approval_package_report(run_readiness_first=False)
 
-    assert report["status"] == STATUS_PHASE9_2_FINAL_APPROVAL_PACKAGE_VALID_STILL_DISABLED
-    assert report["phase9_2_final_approval_package_recorded"] is True
-    assert report["final_approval_packet_valid"] is True
-    assert report["phase9_2_ready_for_manual_final_confirmation"] is True
+    assert report["status"] == STATUS_PHASE9_2_FINAL_APPROVAL_PACKAGE_BLOCKED_STILL_DISABLED
+    assert report["phase9_2_final_approval_package_recorded"] is False
+    assert report["phase9_2_ready_for_manual_final_confirmation"] is False
     assert report["phase9_2_order_submission_authorized"] is False
     assert report["actual_order_submission_performed"] is False
     assert report["order_endpoint_called"] is False

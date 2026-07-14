@@ -19,7 +19,16 @@ from crypto_ai_system.execution.real_order_test_operator_run_package import (
     validate_p68_operator_run_package,
     validate_source_reports,
 )
+from crypto_ai_system.execution.operator_activation_intake_for_real_order_test import (
+    build_p66_operator_activation_intake_report,
+)
+from crypto_ai_system.execution.real_order_test_redacted_evidence_receipt import (
+    build_p67_real_order_test_redacted_evidence_receipt_report,
+)
 from crypto_ai_system.utils.audit import sha256_json
+from external_runtime_packages.binance_futures_testnet_adapter import (
+    build_p65_operator_installed_sender_executable_report,
+)
 
 
 def _latest() -> Path:
@@ -31,11 +40,10 @@ def _load(name: str) -> dict:
 
 
 def _sources() -> tuple[dict, dict, dict]:
-    return (
-        _load("p65_operator_installed_testnet_sender_executable_report.json"),
-        _load("p66_operator_activation_intake_for_real_order_test_report.json"),
-        _load("p67_real_order_test_redacted_evidence_receipt_report.json"),
-    )
+    p65 = build_p65_operator_installed_sender_executable_report()
+    p66 = build_p66_operator_activation_intake_report(p65)
+    p67 = build_p67_real_order_test_redacted_evidence_receipt_report(p66)
+    return p65, p66, p67
 
 
 def _actual_package() -> tuple[dict, dict, dict, dict]:

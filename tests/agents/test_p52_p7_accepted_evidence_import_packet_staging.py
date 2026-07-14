@@ -15,13 +15,16 @@ from crypto_ai_system.execution.p7_accepted_evidence_import_packet_staging impor
 )
 from crypto_ai_system.execution.p7_import_bridge_dry_run import (
     _valid_candidate_fixture,
+    _valid_p50_source_fixture,
     build_p51_p7_import_bridge_dry_run_report,
 )
 
 
 def _accepted_source_and_candidate():
     candidate = _valid_candidate_fixture()
-    source = build_p51_p7_import_bridge_dry_run_report(candidate=candidate)
+    source = build_p51_p7_import_bridge_dry_run_report(
+        p50_report=_valid_p50_source_fixture(), candidate=candidate
+    )
     return source, candidate
 
 

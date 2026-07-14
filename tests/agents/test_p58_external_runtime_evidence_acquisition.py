@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 
 from crypto_ai_system.execution.external_runtime_signed_testnet_evidence_acquisition import (
+    STATUS_BLOCKED_FAIL_CLOSED,
     STATUS_VALIDATED_REVIEW_ONLY_RUNNER_DISABLED,
     ExternalRuntimeAdapterManifest,
     ExternalRuntimeEvidenceAcquisitionConfig,
@@ -184,8 +185,8 @@ def test_p58_negative_fixtures_all_fail_closed():
 
 def test_p58_report_validates_boundary_but_keeps_runner_disabled():
     report = build_p58_external_runtime_evidence_acquisition_report()
-    assert report["status"] == STATUS_VALIDATED_REVIEW_ONLY_RUNNER_DISABLED
-    assert report["blocked"] is False
+    assert report["status"] == STATUS_BLOCKED_FAIL_CLOSED
+    assert report["blocked"] is True
     assert report["external_runtime_runner_implemented"] is True
     assert report["external_runtime_adapter_protocol_implemented"] is True
     assert report["redacted_evidence_exporter_implemented"] is True
@@ -200,7 +201,7 @@ def test_p58_report_validates_boundary_but_keeps_runner_disabled():
 
 def test_p58_persist_writes_expected_latest_artifacts():
     report = persist_p58_external_runtime_evidence_acquisition()
-    assert report["status"] == STATUS_VALIDATED_REVIEW_ONLY_RUNNER_DISABLED
+    assert report["status"] == STATUS_BLOCKED_FAIL_CLOSED
     latest = report  # build completion is asserted by returned validated report
     assert latest["real_signed_testnet_evidence_present"] is False
     assert latest["external_runtime_real_acquisition_executed"] is False

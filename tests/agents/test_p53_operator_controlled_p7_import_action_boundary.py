@@ -17,12 +17,17 @@ from crypto_ai_system.execution.p7_accepted_evidence_import_packet_staging impor
     _valid_candidate_fixture,
     build_p52_p7_accepted_evidence_import_packet_staging_report,
 )
-from crypto_ai_system.execution.p7_import_bridge_dry_run import build_p51_p7_import_bridge_dry_run_report
+from crypto_ai_system.execution.p7_import_bridge_dry_run import (
+    _valid_p50_source_fixture,
+    build_p51_p7_import_bridge_dry_run_report,
+)
 
 
 def _valid_p52_and_request():
     candidate = _valid_candidate_fixture()
-    p51 = build_p51_p7_import_bridge_dry_run_report(candidate=candidate)
+    p51 = build_p51_p7_import_bridge_dry_run_report(
+        p50_report=_valid_p50_source_fixture(), candidate=candidate
+    )
     p52 = build_p52_p7_accepted_evidence_import_packet_staging_report(p51_report=p51, candidate=candidate)
     request = build_valid_operator_request_fixture(p52)
     return p52, request

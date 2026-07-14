@@ -11,6 +11,7 @@ from crypto_ai_system.config import AppConfig, load_config
 from crypto_ai_system.execution.p7_import_bridge_dry_run import (
     STATUS_DRY_RUN_ACCEPTED_REVIEW_ONLY_NO_SUBMIT as P51_ACCEPTED_STATUS,
     _valid_candidate_fixture,
+    _valid_p50_source_fixture,
     build_p51_p7_import_bridge_dry_run_report,
     validate_p7_bridge_candidate,
 )
@@ -575,10 +576,15 @@ def build_p52_p7_accepted_evidence_import_packet_staging_report(
 def build_p52_negative_fixture_results(*, cfg: AppConfig | None = None) -> dict[str, Any]:
     cfg = cfg or load_config()
     valid_candidate = _valid_candidate_fixture()
-    accepted_p51 = build_p51_p7_import_bridge_dry_run_report(cfg=cfg, candidate=valid_candidate)
+    p50_source = _valid_p50_source_fixture()
+    accepted_p51 = build_p51_p7_import_bridge_dry_run_report(
+        cfg=cfg, p50_report=p50_source, candidate=valid_candidate
+    )
     rejected_candidate = deepcopy(valid_candidate)
     rejected_candidate["p7_input_preview"]["exchange_order_id"] = "mock_order_123"
-    rejected_p51 = build_p51_p7_import_bridge_dry_run_report(cfg=cfg, candidate=rejected_candidate)
+    rejected_p51 = build_p51_p7_import_bridge_dry_run_report(
+        cfg=cfg, p50_report=p50_source, candidate=rejected_candidate
+    )
     tampered_candidate = deepcopy(valid_candidate)
     tampered_candidate["p7_input_preview"]["client_order_id"] = "client_order_tampered"
     status_write_source = {**accepted_p51, "p7_valid_status_written_by_p51": True}
@@ -633,7 +639,11 @@ def persist_p52_p7_accepted_evidence_import_packet_staging(*, cfg: AppConfig | N
     template = report["staging_template"]
     packet_template = build_p52_p7_accepted_evidence_import_packet_staging_report(
         cfg=cfg,
-        p51_report=build_p51_p7_import_bridge_dry_run_report(cfg=cfg, candidate=_valid_candidate_fixture()),
+        p51_report=build_p51_p7_import_bridge_dry_run_report(
+            cfg=cfg,
+            p50_report=_valid_p50_source_fixture(),
+            candidate=_valid_candidate_fixture(),
+        ),
         candidate=_valid_candidate_fixture(),
     ).get("staged_packet")
     registry_record = append_registry_record(

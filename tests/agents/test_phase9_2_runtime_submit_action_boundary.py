@@ -4,6 +4,7 @@ from pathlib import Path
 
 from crypto_ai_system.config import load_config
 from crypto_ai_system.validation.phase9_2_runtime_submit_action_boundary import (
+    STATUS_RUNTIME_SUBMIT_ACTION_BOUNDARY_BLOCKED,
     STATUS_RUNTIME_SUBMIT_ACTION_BOUNDARY_RECORDED_BLOCKED,
     build_runtime_submit_action_boundary_template,
     build_runtime_submit_action_readiness_report,
@@ -16,9 +17,9 @@ from crypto_ai_system.validation.phase9_2_runtime_submit_action_boundary import 
 def test_phase9_2_runtime_submit_action_boundary_records_blocked_review_only() -> None:
     report = persist_phase9_2_runtime_submit_action_boundary_report(run_manual_confirmation_first=False)
 
-    assert report["status"] == STATUS_RUNTIME_SUBMIT_ACTION_BOUNDARY_RECORDED_BLOCKED
-    assert report["phase9_2_runtime_submit_action_boundary_recorded"] is True
-    assert report["runtime_submit_action_ready_for_explicit_submit_approval_review_only"] is True
+    assert report["status"] == STATUS_RUNTIME_SUBMIT_ACTION_BOUNDARY_BLOCKED
+    assert report["phase9_2_runtime_submit_action_boundary_recorded"] is False
+    assert report["runtime_submit_action_ready_for_explicit_submit_approval_review_only"] is False
     assert report["runtime_submit_action_approved"] is False
     assert report["runtime_submit_action_executed"] is False
     assert report["phase9_2_order_submission_authorized"] is False

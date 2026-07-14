@@ -1110,13 +1110,39 @@ def validate_p58_operator_approval(
     return validation
 
 
+def _valid_p58_source_fixture(
+    *, status: str, hash_key: str
+) -> dict[str, Any]:
+    payload = {
+        "status": status,
+        "blocked": False,
+        "review_only": True,
+        "actual_order_submission_performed": False,
+        "order_endpoint_called": False,
+        "http_request_sent": False,
+        "signature_created": False,
+        "secret_value_accessed": False,
+    }
+    payload[hash_key] = sha256_json(payload)
+    return payload
+
+
 def build_valid_p58_self_test_request(
     *, cfg: AppConfig | None = None
 ) -> P58EvidenceAcquisitionRequest:
-    cfg = cfg or load_config()
-    p6 = _read_latest_json(cfg, "p6_external_runtime_preflight_report.json")
-    p48 = _read_latest_json(cfg, "p48_local_runtime_adapter_connector_report.json")
-    p49 = _read_latest_json(cfg, "p49_external_runtime_evidence_handoff_report.json")
+    del cfg
+    p6 = _valid_p58_source_fixture(
+        status="P6_EXTERNAL_RUNTIME_PREFLIGHT_READY_REVIEW_ONLY_NO_SUBMIT",
+        hash_key="p6_external_runtime_preflight_report_sha256",
+    )
+    p48 = _valid_p58_source_fixture(
+        status="P48_LOCAL_RUNTIME_ADAPTER_CONNECTOR_READY_REVIEW_ONLY_NO_SUBMIT",
+        hash_key="p48_local_runtime_adapter_connector_sha256",
+    )
+    p49 = _valid_p58_source_fixture(
+        status="P49_EXTERNAL_RUNTIME_EVIDENCE_HANDOFF_READY_REVIEW_ONLY_NO_SUBMIT",
+        hash_key="p49_external_runtime_evidence_handoff_sha256",
+    )
     adapter = P58NoNetworkFixtureAdapter()
     manifest = ExternalRuntimeAdapterManifest(
         adapter_id=adapter.adapter_id,
