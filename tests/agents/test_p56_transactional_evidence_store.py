@@ -141,16 +141,16 @@ def test_p56_rejects_secret_or_raw_payload_fields(tmp_path):
     assert store.row_counts()["import_records"] == 0
 
 
-def test_p56_report_blocks_without_real_evidence_but_keeps_backend_validation():
+def test_p56_report_blocks_without_real_evidence_and_withholds_readiness_flags():
     report = build_p56_transactional_evidence_store_report()
     assert report["status"] == STATUS_BLOCKED_FAIL_CLOSED
     assert report["blocked"] is True
     assert report["backend_implementation_added"] is True
-    assert report["backend_transaction_ready"] is True
-    assert report["backend_atomic_lock_nonce_append_commit_proven"] is True
-    assert report["backend_rollback_proven"] is True
-    assert report["backend_duplicate_prevention_proven"] is True
-    assert report["backend_append_only_guards_proven"] is True
+    assert report["backend_transaction_ready"] is False
+    assert report["backend_atomic_lock_nonce_append_commit_proven"] is False
+    assert report["backend_rollback_proven"] is False
+    assert report["backend_duplicate_prevention_proven"] is False
+    assert report["backend_append_only_guards_proven"] is False
     assert report["backend_self_test_database_persisted"] is False
     assert report["real_signed_testnet_evidence_present"] is False
     assert report["real_p7_import_integrated"] is False
