@@ -88,6 +88,11 @@ COINALYZE_ENABLED = env_bool(["COINALYZE_ENABLED", "ENABLE_COINALYZE", "USE_COIN
 COINALYZE_API_KEY = env_str("COINALYZE_API_KEY", "")
 BINANCE_MARKET_DATA_ENABLED = env_bool("BINANCE_MARKET_DATA_ENABLED", False)  # legacy-only; Extended is default
 BINANCE_PUBLIC_BASE_URL = env_str("BINANCE_PUBLIC_BASE_URL", "https://api.binance.com")
+# Real market data via Binance USD-M Futures public endpoints (no API key
+# required, read-only). When enabled the collector fetches real candles and
+# falls back to synthetic only if the fetch fails.
+REAL_MARKET_DATA_ENABLED = env_bool(["REAL_MARKET_DATA_ENABLED", "USE_REAL_MARKET_DATA"], True)
+BINANCE_FUTURES_PUBLIC_BASE_URL = env_str("BINANCE_FUTURES_PUBLIC_BASE_URL", "https://fapi.binance.com")
 
 # Spreadsheet-first storage
 SPREADSHEET_ENABLED = env_bool(["SPREADSHEET_ENABLED", "GOOGLE_SHEETS_ENABLED", "ENABLE_GOOGLE_SHEETS"], False)

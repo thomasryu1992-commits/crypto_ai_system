@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crypto-ai-system"
-version = "0.286.2"
-description = "Crypto AI System review-only chain and research/trading framework."
+version = "0.300.0"
+description = "Crypto AI System: lean five-agent trading pipeline (data -> research -> validation -> trading -> feedback)."
 requires-python = ">=3.10"
 dependencies = [
   "pandas>=2.2,<3.0",

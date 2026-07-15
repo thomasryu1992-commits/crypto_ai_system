@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import config.settings as settings
 from config.settings import MAX_ORDER_NOTIONAL_USDT, ORDER_INTENT_PATH, ORDER_RESULT_PATH, TRADE_DECISION_PATH
 from core.json_io import atomic_write_json, read_json
 from core.time_utils import utc_now_iso
@@ -7,7 +8,14 @@ from core.event_log import log_event
 from crypto_ai_system.execution.idempotency import enrich_order_identity
 from crypto_ai_system.execution.live_guard import run_live_readiness_check
 from crypto_ai_system.execution.paper_execution_engine_v2 import execute_and_persist_paper_order
+from crypto_ai_system.execution.signed_testnet_adapter import SignedTestnetAdapter
+from crypto_ai_system.execution.signed_testnet_final_guard import (
+    evaluate_signed_testnet_final_guard,
+    record_submission,
+)
 from crypto_ai_system.trading.order_id_chain import order_intent_id_from_payload
+
+_SIGNED_TESTNET_STAGES = {"signed_testnet", "testnet"}
 
 
 ORDER_EXECUTOR_MODE = "GUARDED_REVIEW_ONLY"
@@ -127,6 +135,8 @@ def execute_order_intent(intent: dict) -> dict:
         result["readiness"] = readiness
         result["filled"] = (result.get("simulated_fill") or {}).get("fill_status") in {"FILLED", "PARTIALLY_FILLED"}
         result["exchange_order_id"] = None
+    elif str(intent.get("execution_stage") or intent.get("decision_stage") or "").lower() in _SIGNED_TESTNET_STAGES:
+        result = _execute_signed_testnet(intent, readiness)
     elif not readiness.get("ready", False):
         result = {
             "created_at": utc_now_iso(),
@@ -153,9 +163,55 @@ def execute_order_intent(intent: dict) -> dict:
     result["order_executor_mode"] = ORDER_EXECUTOR_MODE
     result["live_trading_allowed_by_this_module"] = LIVE_TRADING_ALLOWED_BY_THIS_MODULE
     result["adapter_routing_enabled_by_this_module"] = ADAPTER_ROUTING_ENABLED_BY_THIS_MODULE
-    result["external_order_submission_performed"] = EXTERNAL_ORDER_SUBMISSION_PERFORMED
+    # A branch (e.g. signed testnet) may have already recorded a real submission;
+    # only default this to the module constant when the branch did not set it.
+    result.setdefault("external_order_submission_performed", EXTERNAL_ORDER_SUBMISSION_PERFORMED)
     atomic_write_json(ORDER_RESULT_PATH, result)
     log_event("order_execution_attempted", {"status": result["status"], "state": result["state"], "client_order_id": intent.get("client_order_id")})
+    return result
+
+
+def _execute_signed_testnet(intent: dict, readiness: dict) -> dict:
+    """Run the pre-submit final guard, then submit a single signed testnet order.
+
+    Fails closed: unless the guard returns READY, nothing is signed or sent.
+    """
+    guard = evaluate_signed_testnet_final_guard(intent)
+    result = {
+        "created_at": utc_now_iso(),
+        "intent": intent,
+        "readiness": readiness,
+        "final_guard": guard,
+        "exchange_order_id": None,
+        "filled": False,
+        "external_order_submission_performed": False,
+    }
+
+    if not guard.get("approved"):
+        result["state"] = "REJECTED"
+        result["status"] = f"SIGNED_TESTNET_{guard.get('status', 'BLOCKED')}"
+        result["mode"] = "SIGNED_TESTNET_GUARD_BLOCK"
+        return result
+
+    adapter = SignedTestnetAdapter(
+        api_key=settings.BINANCE_API_KEY,
+        api_secret=settings.BINANCE_API_SECRET,
+        base_url=settings.BINANCE_TESTNET_BASE_URL,
+    )
+    submit = adapter.submit_order(intent)
+    submitted = bool(submit.get("submitted"))
+    if submitted:
+        record_submission()
+
+    result["mode"] = "SIGNED_TESTNET_ADAPTER"
+    result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
+    result["status"] = (
+        "SIGNED_TESTNET_ORDER_SUBMITTED" if submitted else "SIGNED_TESTNET_SUBMIT_FAILED"
+    )
+    result["submit_result"] = submit
+    result["exchange_order_id"] = submit.get("exchange_order_id")
+    result["client_order_id"] = submit.get("client_order_id")
+    result["external_order_submission_performed"] = submitted
     return result
 
 
@@ -226,9 +282,12 @@ def execute_order_with_risk_check(
     return result
 
 
-def run_order_executor() -> dict:
+def run_order_executor(execution_stage: str | None = None) -> dict:
     decision = read_json(TRADE_DECISION_PATH, {})
     intent = build_order_intent(decision)
+    if execution_stage and intent.get("status") == "ORDER_INTENT_CREATED":
+        intent["execution_stage"] = execution_stage
+        intent["decision_stage"] = execution_stage
     atomic_write_json(ORDER_INTENT_PATH, intent)
     return execute_order_intent(intent)
 
