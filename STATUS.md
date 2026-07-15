@@ -167,7 +167,12 @@ Roadmap S1–S11:
 | S1 | Strategy contract foundation: `StrategySpec`, status model, rule hash, allowed-feature registry, candidate registry | ✅ done (`src/crypto_ai_system/strategy_factory/`) |
 | S2 | Generation batches (4 specs/gen) from template + parameter mutation | ✅ done (`strategy_generator_agent`, `strategy_template_library`) |
 | S3 | Validation agent (feature-exists / look-ahead / stop-loss / ranges) | ✅ done (`strategy_validator_agent`) |
-| S4 | Unified backtest engine (cost + slippage + walk-forward + regime split) — critical path | todo |
+| S4 | Unified backtest engine (cost + slippage + walk-forward + regime split) — critical path, split S4a–S4e | in progress |
+| ├ S4a | Spec evaluator (feature row → entry match/direction; shared with S7) | ✅ done (`strategy_evaluator`) |
+| ├ S4b | Cost + slippage + position-sizing model | todo |
+| ├ S4c | Execution simulator (single in-sample pass → trade ledger) | todo |
+| ├ S4d | Performance metrics (expectancy_R, profit_factor, drawdown, sharpe-like…) | todo |
+| └ S4e | Walk-forward + regime split + BacktestAgent record | todo |
 | S5 | Batch champion selection (relative rank **and** absolute gate) | todo |
 | S6 | Active strategy pool (paper cap 5, status model) | todo |
 | S7 | Multi-strategy entry router (`OR`, direction-conflict block) — touches hot path | todo |

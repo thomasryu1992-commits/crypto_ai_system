@@ -30,6 +30,11 @@ from crypto_ai_system.strategy_factory.strategy_spec import (
 from crypto_ai_system.strategy_factory.strategy_hash import compute_strategy_rule_hash
 from crypto_ai_system.strategy_factory.strategy_generator_agent import generate_batch
 from crypto_ai_system.strategy_factory.strategy_validator_agent import validate_strategy
+from crypto_ai_system.strategy_factory.strategy_evaluator import (
+    MatchResult,
+    evaluate_condition,
+    evaluate_spec,
+)
 
 __all__ = [
     "Direction",
@@ -43,4 +48,7 @@ __all__ = [
     "compute_strategy_rule_hash",
     "generate_batch",
     "validate_strategy",
+    "MatchResult",
+    "evaluate_condition",
+    "evaluate_spec",
 ]
