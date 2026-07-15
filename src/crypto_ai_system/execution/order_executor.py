@@ -182,6 +182,9 @@ def _execute_signed_testnet(intent: dict, readiness: dict) -> dict:
         "intent": intent,
         "readiness": readiness,
         "final_guard": guard,
+        # Surface the connectivity flag at the result level so outcome/
+        # performance aggregation can exclude non-strategy orders.
+        "connectivity_test": bool(intent.get("connectivity_test")),
         "exchange_order_id": None,
         "filled": False,
         "external_order_submission_performed": False,

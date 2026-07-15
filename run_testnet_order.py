@@ -122,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:
         "order_notional_usdt": notional,
         "notional_usdt": notional,
         "reduce_only": args.reduce_only,
+        # Connectivity-only: this bypasses the real PreOrderRiskGate on purpose
+        # (it verifies signing/submission/reconciliation, NOT the strategy).
+        # Marked so it can never be aggregated as strategy performance.
+        "connectivity_test": True,
         "pre_order_risk_gate_approved": True,
         "risk_gate_id": f"connectivity_test_{utc_now_iso()}",
         "order_intent_created": True,

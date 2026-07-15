@@ -31,7 +31,18 @@ jobs:
         run: python -m pytest -q
 
       - name: Pipeline smoke (one cycle)
-        run: python run_pipeline.py
+        # Exit 0 (trade placed) and 2 (no-trade cycle) are both healthy (P0-6);
+        # only safety-halt/error codes (10/20/30/50) should fail CI.
+        run: |
+          set +e
+          python run_pipeline.py
+          code=$?
+          set -e
+          echo "run_pipeline.py exit code: $code"
+          case "$code" in
+            0|2) echo "healthy (0=trade placed, 2=no-trade cycle)";;
+            *) echo "unhealthy exit code $code"; exit "$code";;
+          esac
 
       - name: Safety flag guard (no order/live/testnet enabled by default)
         run: python scripts/check_safety_defaults.py
