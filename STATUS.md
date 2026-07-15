@@ -189,7 +189,7 @@ Roadmap S1–S11:
 | └ S4e | Walk-forward + regime split + BacktestAgent record | ✅ done (`backtest_agent`) |
 | S5 | Batch champion selection (relative rank **and** absolute gate) | ✅ done (`champion_selector_agent`) |
 | S6 | Active strategy pool (paper cap 5, status model) | ✅ done (`active_strategy_pool`) |
-| S7 | Multi-strategy entry router (`OR`, direction-conflict block) — touches hot path | todo |
+| S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router done (`entry_strategy_router_agent`); live pipeline wiring pending |
 | S8 | Strategy-id outcome attribution | todo |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | todo |
 | S11 | Continuous factory loop + diversity guard | todo |

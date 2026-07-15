@@ -42,6 +42,7 @@ from crypto_ai_system.strategy_factory.active_strategy_pool import (
     register_champion,
     set_status,
 )
+from crypto_ai_system.strategy_factory.entry_strategy_router_agent import route_entries
 
 __all__ = [
     "Direction",
@@ -63,4 +64,5 @@ __all__ = [
     "paper_active_specs",
     "register_champion",
     "set_status",
+    "route_entries",
 ]
