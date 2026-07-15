@@ -36,15 +36,15 @@ python -m pytest -q               # tests
 python scripts/check_safety_defaults.py   # fail-closed flag guard
 ```
 
-## Current stage: paper (pre-live)
+## Current stage: signed testnet (order + reconciliation verified)
 
 | Concern | State |
 |---|---|
 | Pipeline end-to-end | ✅ runs (all five stages OK on real data) |
 | Data source | ✅ real Binance USD-M Futures public klines (read-only, no key); synthetic fallback on failure |
 | Paper execution | ✅ works |
-| Signed-testnet adapter | ⚙️ implemented (HMAC signing + POST, hard-capped, disabled by default); no order submitted yet |
-| Testnet reconciliation | ⚙️ implemented (order/position/balance vs intent, mismatch detection); runs only after a real testnet submission |
+| Signed-testnet adapter | ✅ verified — one order submitted and FILLED on testnet (2026-07-15), reconciled with zero mismatches |
+| Testnet reconciliation | ✅ verified — RECONCILED against a real testnet fill (order/position/balance matched intent) |
 | Live order path | ❌ not implemented; trading agent refuses it |
 | Live/testnet flags | 🔒 all False by default (fail-closed) |
 
