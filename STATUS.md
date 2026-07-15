@@ -189,7 +189,7 @@ Roadmap S1–S11:
 | └ S4e | Walk-forward + regime split + BacktestAgent record | ✅ done (`backtest_agent`) |
 | S5 | Batch champion selection (relative rank **and** absolute gate) | ✅ done (`champion_selector_agent`) |
 | S6 | Active strategy pool (paper cap 5, status model) | ✅ done (`active_strategy_pool`) |
-| S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router + shadow live wiring done; order-driving wiring pending |
+| S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router + shadow + paper-drive wiring done (opt-in, gated) |
 | S8 | Strategy-id outcome attribution | ✅ done (`strategy_outcome_attribution`) |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | ✅ done (`feedback/strategy_performance_agent`, `feedback/strategy_lifecycle_agent`) |
 | S11 | Continuous factory loop + diversity guard | ✅ done (`continuous_factory`) |
@@ -211,9 +211,23 @@ the live candles via the same `build_feature_frame` the backtest uses
 (`runtime_feature_adapter`), routes the active pool over it, and writes
 `storage/latest/strategy_routing.json`. It is advisory — `drives_execution=false`,
 never halts the pipeline, and the default pipeline is unchanged when the flag is
-off. **Remaining:** increment 2 turns a routed candidate into an actual paper
-entry (behind the shared research permission + PreOrderRiskGate, with S8
-attribution on the outcome) — a separate, carefully-reviewed step.
+off.
+
+**Live wiring — increment 2 (paper drive):** behind
+`STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED` (default false, in the safety guard;
+requires routing enabled too, paper stage only). When a routed candidate exists,
+`strategy_execution_bridge` assembles a canonical trade decision — direction from
+the strategy, entry from the live price, SL/TP from the strategy's ATR exit rules,
+plus S8 attribution — and evaluates a fresh PreOrderRiskGate for that direction.
+Following §2.2, the strategy only creates the opportunity: `allow_order_intent`
+is true only when the research permission allows the direction **and** the gate
+approves; otherwise the research decision stands (fail-closed). When it is
+approved the *unchanged* order executor + paper kernel carry it, and the S8
+attribution (strategy_id / eval id / rule hash) rides the order intent → paper
+position → outcome. Verified on real artifacts: the decision assembles correctly
+and refuses order intent when the gate/permission don't approve. **Remaining:**
+consume the attributed paper outcomes into S9/S10 live (close the factory loop on
+real paper trades).
 
 ## History
 

@@ -174,6 +174,9 @@ MAX_LIVE_TRADES_PER_DAY = env_int("MAX_LIVE_TRADES_PER_DAY", 3)
 # Strategy factory live routing. Shadow mode records what the active pool would
 # do each cycle without changing any order; it never drives execution on its own.
 STRATEGY_FACTORY_ROUTING_ENABLED = env_bool("STRATEGY_FACTORY_ROUTING_ENABLED", False)
+# Drive mode (paper only): a routed candidate becomes an actual paper entry,
+# still gated by research permission + PreOrderRiskGate. Requires routing enabled.
+STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED = env_bool("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED", False)
 
 # Live canary preparation (read-only probe; grants no order authority)
 LIVE_READONLY_PROBE_ENABLED = env_bool("LIVE_READONLY_PROBE_ENABLED", False)

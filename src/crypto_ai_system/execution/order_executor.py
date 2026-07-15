@@ -78,7 +78,13 @@ def build_order_intent(trade_decision: dict) -> dict:
         "order_notional_usdt": notional,
         "source_decision": trade_decision.get("final_decision"),
         "confidence": trade_decision.get("confidence", 0),
-        "strategy_id": "research_bridge_v2",
+        # Strategy-factory attribution when a strategy drove this decision; falls
+        # back to the research bridge marker otherwise (S8 lineage).
+        "strategy_id": trade_decision.get("strategy_id") or "research_bridge_v2",
+        "supporting_strategy_ids": trade_decision.get("supporting_strategy_ids") or [],
+        "strategy_entry_evaluation_id": trade_decision.get("strategy_entry_evaluation_id"),
+        "strategy_rule_hash": trade_decision.get("strategy_rule_hash"),
+        "strategy_generation_id": trade_decision.get("strategy_generation_id"),
         "signal_id": trade_decision.get("research_signal_id") or trade_decision.get("final_decision", "unknown_signal"),
         "research_signal_id": trade_decision.get("research_signal_id") or trade_decision.get("research_signal", {}).get("research_signal_id"),
         "decision_id": trade_decision.get("decision_id"),

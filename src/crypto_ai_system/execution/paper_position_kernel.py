@@ -119,6 +119,13 @@ def open_from_execution(
         "order_intent_id": execution_record.get("order_intent_id") or reconciliation.get("order_intent_id"),
         "execution_id": execution_record.get("execution_id") or reconciliation.get("execution_id"),
         "reconciliation_id": reconciliation.get("reconciliation_id"),
+        # Strategy-factory attribution (S8) when a strategy drove this entry; None
+        # for research-driven entries. Rides through to the CLOSED outcome.
+        "strategy_id": intent.get("strategy_id") if intent.get("strategy_id") != "research_bridge_v2" else None,
+        "supporting_strategy_ids": intent.get("supporting_strategy_ids") or [],
+        "strategy_entry_evaluation_id": intent.get("strategy_entry_evaluation_id"),
+        "strategy_rule_hash": intent.get("strategy_rule_hash"),
+        "strategy_generation_id": intent.get("strategy_generation_id"),
         # The entry reconciliation is what the outcome is computed from on close.
         "entry_reconciliation": dict(reconciliation),
     }

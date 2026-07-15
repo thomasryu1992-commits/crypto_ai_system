@@ -10,10 +10,10 @@ to run the execution stage.
 from __future__ import annotations
 
 import config.settings as settings
-from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH
+from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH, TRADE_DECISION_PATH
 
 from bridge.research_trading_bridge import run_research_trading_bridge
-from core.json_io import read_json
+from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
 from crypto_ai_system.execution.paper_position_kernel import (
@@ -87,6 +87,28 @@ class TradingAgent(Agent):
     name = "trading"
     fatal_on_error = True
 
+    def _maybe_strategy_decision(self, ctx: PipelineContext, execution_stage: str, open_positions: int):
+        """Build a strategy-driven trade decision from this cycle's router result.
+
+        Isolated so a failure here can never break the research path: any error
+        returns None and the research decision stands."""
+        routing = ctx.get("strategy_routing")
+        if not isinstance(routing, dict):
+            return None
+        try:
+            from crypto_ai_system.strategy_factory.strategy_execution_bridge import (
+                build_strategy_decision_for_cycle,
+            )
+
+            cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
+            now = ctx.cycle.started_at_utc if ctx.cycle else None
+            return build_strategy_decision_for_cycle(
+                routing, execution_stage=execution_stage, open_positions=open_positions,
+                cycle_id=cycle_id, now=now,
+            )
+        except Exception:  # noqa: BLE001 - never let the drive path break research
+            return None
+
     def execute(self, ctx: PipelineContext) -> StageResult:
         # Fail-closed stage routing. The executor's final guard is the last
         # gate before anything is signed.
@@ -118,6 +140,23 @@ class TradingAgent(Agent):
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
         trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
+
+        # Strategy-factory drive (paper only, opt-in): when a routed candidate
+        # exists this cycle, replace the research decision with a strategy-driven
+        # one. It is still gated by research permission + PreOrderRiskGate inside
+        # the builder, and only overrides when it produces an order-intent-eligible
+        # decision — otherwise the research decision stands (fail-closed).
+        strategy_drive = None
+        if (
+            is_paper
+            and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
+            and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
+        ):
+            strategy_drive = self._maybe_strategy_decision(ctx, execution_stage, open_positions)
+            if strategy_drive is not None and strategy_drive.get("allow_order_intent"):
+                atomic_write_json(TRADE_DECISION_PATH, strategy_drive)
+                trade_decision = strategy_drive
+
         order = run_order_executor(execution_stage)
 
         # Reconcile against the venue only when a real testnet order was
@@ -162,6 +201,8 @@ class TradingAgent(Agent):
             "execution_stage": execution_stage,
             "trading_cycle": trading,
             "trade_decision": trade_decision,
+            "strategy_drive_decision": strategy_drive,
+            "strategy_drive_active": bool(strategy_drive is not None and strategy_drive.get("allow_order_intent")),
             "order_result": order,
             "reconciliation": reconciliation,
             "trade_executed": trade_executed,
