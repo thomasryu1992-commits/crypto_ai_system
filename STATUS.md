@@ -105,7 +105,8 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 3. **Operator step**: create Binance **testnet** API keys, set env (`BINANCE_API_KEY/SECRET`, `TESTNET_SIGNED_ORDER_ENABLED=true`, `SIGNED_TESTNET_PLACE_ORDER_ENABLED=true`, `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS`), and submit one testnet order. Claude does not run this or handle real keys.
 4. ✅ Testnet reconciliation implemented + verified (first order RECONCILED on testnet).
 5. ✅ Repeated-session harness (Phase 10) — `run_testnet_session.py` runs N open/close cycles with fill/slippage/latency/cost stats. **Operator step**: run several sessions (raise the daily cap) to confirm stability.
-6. Live canary preparation.
+6. ✅ Live canary preparation gate implemented (`scripts/check_live_canary_readiness.py`) — requires ≥5 clean testnet sessions plus a live **read-only** probe (key restrictions, balance, symbol filters, commission). GET-only by construction; grants no order authority. **Operator step**: run enough clean sessions, create a live read-only key (no withdrawals/transfers), then run the check with `--probe`.
+7. Live canary one-order boundary (separate approval + runtime, after step 6 is READY).
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
 Create Binance USD-M **Futures testnet** API keys at
@@ -149,6 +150,19 @@ round-trip cost. It stops early when the daily order cap is hit. Each session
 uses 2 orders, so `--sessions` is bounded by
 `SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT / 2` — raise the daily cap for longer runs
 (testnet fake funds).
+
+### Live canary preparation (operator)
+```
+py scripts/check_live_canary_readiness.py           # testnet evidence + config only
+py scripts/check_live_canary_readiness.py --probe   # + signed GET-only live probe
+```
+Gate 1 needs `storage/latest/signed_testnet_session_report.json` with ≥5 clean,
+fully reconciled sessions. Gate 2 needs `LIVE_READONLY_PROBE_ENABLED=true` and a
+**separate live API key restricted to reading** (`LIVE_BINANCE_API_KEY/SECRET`);
+the probe fails closed if the key allows withdrawals or transfers. The written
+report (`storage/latest/live_canary_preparation.json`) is evidence only — every
+order-authority flag in it is hardcoded false, and the live canary order itself
+remains a separate approval and runtime boundary.
 
 ## History
 
