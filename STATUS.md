@@ -46,8 +46,18 @@ py scripts/paper_performance_summary.py   # accumulated expectancy/win/drawdown
 ```
 Runs the pipeline on an interval to accumulate paper outcomes on real data
 (no orders unless the signed-testnet path is explicitly enabled). Foreground;
-Ctrl+C stops it. For unattended runs, point Windows Task Scheduler at
-`run_pipeline.py`.
+Ctrl+C stops it.
+
+### Durable scheduling (survives terminal/session close)
+Register a Windows Scheduled Task that runs one cycle every hour:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup_scheduler_task.ps1
+powershell -ExecutionPolicy Bypass -File scripts\setup_scheduler_task.ps1 -IntervalMinutes 60
+powershell -ExecutionPolicy Bypass -File scripts\setup_scheduler_task.ps1 -Remove   # unregister
+```
+Each run executes `run_scheduler.py --once` (via `scripts\run_scheduler_once.bat`),
+appending to `storage\logs\scheduler.log` and the dashboard metrics log. Verify
+with `Get-ScheduledTask -TaskName CryptoAISystemPaperScheduler`.
 
 ### Metrics dashboard
 ```bash
