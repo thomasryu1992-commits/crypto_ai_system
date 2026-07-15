@@ -60,6 +60,10 @@ def build_market_intent(
         "order_notional_usdt": round(quantity * price, 2),
         "notional_usdt": round(quantity * price, 2),
         "reduce_only": reduce_only,
+        # Connectivity harness: verifies venue plumbing, not the strategy. The
+        # RiskGate approval is synthetic and marked, so these orders are never
+        # aggregated as strategy performance.
+        "connectivity_test": True,
         "pre_order_risk_gate_approved": True,
         "risk_gate_id": gate_id,
         "order_intent_created": True,
