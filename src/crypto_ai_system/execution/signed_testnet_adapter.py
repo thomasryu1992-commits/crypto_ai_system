@@ -27,6 +27,8 @@ from crypto_ai_system.execution.retry_policy import classify_exchange_error
 ALLOWED_TESTNET_HOSTS = frozenset({"testnet.binancefuture.com"})
 
 ORDER_PATH = "/fapi/v1/order"
+POSITION_RISK_PATH = "/fapi/v2/positionRisk"
+BALANCE_PATH = "/fapi/v2/balance"
 
 # A transport takes (method, url, params, headers, timeout) and returns
 # (http_status_code, parsed_json_or_error_dict).
@@ -163,6 +165,13 @@ class SignedTestnetAdapter:
         return self._send(
             "DELETE", ORDER_PATH, {"symbol": symbol, "origClientOrderId": client_order_id}
         )
+
+    def get_positions(self, symbol: str | None = None) -> dict[str, Any]:
+        params = {"symbol": symbol} if symbol else {}
+        return self._send("GET", POSITION_RISK_PATH, params)
+
+    def get_balance(self) -> dict[str, Any]:
+        return self._send("GET", BALANCE_PATH, {})
 
 
 def _redact(params: dict[str, Any]) -> dict[str, Any]:
