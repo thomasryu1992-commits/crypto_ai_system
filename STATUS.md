@@ -188,7 +188,7 @@ Roadmap S1–S11:
 | ├ S4d | Performance metrics (expectancy_R, profit_factor, drawdown, sharpe-like…) | ✅ done (`performance_metrics`) |
 | └ S4e | Walk-forward + regime split + BacktestAgent record | ✅ done (`backtest_agent`) |
 | S5 | Batch champion selection (relative rank **and** absolute gate) | ✅ done (`champion_selector_agent`) |
-| S6 | Active strategy pool (paper cap 5, status model) | todo |
+| S6 | Active strategy pool (paper cap 5, status model) | ✅ done (`active_strategy_pool`) |
 | S7 | Multi-strategy entry router (`OR`, direction-conflict block) — touches hot path | todo |
 | S8 | Strategy-id outcome attribution | todo |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | todo |

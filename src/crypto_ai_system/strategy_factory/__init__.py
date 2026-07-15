@@ -35,6 +35,13 @@ from crypto_ai_system.strategy_factory.strategy_evaluator import (
     evaluate_condition,
     evaluate_spec,
 )
+from crypto_ai_system.strategy_factory.active_strategy_pool import (
+    add_champion,
+    empty_pool,
+    paper_active_specs,
+    register_champion,
+    set_status,
+)
 
 __all__ = [
     "Direction",
@@ -51,4 +58,9 @@ __all__ = [
     "MatchResult",
     "evaluate_condition",
     "evaluate_spec",
+    "add_champion",
+    "empty_pool",
+    "paper_active_specs",
+    "register_champion",
+    "set_status",
 ]
