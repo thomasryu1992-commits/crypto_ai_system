@@ -136,6 +136,21 @@ def main(argv: list[str] | None = None) -> int:
                       ("status", "state", "exchange_order_id", "client_order_id",
                        "external_order_submission_performed")}, indent=2, default=str))
 
+    # Surface why a submission was blocked or failed, so it is diagnosable.
+    guard = order_result.get("final_guard")
+    if guard and not guard.get("approved"):
+        print("blocked by final guard:")
+        for reason in (guard.get("blocks") or []) + (guard.get("repairs") or []):
+            print(f"  - {reason}")
+    submit = order_result.get("submit_result")
+    if submit and not submit.get("submitted"):
+        err = submit.get("error")
+        print(f"exchange rejected the order: {err} "
+              f"(http {submit.get('http_status')})")
+        if args.reduce_only:
+            print("  hint: reduceOnly on a flat position is rejected — open a "
+                  "position first, or drop --reduce-only.")
+
     reconciliation = run_signed_testnet_reconciliation()
     print("=== reconciliation ===")
     print(json.dumps({k: reconciliation.get(k) for k in
