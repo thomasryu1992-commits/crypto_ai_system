@@ -15,6 +15,13 @@ PAPER_ENGINE_MODE = "PAPER_ONLY"
 LIVE_TRADING_ALLOWED_BY_THIS_MODULE = False
 EXTERNAL_ORDER_SUBMISSION_PERFORMED = False
 
+# B-4: the canonical paper position lifecycle now lives in
+# execution.paper_position_kernel. This legacy Path A book no longer opens or
+# closes positions in the active runtime (single paper path). The exit math
+# (evaluate_open_position / close_trade / update_position_conservative) is kept
+# for reuse and regression tests; set False to exercise the legacy path directly.
+KERNEL_OWNS_POSITIONS = True
+
 # Max bars to hold an open paper position before a time-based exit. Without this
 # a position that neither hits SL nor TP stays open forever, so no closed trade
 # is ever collected and performance can't be measured (directive P0-4). Values
@@ -212,6 +219,10 @@ def evaluate_open_position(
 
 
 def run_paper_cycle(signal_payload: dict[str, Any], snapshot: dict[str, Any], allow_new_position: bool = True) -> dict[str, Any]:
+    if KERNEL_OWNS_POSITIONS:
+        # Positions are owned by execution.paper_position_kernel; this legacy
+        # book is inert in the active runtime (retired Path A).
+        return {"status": "DELEGATED_TO_KERNEL", "active_position": None}
     state = load_paper_state()
     active = state.get("active_position")
     signal = signal_payload.get("signal", "NONE")

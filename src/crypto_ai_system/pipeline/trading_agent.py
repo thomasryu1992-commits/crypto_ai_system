@@ -10,9 +10,17 @@ to run the execution stage.
 from __future__ import annotations
 
 import config.settings as settings
+from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH
 
 from bridge.research_trading_bridge import run_research_trading_bridge
+from core.json_io import read_json
+from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
+from crypto_ai_system.execution.paper_position_kernel import (
+    has_open_position,
+    open_from_execution,
+    settle_open_position,
+)
 from crypto_ai_system.execution.reconciler import run_reconciler
 from crypto_ai_system.execution.signed_testnet_reconciliation import (
     run_signed_testnet_reconciliation,
@@ -21,6 +29,22 @@ from crypto_ai_system.trading.trading_cycle import run_trading_cycle
 
 from crypto_ai_system.pipeline.base import Agent
 from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
+
+
+def _latest_candle() -> dict | None:
+    data = read_json(MARKET_DATA_PATH, {})
+    candles = data.get("candles", []) if isinstance(data, dict) else []
+    if not candles:
+        return None
+    last = candles[-1]
+    return last if isinstance(last, dict) and "high" in last and "low" in last else None
+
+
+def _f(value) -> float | None:
+    try:
+        return float(value) if value not in {None, ""} else None
+    except (TypeError, ValueError):
+        return None
 
 _CONFIRMATION_PHRASE = "I_UNDERSTAND_THIS_PLACES_REAL_ORDERS"
 
@@ -72,8 +96,28 @@ class TradingAgent(Agent):
 
         allow_new_position = bool(ctx.get("allow_new_position", False))
 
+        cfg = load_config(".")
+        cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
+        snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+        is_paper = execution_stage == "paper"
+
+        # 1. Settle any open paper position FIRST — SL/TP/time exit may close it
+        #    and produce a CLOSED outcome before this cycle considers a new entry.
+        settlement = None
+        if is_paper:
+            settlement = settle_open_position(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+
+        # 2. Open-position count for the gate (max_open_positions enforced there).
+        open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
+
         trading = run_trading_cycle(allow_new_position=allow_new_position)
-        trade_decision = run_research_trading_bridge()
+        trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
         order = run_order_executor(execution_stage)
 
         # Reconcile against the venue only when a real testnet order was
@@ -99,11 +143,20 @@ class TradingAgent(Agent):
         )
         trade_executed = order_filled or order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
 
-        # Paper position lifecycle (Path A). Distinct from order lifecycle above:
-        # a position can open/close in paper without an order-intent submission.
-        paper_status = trading.get("paper_result", {}).get("status") if isinstance(trading, dict) else None
-        position_opened = paper_status == "POSITION_OPENED"
-        position_closed = paper_status == "POSITION_CLOSED"
+        # 3. Open a canonical paper position from a freshly filled entry (only if
+        #    none is open — the gate's max_open_positions already enforces this).
+        opened = None
+        if is_paper and order_filled and not has_open_position(cfg):
+            opened = open_from_execution(
+                order,
+                reconciliation if isinstance(reconciliation, dict) else {},
+                cycle_id=cycle_id,
+                cfg=cfg,
+            )
+
+        # Paper position lifecycle now flows through the kernel, not Path A.
+        position_opened = opened is not None
+        position_closed = settlement is not None
 
         outputs = {
             "execution_stage": execution_stage,
@@ -119,6 +172,7 @@ class TradingAgent(Agent):
             "order_filled": order_filled,
             "position_opened": position_opened,
             "position_closed": position_closed,
+            "position_settlement": settlement,
         }
 
         if not allow_new_position:

@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-import config.settings as settings
 from config.settings import MAX_ORDER_NOTIONAL_USDT, ORDER_INTENT_PATH, ORDER_RESULT_PATH, TRADE_DECISION_PATH
 from core.json_io import atomic_write_json, read_json
 from core.time_utils import utc_now_iso
 from core.event_log import log_event
+from crypto_ai_system.execution.execution_port import select_adapter
 from crypto_ai_system.execution.idempotency import enrich_order_identity
 from crypto_ai_system.execution.live_guard import run_live_readiness_check
-from crypto_ai_system.execution.paper_execution_engine_v2 import execute_and_persist_paper_order
-from crypto_ai_system.execution.signed_testnet_adapter import SignedTestnetAdapter
-from crypto_ai_system.execution.signed_testnet_final_guard import (
-    evaluate_signed_testnet_final_guard,
-    record_submission,
-)
 from crypto_ai_system.trading.order_id_chain import order_intent_id_from_payload
-
-_SIGNED_TESTNET_STAGES = {"signed_testnet", "testnet"}
 
 
 ORDER_EXECUTOR_MODE = "GUARDED_REVIEW_ONLY"
@@ -112,6 +104,8 @@ def build_order_intent(trade_decision: dict) -> dict:
 def execute_order_intent(intent: dict) -> dict:
     readiness = run_live_readiness_check()
 
+    stage = str(intent.get("execution_stage") or intent.get("decision_stage") or "").lower()
+    adapter = select_adapter(stage)
     if intent.get("status") != "ORDER_INTENT_CREATED":
         result = {
             "created_at": utc_now_iso(),
@@ -121,22 +115,11 @@ def execute_order_intent(intent: dict) -> dict:
             "intent": intent,
             "readiness": readiness,
         }
-    elif str(intent.get("execution_stage") or intent.get("decision_stage") or "").lower() == "paper":
-        result = execute_and_persist_paper_order(
-            intent,
-            risk_gate_report=intent.get("risk_gate_report") or {},
-            market_state={
-                "price": intent.get("entry_price"),
-                "fee_bps": intent.get("fee_bps"),
-                "slippage_bps": intent.get("slippage_bps"),
-            },
-        )
-        result["mode"] = "PAPER_EXECUTION_ENGINE_V2"
-        result["readiness"] = readiness
-        result["filled"] = (result.get("simulated_fill") or {}).get("fill_status") in {"FILLED", "PARTIALLY_FILLED"}
-        result["exchange_order_id"] = None
-    elif str(intent.get("execution_stage") or intent.get("decision_stage") or "").lower() in _SIGNED_TESTNET_STAGES:
-        result = _execute_signed_testnet(intent, readiness)
+    elif adapter is not None:
+        # Same canonical OrderIntent, stage-selected venue adapter (P0-1). The
+        # only paper/testnet difference is the adapter; RiskGate/reconciliation
+        # are shared upstream/downstream.
+        result = adapter.submit(intent, readiness=readiness)
     elif not readiness.get("ready", False):
         result = {
             "created_at": utc_now_iso(),
@@ -168,53 +151,6 @@ def execute_order_intent(intent: dict) -> dict:
     result.setdefault("external_order_submission_performed", EXTERNAL_ORDER_SUBMISSION_PERFORMED)
     atomic_write_json(ORDER_RESULT_PATH, result)
     log_event("order_execution_attempted", {"status": result["status"], "state": result["state"], "client_order_id": intent.get("client_order_id")})
-    return result
-
-
-def _execute_signed_testnet(intent: dict, readiness: dict) -> dict:
-    """Run the pre-submit final guard, then submit a single signed testnet order.
-
-    Fails closed: unless the guard returns READY, nothing is signed or sent.
-    """
-    guard = evaluate_signed_testnet_final_guard(intent)
-    result = {
-        "created_at": utc_now_iso(),
-        "intent": intent,
-        "readiness": readiness,
-        "final_guard": guard,
-        # Surface the connectivity flag at the result level so outcome/
-        # performance aggregation can exclude non-strategy orders.
-        "connectivity_test": bool(intent.get("connectivity_test")),
-        "exchange_order_id": None,
-        "filled": False,
-        "external_order_submission_performed": False,
-    }
-
-    if not guard.get("approved"):
-        result["state"] = "REJECTED"
-        result["status"] = f"SIGNED_TESTNET_{guard.get('status', 'BLOCKED')}"
-        result["mode"] = "SIGNED_TESTNET_GUARD_BLOCK"
-        return result
-
-    adapter = SignedTestnetAdapter(
-        api_key=settings.BINANCE_API_KEY,
-        api_secret=settings.BINANCE_API_SECRET,
-        base_url=settings.BINANCE_TESTNET_BASE_URL,
-    )
-    submit = adapter.submit_order(intent)
-    submitted = bool(submit.get("submitted"))
-    if submitted:
-        record_submission()
-
-    result["mode"] = "SIGNED_TESTNET_ADAPTER"
-    result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
-    result["status"] = (
-        "SIGNED_TESTNET_ORDER_SUBMITTED" if submitted else "SIGNED_TESTNET_SUBMIT_FAILED"
-    )
-    result["submit_result"] = submit
-    result["exchange_order_id"] = submit.get("exchange_order_id")
-    result["client_order_id"] = submit.get("client_order_id")
-    result["external_order_submission_performed"] = submitted
     return result
 
 

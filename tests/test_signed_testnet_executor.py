@@ -11,6 +11,8 @@ for _p in (str(ROOT / "src"), str(ROOT)):
         sys.path.insert(0, _p)
 
 from crypto_ai_system.execution import order_executor
+from crypto_ai_system.execution import signed_testnet_adapter as _adapter_mod
+from crypto_ai_system.execution import signed_testnet_final_guard as _guard_mod
 
 
 def _intent():
@@ -45,12 +47,12 @@ class _FakeAdapter:
 
 def test_executor_submits_when_guard_ready(monkeypatch):
     monkeypatch.setattr(
-        order_executor,
+        _guard_mod,
         "evaluate_signed_testnet_final_guard",
         lambda i: {"status": "READY", "approved": True, "blocks": [], "repairs": []},
     )
-    monkeypatch.setattr(order_executor, "SignedTestnetAdapter", _FakeAdapter)
-    monkeypatch.setattr(order_executor, "record_submission", lambda: 1)
+    monkeypatch.setattr(_adapter_mod, "SignedTestnetAdapter", _FakeAdapter)
+    monkeypatch.setattr(_guard_mod, "record_submission", lambda: 1)
 
     result = order_executor.execute_order_intent(_intent())
 
@@ -73,11 +75,11 @@ def test_executor_blocks_when_guard_not_ready(monkeypatch):
             return {}
 
     monkeypatch.setattr(
-        order_executor,
+        _guard_mod,
         "evaluate_signed_testnet_final_guard",
         lambda i: {"status": "BLOCKED", "approved": False, "blocks": ["nope"], "repairs": []},
     )
-    monkeypatch.setattr(order_executor, "SignedTestnetAdapter", _NoAdapter)
+    monkeypatch.setattr(_adapter_mod, "SignedTestnetAdapter", _NoAdapter)
 
     result = order_executor.execute_order_intent(_intent())
 
