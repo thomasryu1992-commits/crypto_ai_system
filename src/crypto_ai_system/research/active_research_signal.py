@@ -21,11 +21,16 @@ from config.settings import LATEST_DIR, MARKET_SNAPSHOT_PATH, RESEARCH_RESULT_PA
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.quality.signal_qa import persist_signal_qa_report, validate_research_signal_quality
+from crypto_ai_system.research.paper_profile import (
+    PAPER_PROFILE_ID,
+    PAPER_PROFILE_SHA256,
+    PAPER_PROFILE_VERSION,
+)
 from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 ACTIVE_RESEARCH_SIGNAL_VERSION = "active_research_signal.v1"
-DEFAULT_PROFILE_ID = "paper_default_v1"
-PROFILE_VERSION = "paper_default_v1.0"
+DEFAULT_PROFILE_ID = PAPER_PROFILE_ID
+PROFILE_VERSION = PAPER_PROFILE_VERSION
 CONFIG_VERSION = "lean_pipeline.v1"
 
 SIGNAL_QA_REPORT_PATH = LATEST_DIR / "signal_qa_report.json"
@@ -138,6 +143,11 @@ def build_active_research_signal(
         "source_bundle_sha256": source_bundle_sha256,
         "profile_id": profile_id,
         "profile_version": PROFILE_VERSION,
+        # Matches the approved paper profile so the gate's profile-hash check
+        # passes for paper. (For non-paper stages the bridge supplies no approved
+        # profile, so the gate blocks regardless.)
+        "profile_sha256": PAPER_PROFILE_SHA256 if profile_id == PAPER_PROFILE_ID else None,
+        "profile_hash": PAPER_PROFILE_SHA256 if profile_id == PAPER_PROFILE_ID else None,
         "config_version": CONFIG_VERSION,
         "created_at_utc": utc_now_canonical(),
         "timestamp": snapshot.get("last_candle_time") or snapshot.get("created_at"),

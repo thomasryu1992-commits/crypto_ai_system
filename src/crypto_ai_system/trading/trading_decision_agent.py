@@ -7,8 +7,14 @@ from crypto_ai_system.trading.order_id_chain import ORDER_ID_CHAIN_VERSION
 from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 TRADING_DECISION_AGENT_VERSION = "step292_trading_decision_agent_refactor_v1"
-TRADING_DECISION_MODE = "TRADING_DECISION_REVIEW_ONLY_NO_ORDER_INTENT"
-ORDER_INTENT_CREATION_ENABLED_BY_AGENT = False
+TRADING_DECISION_MODE = "TRADING_DECISION_ORDER_INTENT_GATED_BY_PRE_ORDER_RISK_GATE"
+# B-3: order-intent creation is now authorised by the real PreOrderRiskGate
+# result (an approved gate is required and supplied per cycle). This is NOT an
+# order-submission switch: paper routes to a simulation adapter, and
+# signed-testnet/live still require their enable flags + confirmation + final
+# guard + a registry-backed RiskGate record. Without an approved gate,
+# allow_order_intent stays False (fail-closed).
+ORDER_INTENT_CREATION_ENABLED_BY_AGENT = True
 ORDER_ROUTING_ENABLED_BY_AGENT = False
 EXTERNAL_ORDER_SUBMISSION_PERFORMED_BY_AGENT = False
 

@@ -73,7 +73,7 @@ class TradingAgent(Agent):
         allow_new_position = bool(ctx.get("allow_new_position", False))
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
-        trade_decision = run_research_trading_bridge()
+        trade_decision = run_research_trading_bridge(execution_stage=execution_stage)
         order = run_order_executor(execution_stage)
 
         # Reconcile against the venue only when a real testnet order was
