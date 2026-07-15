@@ -14,6 +14,9 @@ import config.settings as settings
 from bridge.research_trading_bridge import run_research_trading_bridge
 from crypto_ai_system.execution.order_executor import run_order_executor
 from crypto_ai_system.execution.reconciler import run_reconciler
+from crypto_ai_system.execution.signed_testnet_reconciliation import (
+    run_signed_testnet_reconciliation,
+)
 from crypto_ai_system.trading.trading_cycle import run_trading_cycle
 
 from crypto_ai_system.pipeline.base import Agent
@@ -72,7 +75,15 @@ class TradingAgent(Agent):
         trading = run_trading_cycle(allow_new_position=allow_new_position)
         trade_decision = run_research_trading_bridge()
         order = run_order_executor(execution_stage)
-        reconciliation = run_reconciler()
+
+        # Reconcile against the venue only when a real testnet order was
+        # submitted; otherwise use the paper reconciler.
+        if execution_stage == "signed_testnet" and isinstance(order, dict) and order.get(
+            "external_order_submission_performed"
+        ):
+            reconciliation = run_signed_testnet_reconciliation()
+        else:
+            reconciliation = run_reconciler()
 
         outputs = {
             "execution_stage": execution_stage,

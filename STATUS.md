@@ -44,6 +44,7 @@ python scripts/check_safety_defaults.py   # fail-closed flag guard
 | Data source | ✅ real Binance USD-M Futures public klines (read-only, no key); synthetic fallback on failure |
 | Paper execution | ✅ works |
 | Signed-testnet adapter | ⚙️ implemented (HMAC signing + POST, hard-capped, disabled by default); no order submitted yet |
+| Testnet reconciliation | ⚙️ implemented (order/position/balance vs intent, mismatch detection); runs only after a real testnet submission |
 | Live order path | ❌ not implemented; trading agent refuses it |
 | Live/testnet flags | 🔒 all False by default (fail-closed) |
 
@@ -61,7 +62,7 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 1. ✅ Real market data wired (Binance public klines). Run paper on real data for a sustained window (schedule `run_pipeline.py`) and review outcomes.
 2. ✅ Signed-testnet order adapter implemented (HMAC signing + POST) behind the existing contracts (idempotency, client order id, endpoint allowlist, hard caps, final guard). Disabled by default.
 3. **Operator step**: create Binance **testnet** API keys, set env (`BINANCE_API_KEY/SECRET`, `TESTNET_SIGNED_ORDER_ENABLED=true`, `SIGNED_TESTNET_PLACE_ORDER_ENABLED=true`, `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS`), and submit one testnet order. Claude does not run this or handle real keys.
-4. Verify a testnet session end-to-end (fill / position / balance reconciliation).
+4. ✅ Testnet reconciliation implemented (order/position/balance vs intent). **Operator step**: run it against a real testnet order to verify a session end-to-end.
 5. Live canary.
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
