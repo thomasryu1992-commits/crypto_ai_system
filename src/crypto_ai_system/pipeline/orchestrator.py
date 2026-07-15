@@ -12,7 +12,13 @@ Fail-closed semantics:
 
 from __future__ import annotations
 
+import uuid
+
+import config.settings as settings
+from core.time_utils import utc_now_iso
+
 from crypto_ai_system.pipeline.contracts import (
+    CycleEnvelope,
     PipelineContext,
     PipelineRun,
     StageResult,
@@ -25,6 +31,15 @@ from crypto_ai_system.pipeline.trading_agent import TradingAgent
 from crypto_ai_system.pipeline.validation_agent import ValidationAgent
 
 
+def _new_cycle() -> CycleEnvelope:
+    stage = getattr(settings, "RUNTIME_STAGE", None) or "paper"
+    return CycleEnvelope(
+        cycle_id=f"cycle_{uuid.uuid4().hex[:16]}",
+        started_at_utc=utc_now_iso(),
+        stage=str(stage),
+    )
+
+
 class Pipeline:
     def __init__(self) -> None:
         self.pre_trade = [DataAgent(), ResearchAgent(), ValidationAgent()]
@@ -32,7 +47,7 @@ class Pipeline:
         self.feedback = FeedbackAgent()
 
     def run_once(self) -> PipelineRun:
-        ctx = PipelineContext()
+        ctx = PipelineContext(cycle=_new_cycle())
         results: list[StageResult] = []
         halted = False
 
@@ -64,6 +79,7 @@ class Pipeline:
         return PipelineRun(
             results=results,
             trade_executed=bool(ctx.get("trade_executed", False)),
+            cycle_id=ctx.cycle.cycle_id if ctx.cycle else None,
         )
 
 

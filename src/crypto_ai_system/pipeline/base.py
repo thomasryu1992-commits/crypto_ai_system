@@ -39,6 +39,9 @@ class Agent(ABC):
                 fatal=self.fatal_on_error,
             )
         result.duration_ms = (time.perf_counter() - start) * 1000.0
+        # Stamp cycle lineage on every stage output.
+        if ctx.cycle is not None:
+            result.outputs.setdefault("cycle_id", ctx.cycle.cycle_id)
         return result
 
     @abstractmethod

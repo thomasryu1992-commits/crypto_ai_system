@@ -8,6 +8,7 @@ chains them with fail-closed gating.
 """
 
 from crypto_ai_system.pipeline.contracts import (
+    CycleEnvelope,
     PipelineContext,
     PipelineRun,
     StageResult,
@@ -18,6 +19,7 @@ from crypto_ai_system.pipeline.orchestrator import Pipeline, run_pipeline_once
 __all__ = [
     "Pipeline",
     "run_pipeline_once",
+    "CycleEnvelope",
     "PipelineContext",
     "PipelineRun",
     "StageResult",

@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         payload = {
+            "cycle_id": run.cycle_id,
             "trade_executed": run.trade_executed,
             "halted": run.halted,
             "exit_code": code,

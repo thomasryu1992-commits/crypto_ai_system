@@ -74,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
             "live_candidate_eligible": report.get("live_candidate_eligible"),
         }
         return {
+            "cycle_id": run.cycle_id,
             "stages": stages,
             "trade_executed": run.trade_executed,
             "halted": run.halted,
@@ -91,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         row = {
             "ts": ts,
             "cycle": record["cycle"],
+            "cycle_id": r.get("cycle_id"),
             "ok": record["ok"],
             "duration_s": record.get("duration_s"),
             "stages": r.get("stages"),

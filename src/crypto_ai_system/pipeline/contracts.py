@@ -60,9 +60,24 @@ class StageResult:
 
 
 @dataclass
+class CycleEnvelope:
+    """Identity shared by every artifact produced in one pipeline cycle.
+
+    The cycle_id ties DataSnapshot -> ResearchSignal -> Decision -> RiskGate ->
+    OrderIntent -> Execution -> Reconciliation -> Outcome together so lineage
+    can be verified and cross-cycle reuse detected.
+    """
+
+    cycle_id: str
+    started_at_utc: str
+    stage: str = "paper"
+
+
+@dataclass
 class PipelineContext:
     """Mutable state threaded through the agents within one cycle."""
 
+    cycle: CycleEnvelope | None = None
     results: dict[str, StageResult] = field(default_factory=dict)
     data: dict[str, Any] = field(default_factory=dict)
 
@@ -82,6 +97,7 @@ class PipelineContext:
 class PipelineRun:
     results: list[StageResult]
     trade_executed: bool = False
+    cycle_id: str | None = None
 
     @property
     def halted(self) -> bool:
