@@ -42,7 +42,9 @@ python scripts/check_safety_defaults.py   # fail-closed flag guard
 |---|---|
 | Pipeline end-to-end | ✅ runs (all five stages OK on real data) |
 | Data source | ✅ real Binance USD-M Futures public klines (read-only, no key); synthetic fallback on failure |
-| Order submission | ❌ paper only; no signed/live order path implemented |
+| Paper execution | ✅ works |
+| Signed-testnet adapter | ⚙️ implemented (HMAC signing + POST, hard-capped, disabled by default); no order submitted yet |
+| Live order path | ❌ not implemented; trading agent refuses it |
 | Live/testnet flags | 🔒 all False by default (fail-closed) |
 
 ## Path to live (3 gates, not 15 phases)
@@ -57,9 +59,24 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 
 ### Next steps
 1. ✅ Real market data wired (Binance public klines). Run paper on real data for a sustained window (schedule `run_pipeline.py`) and review outcomes.
-2. Implement the signed-testnet order adapter (HMAC signing + POST) behind the existing contracts (idempotency, client order id, timeout, bounded retry, endpoint allowlist).
-3. Verify a testnet session end-to-end (fill / position / balance reconciliation).
-4. Live canary.
+2. ✅ Signed-testnet order adapter implemented (HMAC signing + POST) behind the existing contracts (idempotency, client order id, endpoint allowlist, hard caps, final guard). Disabled by default.
+3. **Operator step**: create Binance **testnet** API keys, set env (`BINANCE_API_KEY/SECRET`, `TESTNET_SIGNED_ORDER_ENABLED=true`, `SIGNED_TESTNET_PLACE_ORDER_ENABLED=true`, `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS`), and submit one testnet order. Claude does not run this or handle real keys.
+4. Verify a testnet session end-to-end (fill / position / balance reconciliation).
+5. Live canary.
+
+### Enabling the signed-testnet path (operator, on a testnet account only)
+All of these must be set — any one missing keeps the path fail-closed:
+```
+BINANCE_API_KEY=<testnet key>
+BINANCE_API_SECRET=<testnet secret>
+BINANCE_TESTNET=true
+TESTNET_SIGNED_ORDER_ENABLED=true
+SIGNED_TESTNET_PLACE_ORDER_ENABLED=true
+LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS
+```
+Hard caps still apply: `SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT` (default 5) and
+`SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT` (default 3). The pre-submit final guard
+(`execution/signed_testnet_final_guard.py`) re-checks all of this before signing.
 
 ## History
 

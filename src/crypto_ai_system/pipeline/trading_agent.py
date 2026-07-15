@@ -26,13 +26,12 @@ def _flag(name: str, default: bool = False) -> bool:
     return bool(getattr(settings, name, default))
 
 
-def _live_or_testnet_requested() -> bool:
-    return (
-        _flag("LIVE_TRADING_ENABLED")
-        or _flag("ALLOW_LIVE_TRADING")
-        or _flag("ENABLE_TESTNET_ORDERS")
-        or _flag("TESTNET_SIGNED_ORDER_ENABLED")
-    )
+def _live_requested() -> bool:
+    return _flag("LIVE_TRADING_ENABLED") or _flag("ALLOW_LIVE_TRADING")
+
+
+def _testnet_requested() -> bool:
+    return _flag("ENABLE_TESTNET_ORDERS") or _flag("TESTNET_SIGNED_ORDER_ENABLED")
 
 
 def _confirmation_present() -> bool:
@@ -42,31 +41,41 @@ def _confirmation_present() -> bool:
     return bool(given) and given == expected
 
 
+def resolve_execution_stage() -> tuple[str | None, str | None]:
+    """Decide the execution stage from config, fail-closed.
+
+    Returns ``(stage, block_reason)``. When ``block_reason`` is set the caller
+    must refuse execution. ``stage`` is ``"paper"`` or ``"signed_testnet"``.
+    """
+    if _live_requested():
+        return None, "live trading path is not implemented — refusing (fail-closed)"
+    if _testnet_requested() and not _confirmation_present():
+        return None, "testnet order flag enabled without confirmation phrase — refusing"
+    if _testnet_requested() and _confirmation_present():
+        return "signed_testnet", None
+    return "paper", None
+
+
 class TradingAgent(Agent):
     name = "trading"
     fatal_on_error = True
 
     def execute(self, ctx: PipelineContext) -> StageResult:
-        # Fail-closed safety gate: real-order paths require explicit
-        # confirmation. This agent never submits a signed order today; the
-        # guard exists so enabling one is a deliberate, auditable step.
-        if _live_or_testnet_requested() and not _confirmation_present():
-            return self.blocked(
-                [
-                    "live/testnet order flag enabled without confirmation phrase — "
-                    "refusing to run execution (fail-closed)"
-                ],
-                fatal=True,
-            )
+        # Fail-closed stage routing. The executor's final guard is the last
+        # gate before anything is signed.
+        execution_stage, block_reason = resolve_execution_stage()
+        if block_reason:
+            return self.blocked([block_reason], fatal=True)
 
         allow_new_position = bool(ctx.get("allow_new_position", False))
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
         trade_decision = run_research_trading_bridge()
-        order = run_order_executor()
+        order = run_order_executor(execution_stage)
         reconciliation = run_reconciler()
 
         outputs = {
+            "execution_stage": execution_stage,
             "trading_cycle": trading,
             "trade_decision": trade_decision,
             "order_result": order,
