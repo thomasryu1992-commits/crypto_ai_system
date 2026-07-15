@@ -36,6 +36,19 @@ python -m pytest -q               # tests
 python scripts/check_safety_defaults.py   # fail-closed flag guard
 ```
 
+### Sustained paper (scheduler)
+```bash
+py run_scheduler.py                       # run forever, one cycle / hour
+py run_scheduler.py --interval 900        # every 15 min
+py run_scheduler.py --cycles 24           # 24 cycles then stop
+py run_scheduler.py --once                # single cycle
+py scripts/paper_performance_summary.py   # accumulated expectancy/win/drawdown
+```
+Runs the pipeline on an interval to accumulate paper outcomes on real data
+(no orders unless the signed-testnet path is explicitly enabled). Foreground;
+Ctrl+C stops it. For unattended runs, point Windows Task Scheduler at
+`run_pipeline.py`.
+
 ## Current stage: signed testnet (order + reconciliation verified)
 
 | Concern | State |
