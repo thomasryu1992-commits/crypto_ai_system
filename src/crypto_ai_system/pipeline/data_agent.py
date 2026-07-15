@@ -14,12 +14,17 @@ from builders.market_snapshot import build_market_snapshot
 from crypto_ai_system.pipeline.base import Agent
 from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
 
-_SYNTHETIC_MARKERS = ("synthetic", "fallback", "mock", "sample")
+_REAL_QUALITY = "real"
 
 
 def _looks_synthetic(payload: object) -> bool:
-    text = repr(payload).lower()
-    return any(marker in text for marker in _SYNTHETIC_MARKERS)
+    """Authoritative check on the collector's own flags (not a text scan)."""
+    if not isinstance(payload, dict):
+        return True
+    if payload.get("is_synthetic") or payload.get("is_fallback"):
+        return True
+    quality = str(payload.get("data_quality", "")).lower()
+    return quality != _REAL_QUALITY
 
 
 class DataAgent(Agent):

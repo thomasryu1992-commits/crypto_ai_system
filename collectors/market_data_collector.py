@@ -4,7 +4,15 @@ import math
 import random
 from datetime import timedelta
 
-from config.settings import COINALYZE_API_KEY, COINALYZE_ENABLED, MARKET_DATA_PATH, SYMBOL, TIMEFRAME
+from config.settings import (
+    BINANCE_FUTURES_PUBLIC_BASE_URL,
+    COINALYZE_API_KEY,
+    COINALYZE_ENABLED,
+    MARKET_DATA_PATH,
+    REAL_MARKET_DATA_ENABLED,
+    SYMBOL,
+    TIMEFRAME,
+)
 from core.json_io import atomic_write_json
 from core.time_utils import utc_now, utc_now_iso
 from core.event_log import log_event
@@ -35,39 +43,49 @@ def _fallback_candles(count: int = 120) -> list[dict]:
     return candles
 
 
-def collect_market_data() -> dict:
-    # Step130: fallback data remains useful for dry-run, but downstream health blocks trading.
-    source_type = "synthetic_fallback"
-    data_quality = "synthetic"
-    source_reason = "coinalyze_disabled_or_missing_key"
-
-    if COINALYZE_ENABLED and COINALYZE_API_KEY:
-        # Placeholder for future real API implementation.
-        # The package keeps live data disabled unless explicitly implemented and validated.
-        source_type = "synthetic_fallback"
-        data_quality = "synthetic"
-        source_reason = "real_coinalyze_fetch_not_implemented_in_guarded_package"
-
-    candles = _fallback_candles()
-    payload = {
+def _synthetic_payload(source_reason: str) -> dict:
+    return {
         "created_at": utc_now_iso(),
         "symbol": SYMBOL,
         "timeframe": TIMEFRAME,
-        "source": source_type,
-        "source_type": source_type,
-        "data_quality": data_quality,
+        "source": "synthetic_fallback",
+        "source_type": "synthetic_fallback",
+        "data_quality": "synthetic",
         "is_synthetic": True,
         "is_fallback": True,
         "source_reason": source_reason,
-        "candles": candles,
+        "candles": _fallback_candles(),
         "derivatives": {
             "funding_rate": 0.0001,
             "open_interest": 1000000000,
             "open_interest_change_24h": 0.01,
         },
     }
+
+
+def collect_market_data() -> dict:
+    payload: dict
+    if REAL_MARKET_DATA_ENABLED:
+        # Import lazily so environments without the data client / network can
+        # still fall back to synthetic without an import-time failure.
+        try:
+            from collectors.real_market_data import collect_real_market_data
+
+            real = collect_real_market_data(
+                SYMBOL, TIMEFRAME, base_url=BINANCE_FUTURES_PUBLIC_BASE_URL
+            )
+            real["created_at"] = utc_now_iso()
+            payload = real
+        except Exception as exc:  # noqa: BLE001 - fail open to synthetic, closed to trading
+            payload = _synthetic_payload(f"real_fetch_failed: {type(exc).__name__}: {exc}")
+    else:
+        payload = _synthetic_payload("real_market_data_disabled")
+
     atomic_write_json(MARKET_DATA_PATH, payload)
-    log_event("market_data_collected", {"source_type": source_type, "data_quality": data_quality})
+    log_event(
+        "market_data_collected",
+        {"source_type": payload["source_type"], "data_quality": payload["data_quality"]},
+    )
     return payload
 
 
