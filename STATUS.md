@@ -60,6 +60,13 @@ latest performance report and shows uptime, trades placed, expectancy/win/
 drawdown, and health warnings (negative expectancy, stale data, signal drift,
 reconciliation mismatch, recent errors, synthetic data).
 
+To start performance measurement from zero (e.g. after switching to real data),
+clear the accumulated outcome/paper history — it is backed up first:
+```bash
+py scripts/reset_paper_outcomes.py            # dry run: show what would clear
+py scripts/reset_paper_outcomes.py --confirm  # back up + clear (reversible)
+```
+
 ## Current stage: signed testnet (order + reconciliation verified)
 
 | Concern | State |
