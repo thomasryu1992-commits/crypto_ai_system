@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: src:.
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pandas numpy requests PyYAML python-dotenv pytest
+
+      - name: Compile the kept tree
+        run: >-
+          python -m compileall -q
+          src config core collectors builders risk bridge data_health run_pipeline.py
+
+      - name: Unit + integration tests
+        run: python -m pytest -q
+
+      - name: Pipeline smoke (one cycle)
+        run: python run_pipeline.py
+
+      - name: Safety flag guard (no order/live/testnet enabled by default)
+        run: python scripts/check_safety_defaults.py
