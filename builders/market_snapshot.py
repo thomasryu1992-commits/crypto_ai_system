@@ -35,6 +35,9 @@ def build_market_snapshot() -> dict:
     derivatives = data.get("derivatives", {})
     funding_rate = float(derivatives.get("funding_rate", 0.0))
     oi_change_24h = float(derivatives.get("open_interest_change_24h", 0.0))
+    # Preserve per-source status (available/missing/neutral_due_to_missing/...)
+    # so downstream can tell a real 0.0 from absent data (directive §7.2).
+    optional_data_health = data.get("optional_data_health", {})
 
     trend_bias = "neutral"
     if ma20 and ma50 and last_close > ma20 > ma50:
@@ -58,6 +61,7 @@ def build_market_snapshot() -> dict:
         "volume_ratio": volume_ratio,
         "funding_rate": funding_rate,
         "open_interest_change_24h": oi_change_24h,
+        "optional_data_health": optional_data_health,
         "trend_bias": trend_bias,
         "candle_count": len(candles),
     }
