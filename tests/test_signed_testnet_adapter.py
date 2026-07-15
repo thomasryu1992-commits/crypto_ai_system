@@ -81,6 +81,22 @@ def test_submit_builds_expected_params_and_signs():
     assert result["exchange_order_id"] == 999
 
 
+def test_reduce_only_adds_reduce_only_param():
+    transport, captured = _capture_transport()
+    adapter = SignedTestnetAdapter("k", "s", transport=transport)
+    intent = _intent()
+    intent["reduce_only"] = True
+    adapter.submit_order(intent)
+    assert captured["params"]["reduceOnly"] == "true"
+
+
+def test_open_order_has_no_reduce_only_param():
+    transport, captured = _capture_transport()
+    adapter = SignedTestnetAdapter("k", "s", transport=transport)
+    adapter.submit_order(_intent())
+    assert "reduceOnly" not in captured["params"]
+
+
 def test_result_redacts_signature_and_never_exposes_secret():
     transport, _ = _capture_transport()
     adapter = SignedTestnetAdapter("mykey", "supersecret", transport=transport)

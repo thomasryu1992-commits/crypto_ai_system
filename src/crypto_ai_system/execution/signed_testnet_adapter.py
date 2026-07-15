@@ -145,6 +145,10 @@ class SignedTestnetAdapter:
             "quantity": intent["quantity"],
             "newClientOrderId": intent["client_order_id"],
         }
+        if intent.get("reduce_only"):
+            # Closing/reducing order: the exchange must not let it flip the
+            # position to the opposite side.
+            params["reduceOnly"] = "true"
         if params["type"] == "LIMIT":
             params["price"] = intent["entry_price"]
             params["timeInForce"] = intent.get("time_in_force", "GTC")

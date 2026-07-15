@@ -31,12 +31,17 @@ class _MockAdapter:
         return self._balance
 
 
-def _order_result(submitted=True, qty=0.001, side="BUY"):
+def _order_result(submitted=True, qty=0.001, side="BUY", reduce_only=False):
     return {
         "external_order_submission_performed": submitted,
         "exchange_order_id": 555,
         "client_order_id": "CAI_BTCUSDT_LONG_x",
-        "intent": {"symbol": "BTCUSDT", "side": side, "quantity": qty},
+        "intent": {
+            "symbol": "BTCUSDT",
+            "side": side,
+            "quantity": qty,
+            "reduce_only": reduce_only,
+        },
     }
 
 
@@ -90,6 +95,22 @@ def test_mismatch_filled_qty_vs_position_size():
     result = reconcile_signed_testnet(_order_result(), adapter)
     assert result["status"] == "MISMATCH"
     assert "filled_qty_does_not_match_position_size" in result["mismatches"]
+
+
+def test_reduce_only_close_to_flat_is_reconciled():
+    # SELL reduce-only that closes a long to zero must NOT be a mismatch.
+    adapter = _MockAdapter(_filled_order("0.002"), _position(0.0), _balance())
+    result = reconcile_signed_testnet(_order_result(side="SELL", reduce_only=True), adapter)
+    assert result["status"] == "RECONCILED", result
+    assert result["mismatches"] == []
+
+
+def test_reduce_only_flip_to_short_is_mismatch():
+    # If a SELL reduce-only somehow left a short position, flag it.
+    adapter = _MockAdapter(_filled_order("0.002"), _position(-0.002), _balance())
+    result = reconcile_signed_testnet(_order_result(side="SELL", reduce_only=True), adapter)
+    assert result["status"] == "MISMATCH"
+    assert "reduce_only_sell_flipped_to_short" in result["mismatches"]
 
 
 def test_unreconciled_when_query_fails():

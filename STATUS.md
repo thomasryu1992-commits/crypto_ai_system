@@ -62,8 +62,9 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 1. ✅ Real market data wired (Binance public klines). Run paper on real data for a sustained window (schedule `run_pipeline.py`) and review outcomes.
 2. ✅ Signed-testnet order adapter implemented (HMAC signing + POST) behind the existing contracts (idempotency, client order id, endpoint allowlist, hard caps, final guard). Disabled by default.
 3. **Operator step**: create Binance **testnet** API keys, set env (`BINANCE_API_KEY/SECRET`, `TESTNET_SIGNED_ORDER_ENABLED=true`, `SIGNED_TESTNET_PLACE_ORDER_ENABLED=true`, `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS`), and submit one testnet order. Claude does not run this or handle real keys.
-4. ✅ Testnet reconciliation implemented (order/position/balance vs intent). **Operator step**: run it against a real testnet order to verify a session end-to-end.
-5. Live canary.
+4. ✅ Testnet reconciliation implemented + verified (first order RECONCILED on testnet).
+5. ✅ Repeated-session harness (Phase 10) — `run_testnet_session.py` runs N open/close cycles with fill/slippage/latency/cost stats. **Operator step**: run several sessions (raise the daily cap) to confirm stability.
+6. Live canary preparation.
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
 Create Binance USD-M **Futures testnet** API keys at
@@ -96,6 +97,17 @@ py run_testnet_order.py --confirm                # place ONE small order, then r
 The runner sizes one order within the cap, submits it through the final guard
 and adapter, then prints the fill/position/balance reconciliation. Claude does
 not run this — it is an operator action with real testnet keys.
+
+### Repeated sessions (Phase 10, operator)
+```
+py run_testnet_session.py --sessions 3 --confirm   # N open/close cycles + stats
+```
+Each session opens a small long and closes it (reduceOnly), reconciling each
+leg, and reports fill/reconcile rate, slippage (bps), latency (ms), and
+round-trip cost. It stops early when the daily order cap is hit. Each session
+uses 2 orders, so `--sessions` is bounded by
+`SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT / 2` — raise the daily cap for longer runs
+(testnet fake funds).
 
 ## History
 

@@ -51,6 +51,9 @@ def reconcile_signed_testnet(order_result: dict, adapter: SignedTestnetAdapter) 
     side = intent.get("side")
     client_order_id = order_result.get("client_order_id") or intent.get("client_order_id")
     expected_qty = _float(intent.get("quantity"))
+    reduce_only = bool(intent.get("reduce_only")) or str(
+        intent.get("position_effect", "")
+    ).upper() in {"CLOSE", "REDUCE"}
 
     base = {
         "created_at": utc_now_iso(),
@@ -59,6 +62,7 @@ def reconcile_signed_testnet(order_result: dict, adapter: SignedTestnetAdapter) 
             "symbol": symbol,
             "side": side,
             "quantity": expected_qty,
+            "reduce_only": reduce_only,
             "client_order_id": client_order_id,
             "exchange_order_id": order_result.get("exchange_order_id"),
         },
@@ -109,16 +113,25 @@ def reconcile_signed_testnet(order_result: dict, adapter: SignedTestnetAdapter) 
     if isinstance(order_resp, dict) and not order_resp.get("orderId"):
         mismatches.append("exchange_order_not_found_by_client_order_id")
 
-    if filled and abs(position_amt) < _QTY_TOLERANCE:
-        mismatches.append("order_filled_but_no_open_position")
-
-    if filled and side == "BUY" and position_amt < 0:
-        mismatches.append("buy_order_but_short_position")
-    if filled and side == "SELL" and position_amt > 0:
-        mismatches.append("sell_order_but_long_position")
-
-    if filled and abs(executed_qty - abs(position_amt)) > max(_QTY_TOLERANCE, expected_qty * 1e-6):
-        mismatches.append("filled_qty_does_not_match_position_size")
+    if reduce_only:
+        # Closing/reducing order: the fill should move the position toward flat.
+        # A resulting position of 0 is a clean close (success). We cannot know
+        # the prior size in a single shot, so we only flag a flip to the
+        # opposite side, which reduceOnly must prevent.
+        if filled and side == "SELL" and position_amt < -_QTY_TOLERANCE:
+            mismatches.append("reduce_only_sell_flipped_to_short")
+        if filled and side == "BUY" and position_amt > _QTY_TOLERANCE:
+            mismatches.append("reduce_only_buy_flipped_to_long")
+    else:
+        # Opening order: a fill should leave a position of matching size/side.
+        if filled and abs(position_amt) < _QTY_TOLERANCE:
+            mismatches.append("order_filled_but_no_open_position")
+        if filled and side == "BUY" and position_amt < 0:
+            mismatches.append("buy_order_but_short_position")
+        if filled and side == "SELL" and position_amt > 0:
+            mismatches.append("sell_order_but_long_position")
+        if filled and abs(executed_qty - abs(position_amt)) > max(_QTY_TOLERANCE, expected_qty * 1e-6):
+            mismatches.append("filled_qty_does_not_match_position_size")
 
     if unreachable:
         status = "UNRECONCILED"

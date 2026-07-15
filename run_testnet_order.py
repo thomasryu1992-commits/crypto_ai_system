@@ -72,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Place one signed testnet order and reconcile.")
     parser.add_argument("--confirm", action="store_true", help="required to actually submit")
     parser.add_argument("--side", choices=["BUY", "SELL"], default="BUY")
+    parser.add_argument("--reduce-only", action="store_true",
+                        help="close/reduce an existing position (sends reduceOnly)")
     parser.add_argument("--notional", type=float, default=None,
                         help="target order notional in USDT (default: the configured cap)")
     parser.add_argument("--symbol", default=None, help="override symbol (canonical or Binance)")
@@ -119,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         "quantity": quantity,
         "order_notional_usdt": notional,
         "notional_usdt": notional,
+        "reduce_only": args.reduce_only,
         "pre_order_risk_gate_approved": True,
         "risk_gate_id": f"connectivity_test_{utc_now_iso()}",
         "order_intent_created": True,
@@ -132,6 +135,21 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({k: order_result.get(k) for k in
                       ("status", "state", "exchange_order_id", "client_order_id",
                        "external_order_submission_performed")}, indent=2, default=str))
+
+    # Surface why a submission was blocked or failed, so it is diagnosable.
+    guard = order_result.get("final_guard")
+    if guard and not guard.get("approved"):
+        print("blocked by final guard:")
+        for reason in (guard.get("blocks") or []) + (guard.get("repairs") or []):
+            print(f"  - {reason}")
+    submit = order_result.get("submit_result")
+    if submit and not submit.get("submitted"):
+        err = submit.get("error")
+        print(f"exchange rejected the order: {err} "
+              f"(http {submit.get('http_status')})")
+        if args.reduce_only:
+            print("  hint: reduceOnly on a flat position is rejected — open a "
+                  "position first, or drop --reduce-only.")
 
     reconciliation = run_signed_testnet_reconciliation()
     print("=== reconciliation ===")
