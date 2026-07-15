@@ -6,7 +6,11 @@ from typing import Any, Iterable, Mapping
 
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import AppConfig, load_config
-from crypto_ai_system.registry.base_registry import append_registry_record, registry_path
+from crypto_ai_system.registry.base_registry import (
+    append_registry_record,
+    load_registry_records,
+    registry_path,
+)
 from crypto_ai_system.trading.order_id_chain import (
     ORDER_ID_CHAIN_VERSION,
     chain_complete,
@@ -447,9 +451,52 @@ def build_outcome_feedback_registry_record(outcome: Mapping[str, Any]) -> dict[s
     return record
 
 
+def outcome_skip_reason(payload: Mapping[str, Any], existing_records: list[Mapping[str, Any]]) -> str | None:
+    """Decide whether an outcome must NOT be appended (P0-3).
+
+    Returns a skip reason (``"not_closed"`` / ``"no_execution"`` /
+    ``"duplicate"``) or ``None`` to append. Pure — no IO.
+    """
+    if not bool(payload.get("outcome_closed")):
+        return "not_closed"
+    execution_id = payload.get("execution_id")
+    reconciliation_id = payload.get("reconciliation_id")
+    if not execution_id and not reconciliation_id:
+        return "no_execution"
+    outcome_id = payload.get("outcome_id")
+    seen_outcomes = {r.get("outcome_id") for r in existing_records}
+    seen_execs = {r.get("execution_id") for r in existing_records if r.get("execution_id")}
+    seen_recons = {r.get("reconciliation_id") for r in existing_records if r.get("reconciliation_id")}
+    if (
+        (outcome_id and outcome_id in seen_outcomes)
+        or (execution_id and execution_id in seen_execs)
+        or (reconciliation_id and reconciliation_id in seen_recons)
+    ):
+        return "duplicate"
+    return None
+
+
 def persist_outcome_analytics_record(cfg: AppConfig, outcome: Mapping[str, Any]) -> dict[str, Any]:
     payload = dict(outcome)
     atomic_write_json(_latest_path(cfg, "outcome_analytics_record.json"), payload)
+
+    # P0-3: only a fresh, CLOSED trade produces an outcome, and each
+    # execution/reconciliation is recorded exactly once. No-trade / open /
+    # already-seen cycles must not append (this is what inflated the metrics).
+    reg_path = registry_path(cfg, OUTCOME_FEEDBACK_REGISTRY_NAME)
+    skip_reason = outcome_skip_reason(payload, load_registry_records(reg_path))
+    if skip_reason:
+        marker = {
+            "status": "OUTCOME_DUPLICATE_SKIPPED" if skip_reason == "duplicate" else "NO_TRADE_OBSERVATION",
+            "skip_reason": skip_reason,
+            "outcome_id": payload.get("outcome_id"),
+            "execution_id": payload.get("execution_id"),
+            "reconciliation_id": payload.get("reconciliation_id"),
+            "appended": False,
+        }
+        atomic_write_json(_latest_path(cfg, "outcome_feedback_registry_record.json"), marker)
+        return marker
+
     registry_record = build_outcome_feedback_registry_record(payload)
     persisted = append_registry_record(
         registry_path(cfg, OUTCOME_FEEDBACK_REGISTRY_NAME),
