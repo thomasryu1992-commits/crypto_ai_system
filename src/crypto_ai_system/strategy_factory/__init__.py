@@ -8,6 +8,9 @@ factory builds on:
 * :mod:`strategy_spec` — the typed spec, its status model, and structural parse.
 * :mod:`strategy_hash` — a deterministic identity hash over a spec's rules.
 * :mod:`strategy_registry` — append-only persistence of candidate specs.
+* :mod:`strategy_template_library` — the allowed generation templates (S2).
+* :mod:`strategy_generator_agent` — batch generation by template + mutation (S2).
+* :mod:`strategy_validator_agent` — the pre-backtest safety gate (S3).
 
 Nothing here can submit an order, mutate runtime settings, read secrets, or
 promote a stage. Those boundaries are enforced by the spec (``can_submit_orders``
@@ -25,6 +28,8 @@ from crypto_ai_system.strategy_factory.strategy_spec import (
     StrategyStatus,
 )
 from crypto_ai_system.strategy_factory.strategy_hash import compute_strategy_rule_hash
+from crypto_ai_system.strategy_factory.strategy_generator_agent import generate_batch
+from crypto_ai_system.strategy_factory.strategy_validator_agent import validate_strategy
 
 __all__ = [
     "Direction",
@@ -36,4 +41,6 @@ __all__ = [
     "StrategySpec",
     "StrategyStatus",
     "compute_strategy_rule_hash",
+    "generate_batch",
+    "validate_strategy",
 ]
