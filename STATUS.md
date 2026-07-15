@@ -40,8 +40,8 @@ python scripts/check_safety_defaults.py   # fail-closed flag guard
 
 | Concern | State |
 |---|---|
-| Pipeline end-to-end | ✅ runs |
-| Data source | ⚠️ synthetic fallback — real client wiring pending |
+| Pipeline end-to-end | ✅ runs (all five stages OK on real data) |
+| Data source | ✅ real Binance USD-M Futures public klines (read-only, no key); synthetic fallback on failure |
 | Order submission | ❌ paper only; no signed/live order path implemented |
 | Live/testnet flags | 🔒 all False by default (fail-closed) |
 
@@ -56,7 +56,7 @@ manual operator approval. Safety (kill switch, notional cap, daily-loss limit,
 hot-path risk gate) is enforced in code, not in evidence artifacts.
 
 ### Next steps
-1. Wire real API clients (`crypto_ai_system.data.*`) into the data agent; run paper on real data for a sustained window.
+1. ✅ Real market data wired (Binance public klines). Run paper on real data for a sustained window (schedule `run_pipeline.py`) and review outcomes.
 2. Implement the signed-testnet order adapter (HMAC signing + POST) behind the existing contracts (idempotency, client order id, timeout, bounded retry, endpoint allowlist).
 3. Verify a testnet session end-to-end (fill / position / balance reconciliation).
 4. Live canary.
