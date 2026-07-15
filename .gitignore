@@ -25,3 +25,5 @@ storage/logs/
 storage/tmp/
 dist/
 *.log
+
+.pytest_tmp/

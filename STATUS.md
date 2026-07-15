@@ -150,6 +150,36 @@ uses 2 orders, so `--sessions` is bounded by
 `SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT / 2` — raise the daily cap for longer runs
 (testnet fake funds).
 
+## Strategy Factory (continuous strategy production → selection → retirement)
+
+A second, independent track that layers a multi-strategy ecosystem onto the same
+5-agent runtime: strategies are generated continuously, backtested in batches,
+the best are promoted into an active pool that trades with `OR` semantics behind
+the shared research/risk gates, and strategies whose live performance decays are
+auto-suspended. It never bypasses `PreOrderRiskGate`, never auto-promotes to
+testnet/live, and never auto-reactivates a suspended strategy. Design doc:
+`Crypto_AI_System_Independent_Agent_Strategy_Factory_Architecture...` (2026-07-15).
+
+Roadmap S1–S11:
+
+| Phase | Scope | State |
+|---|---|---|
+| S1 | Strategy contract foundation: `StrategySpec`, status model, rule hash, allowed-feature registry, candidate registry | ✅ done (`src/crypto_ai_system/strategy_factory/`) |
+| S2 | Generation batches (4 specs/gen) from template + parameter mutation | todo |
+| S3 | Validation agent (feature-exists / look-ahead / stop-loss / ranges) | todo |
+| S4 | Unified backtest engine (cost + slippage + walk-forward + regime split) — critical path | todo |
+| S5 | Batch champion selection (relative rank **and** absolute gate) | todo |
+| S6 | Active strategy pool (paper cap 5, status model) | todo |
+| S7 | Multi-strategy entry router (`OR`, direction-conflict block) — touches hot path | todo |
+| S8 | Strategy-id outcome attribution | todo |
+| S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | todo |
+| S11 | Continuous factory loop + diversity guard | todo |
+
+A strategy spec is declarative data, never generated code: `can_submit_orders`
+and `can_modify_runtime` are hardcoded false and a spec that tries to set them is
+rejected. The allowed-feature registry tracks the *real* `feature_store` columns,
+so a spec cannot reference a feature that will not exist at evaluation time.
+
 ## History
 
 Pre-refactor state (the over-engineered governance/evidence apparatus) is frozen
