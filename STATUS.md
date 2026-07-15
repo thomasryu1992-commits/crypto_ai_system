@@ -192,12 +192,19 @@ Roadmap S1–S11:
 | S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router done (`entry_strategy_router_agent`); live pipeline wiring pending |
 | S8 | Strategy-id outcome attribution | ✅ done (`strategy_outcome_attribution`) |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | ✅ done (`feedback/strategy_performance_agent`, `feedback/strategy_lifecycle_agent`) |
-| S11 | Continuous factory loop + diversity guard | todo |
+| S11 | Continuous factory loop + diversity guard | ✅ done (`continuous_factory`) |
 
 A strategy spec is declarative data, never generated code: `can_submit_orders`
 and `can_modify_runtime` are hardcoded false and a spec that tries to set them is
 rejected. The allowed-feature registry tracks the *real* `feature_store` columns,
 so a spec cannot reference a feature that will not exist at evaluation time.
+
+The full offline factory (S1–S11) is complete: `continuous_factory.run_factory_cycle`
+runs generate → backtest → champion → pool per generation, the lifecycle agent
+retires decayed strategies, and the router turns the active pool into entry
+candidates. The remaining integration is wiring the router into the live
+`trading_agent` hot path (behind the shared research permission and
+PreOrderRiskGate) — deliberately left as a separate, carefully-reviewed step.
 
 ## History
 

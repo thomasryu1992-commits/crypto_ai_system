@@ -83,6 +83,14 @@ def is_strategy_id_active(pool: dict, strategy_id: str) -> bool:
     )
 
 
+def family_count(pool: dict, family: str) -> int:
+    """How many slot-occupying strategies belong to ``family`` (diversity guard)."""
+    return sum(
+        1 for e in occupying_entries(pool)
+        if (e.get("strategy_spec") or {}).get("strategy_family") == family
+    )
+
+
 def paper_active_specs(pool: dict) -> list[dict]:
     """Specs of PAPER_ACTIVE strategies — what the S7 router will evaluate."""
     return [
