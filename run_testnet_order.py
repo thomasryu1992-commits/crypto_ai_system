@@ -29,6 +29,13 @@ def _bootstrap() -> None:
     for p in (str(root / "src"), str(root)):
         if p not in sys.path:
             sys.path.insert(0, p)
+    # Load .env before importing config (config reads env at import time).
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(root / ".env")
+    except Exception:
+        pass
 
 
 def _current_price(binance_symbol: str) -> float:

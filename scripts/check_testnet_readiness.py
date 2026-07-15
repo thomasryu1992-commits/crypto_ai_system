@@ -17,6 +17,14 @@ for _p in (str(ROOT / "src"), str(ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+# Load .env before importing config (config reads env at import time).
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+except Exception:
+    pass
+
 from crypto_ai_system.execution.signed_testnet_preflight import (  # noqa: E402
     check_config_readiness,
     probe_auth,

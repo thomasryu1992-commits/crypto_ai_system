@@ -22,6 +22,14 @@ def _bootstrap() -> None:
     for path in (str(src), str(root)):
         if path not in sys.path:
             sys.path.insert(0, path)
+    # Load .env before any config module is imported (config reads env at
+    # import time). Safe no-op if python-dotenv or the file is absent.
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(root / ".env")
+    except Exception:
+        pass
 
 
 def main(argv: list[str] | None = None) -> int:
