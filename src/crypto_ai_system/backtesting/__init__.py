@@ -17,6 +17,10 @@ from crypto_ai_system.backtesting.backtest_agent import (
     evaluate_absolute_gate,
     run_backtest_agent,
 )
+from crypto_ai_system.backtesting.champion_selector_agent import (
+    ChampionScoreWeights,
+    select_batch_champion,
+)
 
 __all__ = [
     "CostModel",
@@ -27,4 +31,6 @@ __all__ = [
     "AbsoluteGate",
     "evaluate_absolute_gate",
     "run_backtest_agent",
+    "ChampionScoreWeights",
+    "select_batch_champion",
 ]
