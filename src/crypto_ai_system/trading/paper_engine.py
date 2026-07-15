@@ -15,6 +15,13 @@ PAPER_ENGINE_MODE = "PAPER_ONLY"
 LIVE_TRADING_ALLOWED_BY_THIS_MODULE = False
 EXTERNAL_ORDER_SUBMISSION_PERFORMED = False
 
+# Max bars to hold an open paper position before a time-based exit. Without this
+# a position that neither hits SL nor TP stays open forever, so no closed trade
+# is ever collected and performance can't be measured (directive P0-4). Values
+# mirror the backtest matrix so paper and backtest agree on holding horizon.
+PAPER_MAX_HOLD_BARS = {"15m": 96, "1h": 48, "4h": 30}
+DEFAULT_MAX_HOLD_BARS = 48
+
 
 def _default_state() -> dict[str, Any]:
     return {"active_position": None, "last_update": None, "closed_trades": []}
@@ -108,12 +115,17 @@ def build_paper_position(
 def close_trade(position: dict[str, Any], result: str, exit_price: float, exit_reason: str) -> dict[str, Any]:
     entry = float(position["entry_price"])
     risk = float(position["risk"])
+    direction = str(position.get("direction", "LONG")).upper()
     if result == "WIN":
-        pnl_r = abs(exit_price - entry) / risk
+        pnl_r = abs(exit_price - entry) / risk if risk else 0.0
     elif result == "LOSS":
         pnl_r = -1.0
     else:
-        pnl_r = 0.0
+        # TIME_EXIT / MANUAL_EXIT close at market: realized signed R, not a
+        # capped -1R (SL) or fixed +reward (TP). A long that time-exits above
+        # entry is a partial win; below entry, a partial loss.
+        signed = (exit_price - entry) if direction == "LONG" else (entry - exit_price)
+        pnl_r = signed / risk if risk else 0.0
 
     trade = {
         **position,
@@ -157,6 +169,48 @@ def update_position_conservative(position: dict[str, Any], candle: dict[str, Any
     return None, position
 
 
+def _latest_candle() -> dict[str, Any] | None:
+    data = read_json(MARKET_DATA_PATH, {})
+    candles = data.get("candles", [])
+    if not candles:
+        return None
+    last = candles[-1]
+    if not isinstance(last, dict) or "high" not in last or "low" not in last:
+        return None
+    return last
+
+
+def evaluate_open_position(
+    position: dict[str, Any],
+    candle: dict[str, Any] | None,
+    *,
+    last_close: float | None = None,
+    manual_exit: bool = False,
+    max_hold_bars: int = DEFAULT_MAX_HOLD_BARS,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Evaluate whether an open paper position should close this cycle.
+
+    Order of precedence: manual override -> intrabar SL/TP (pessimistic SL-first
+    on the same candle) -> time exit. Returns ``(closed_trade, None)`` when the
+    position closed, else ``(None, still_open_position)``. Pure w.r.t. state
+    files except that ``close_trade`` records the closed trade.
+    """
+    if manual_exit:
+        exit_price = float(last_close if last_close is not None else position.get("entry_price", 0.0))
+        return close_trade(position, "MANUAL_EXIT", exit_price, "manual_exit"), None
+
+    if candle is not None:
+        closed, still_open = update_position_conservative(position, candle)
+        if closed is not None:
+            return closed, None
+        position = still_open or position
+
+    if last_close is not None and int(position.get("holding_candles", 0)) >= int(max_hold_bars):
+        return close_trade(position, "TIME_EXIT", float(last_close), "time_exit"), None
+
+    return None, position
+
+
 def run_paper_cycle(signal_payload: dict[str, Any], snapshot: dict[str, Any], allow_new_position: bool = True) -> dict[str, Any]:
     state = load_paper_state()
     active = state.get("active_position")
@@ -164,10 +218,39 @@ def run_paper_cycle(signal_payload: dict[str, Any], snapshot: dict[str, Any], al
     reasons = signal_payload.get("reasons", [])
 
     if active:
-        active["last_seen_price"] = snapshot.get("last_close")
-        state["active_position"] = active
+        # An open position is evaluated for exit BEFORE any new-entry logic.
+        # Previously this branch only stamped last_seen_price and returned, so
+        # positions never closed and no closed outcome was ever produced (P0-4).
+        last_close = snapshot.get("last_close")
+        last_close_f = None if last_close in {None, ""} else float(last_close)
+        timeframe = str(snapshot.get("timeframe", "1h"))
+        max_hold = PAPER_MAX_HOLD_BARS.get(timeframe, DEFAULT_MAX_HOLD_BARS)
+        closed, still_open = evaluate_open_position(
+            active,
+            _latest_candle(),
+            last_close=last_close_f,
+            manual_exit=bool(signal_payload.get("manual_exit", False)),
+            max_hold_bars=max_hold,
+        )
+        if closed is not None:
+            state["active_position"] = None
+            state.setdefault("closed_trades", []).append(closed)
+            save_paper_state(state)
+            log_event(
+                "paper_position_closed",
+                {
+                    "direction": closed.get("direction"),
+                    "exit_reason": closed.get("exit_reason"),
+                    "result": closed.get("result"),
+                    "pnl_r": closed.get("pnl_r"),
+                },
+            )
+            return {"status": "POSITION_CLOSED", "closed_trade": closed, "active_position": None}
+
+        still_open["last_seen_price"] = last_close
+        state["active_position"] = still_open
         save_paper_state(state)
-        return {"status": "ACTIVE_POSITION_UPDATED", "active_position": active}
+        return {"status": "ACTIVE_POSITION_UPDATED", "active_position": still_open}
 
     permission_allow_new = bool(signal_payload.get("allow_new_position", True))
     risk_level = str(signal_payload.get("risk_level", "normal"))

@@ -99,6 +99,12 @@ class TradingAgent(Agent):
         )
         trade_executed = order_filled or order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
 
+        # Paper position lifecycle (Path A). Distinct from order lifecycle above:
+        # a position can open/close in paper without an order-intent submission.
+        paper_status = trading.get("paper_result", {}).get("status") if isinstance(trading, dict) else None
+        position_opened = paper_status == "POSITION_OPENED"
+        position_closed = paper_status == "POSITION_CLOSED"
+
         outputs = {
             "execution_stage": execution_stage,
             "trading_cycle": trading,
@@ -111,6 +117,8 @@ class TradingAgent(Agent):
             "order_intent_created": order_intent_created,
             "order_submitted": order_submitted,
             "order_filled": order_filled,
+            "position_opened": position_opened,
+            "position_closed": position_closed,
         }
 
         if not allow_new_position:
