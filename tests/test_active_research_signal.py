@@ -11,6 +11,7 @@ for _p in (str(ROOT / "src"), str(ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from crypto_ai_system.quality.signal_qa import PASS_PAPER_ONLY, PASS_RESULTS, validate_research_signal_quality
 from crypto_ai_system.research.active_research_signal import build_active_research_signal
 
 
@@ -98,3 +99,21 @@ def test_neutral_scenario_blocks_new_position():
     sig = build_active_research_signal(_snapshot(), _research(scenario="Neutral", signal_timing="Late"))
     assert sig["trade_permission"]["allow_new_position"] is False
     assert sig["entry_side"] == "FLAT"
+
+
+def test_signal_passes_signal_qa():
+    # E-3: the built signal has every QA-required field and passes QA on real,
+    # fully-available data (PASS_PAPER_ONLY -> decision-authoritative).
+    sig = build_active_research_signal(_snapshot(), _research())
+    qa = validate_research_signal_quality(sig)
+    assert qa["signal_qa_result"] in PASS_RESULTS
+    assert qa["signal_qa_result"] == PASS_PAPER_ONLY
+    assert qa["research_signal_id"] == sig["research_signal_id"]
+    assert qa["missing_required_fields"] == []
+
+
+def test_synthetic_signal_fails_qa():
+    sig = build_active_research_signal(_snapshot(is_synthetic=True), _research())
+    qa = validate_research_signal_quality(sig)
+    assert qa["signal_qa_result"] not in PASS_RESULTS
+    assert "BLOCK_FALLBACK_OR_SYNTHETIC" in qa["block_reasons"]

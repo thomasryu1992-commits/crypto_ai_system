@@ -17,13 +17,18 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from config.settings import MARKET_SNAPSHOT_PATH, RESEARCH_RESULT_PATH, RESEARCH_SIGNAL_PATH
+from config.settings import LATEST_DIR, MARKET_SNAPSHOT_PATH, RESEARCH_RESULT_PATH, RESEARCH_SIGNAL_PATH
 from core.json_io import atomic_write_json, read_json
+from crypto_ai_system.config import load_config
+from crypto_ai_system.quality.signal_qa import persist_signal_qa_report, validate_research_signal_quality
 from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
 ACTIVE_RESEARCH_SIGNAL_VERSION = "active_research_signal.v1"
 DEFAULT_PROFILE_ID = "paper_default_v1"
+PROFILE_VERSION = "paper_default_v1.0"
 CONFIG_VERSION = "lean_pipeline.v1"
+
+SIGNAL_QA_REPORT_PATH = LATEST_DIR / "signal_qa_report.json"
 
 # Scenario/timing that permit a long (mirrors the decision engine bias).
 _LONG_SCENARIOS = {"Bullish", "Constructive"}
@@ -132,6 +137,7 @@ def build_active_research_signal(
         "feature_matrix_sha256": feature_matrix_sha256,
         "source_bundle_sha256": source_bundle_sha256,
         "profile_id": profile_id,
+        "profile_version": PROFILE_VERSION,
         "config_version": CONFIG_VERSION,
         "created_at_utc": utc_now_canonical(),
         "timestamp": snapshot.get("last_candle_time") or snapshot.get("created_at"),
@@ -175,6 +181,17 @@ def run_active_research_signal(*, cycle_id: str | None = None) -> dict[str, Any]
 
     signal = build_active_research_signal(snapshot, research, cycle_id=cycle_id)
     atomic_write_json(RESEARCH_SIGNAL_PATH, signal)
+
+    # Signal QA over THIS cycle's signal (E-3). Writing a matching QA report is
+    # what makes the decision engine treat the signal as authoritative
+    # (USE_RESEARCH_SIGNAL_GATE). A stale/synthetic/incomplete signal fails QA.
+    cfg = load_config(".")
+    qa_report = validate_research_signal_quality(signal, cfg=cfg)
+    atomic_write_json(SIGNAL_QA_REPORT_PATH, qa_report)
+    try:
+        persist_signal_qa_report(cfg, qa_report)
+    except Exception:  # noqa: BLE001 - registry persistence is best-effort here
+        pass
 
     # Stamp lineage onto the legacy research result so the decision engine treats
     # this cycle's signal as the matching one (not stale cross-cycle state).
