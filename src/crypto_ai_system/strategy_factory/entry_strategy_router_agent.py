@@ -24,8 +24,8 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
-from crypto_ai_system.strategy_factory.active_strategy_pool import POOL_VERSION
-from crypto_ai_system.strategy_factory.strategy_spec import StrategySpec, StrategyStatus
+from crypto_ai_system.strategy_factory.active_strategy_pool import OCCUPYING_STATUSES, POOL_VERSION
+from crypto_ai_system.strategy_factory.strategy_spec import StrategySpec
 from crypto_ai_system.strategy_factory.strategy_evaluator import evaluate_spec
 
 STATUS_ENTRY_CANDIDATE = "ENTRY_CANDIDATE"
@@ -35,21 +35,25 @@ STATUS_BLOCKED = "BLOCKED"
 BLOCK_DIRECTION_CONFLICT = "BLOCK_STRATEGY_DIRECTION_CONFLICT"
 
 
-def _paper_active_entries(pool: Mapping[str, Any]) -> list[dict]:
+def _routable_entries(pool: Mapping[str, Any]) -> list[dict]:
+    """Entries allowed to open a new position: those holding a slot
+    (PAPER_ACTIVE / WARNING / PROBATION). Suspended and archived strategies are
+    excluded — a suspended strategy must not create an OrderIntent (§19), and a
+    flagged strategy keeps trading so its rolling window can recover or escalate."""
     return [
         e for e in (pool.get("active_strategies") or [])
-        if e.get("status") == StrategyStatus.PAPER_ACTIVE.value and e.get("strategy_spec")
+        if e.get("status") in OCCUPYING_STATUSES and e.get("strategy_spec")
     ]
 
 
 def route_entries(pool: Mapping[str, Any], feature_row: Mapping[str, Any], *, now: str | None = None) -> dict[str, Any]:
-    """Evaluate every active strategy against one feature row and route an entry.
+    """Evaluate every routable strategy against one feature row and route an entry.
 
     Returns a router result carrying the strategy id chain. ``order_candidate_count``
     is 0 (no match or conflict) or 1 (a single entry candidate, however many
     strategies agreed).
     """
-    entries = _paper_active_entries(pool)
+    entries = _routable_entries(pool)
     evaluations: list[dict[str, Any]] = []
     matches: list[dict[str, Any]] = []
 

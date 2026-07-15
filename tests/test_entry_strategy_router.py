@@ -112,14 +112,28 @@ def test_opposite_direction_blocks():
 
 # -- routing scope ------------------------------------------------------------
 
-def test_only_paper_active_routed():
+def test_flagged_strategies_still_routed():
+    # WARNING/PROBATION keep trading so their rolling window can recover or
+    # escalate; only SUSPENDED/ARCHIVED are removed from routing. Distinct
+    # thresholds give the two strategies distinct rule hashes so both enter.
     pool = _pool(
         _long_when_rsi_below("S001", 40),
-        _long_when_rsi_below("S006", 40),
+        _long_when_rsi_below("S006", 45),
     )
     pool, _ = set_status(pool, "S006", StrategyStatus.PROBATION, now=NOW)
     result = route_entries(pool, {"rsi": 20}, now=NOW)
-    # S006 is on probation -> not routed; only S001 matches.
+    assert result["matched_strategy_ids"] == ["S001", "S006"]
+    assert result["strategies_evaluated"] == 2
+
+
+def test_suspended_and_archived_not_routed():
+    pool = _pool(
+        _long_when_rsi_below("S001", 40),
+        _long_when_rsi_below("S006", 45),
+    )
+    pool, _ = set_status(pool, "S006", StrategyStatus.SUSPENDED, now=NOW)
+    result = route_entries(pool, {"rsi": 20}, now=NOW)
+    # Suspended cannot create an OrderIntent (§19); only S001 routes.
     assert result["matched_strategy_ids"] == ["S001"]
     assert result["strategies_evaluated"] == 1
 

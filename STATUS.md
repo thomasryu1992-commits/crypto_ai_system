@@ -191,7 +191,7 @@ Roadmap S1–S11:
 | S6 | Active strategy pool (paper cap 5, status model) | ✅ done (`active_strategy_pool`) |
 | S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router done (`entry_strategy_router_agent`); live pipeline wiring pending |
 | S8 | Strategy-id outcome attribution | ✅ done (`strategy_outcome_attribution`) |
-| S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | todo |
+| S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | ✅ done (`feedback/strategy_performance_agent`, `feedback/strategy_lifecycle_agent`) |
 | S11 | Continuous factory loop + diversity guard | todo |
 
 A strategy spec is declarative data, never generated code: `can_submit_orders`
