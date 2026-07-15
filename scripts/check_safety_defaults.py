@@ -26,6 +26,7 @@ MUST_BE_FALSE = (
     "ALLOW_LIVE_TRADING",
     "ENABLE_TESTNET_ORDERS",
     "TESTNET_SIGNED_ORDER_ENABLED",
+    "LIVE_READONLY_PROBE_ENABLED",
 )
 
 # Confirmation gate must be empty by default.
