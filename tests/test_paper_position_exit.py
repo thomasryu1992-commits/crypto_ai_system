@@ -104,8 +104,10 @@ def test_no_candle_no_manual_keeps_open():
 
 
 def test_run_paper_cycle_closes_open_position(monkeypatch):
-    """Integration: run_paper_cycle evaluates an open position and closes it,
-    clearing active_position and recording the closed trade in state."""
+    """Integration: the legacy Path A run_paper_cycle evaluates an open position
+    and closes it. In the active runtime the kernel owns positions, so exercise
+    the legacy path explicitly here."""
+    monkeypatch.setattr(paper_engine, "KERNEL_OWNS_POSITIONS", False)
     pos = _long()
     state = {"active_position": pos, "closed_trades": []}
     saved = {}

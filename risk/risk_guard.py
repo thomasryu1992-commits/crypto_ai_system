@@ -16,10 +16,31 @@ from core.event_log import log_event
 
 
 def _closed_trades() -> list[dict]:
-    data = read_json(PAPER_TRADES_PATH, [])
-    if isinstance(data, list):
-        return [t for t in data if t.get("status") == "CLOSED" or t.get("result")]
-    return []
+    # B-4: the canonical paper position kernel is the single source of closed
+    # paper outcomes. Read them from the outcome-feedback registry (result_R),
+    # not the retired Path A trade file.
+    try:
+        from crypto_ai_system.config import load_config
+        from crypto_ai_system.registry.base_registry import load_registry_records, registry_path
+
+        cfg = load_config(".")
+        rows = load_registry_records(registry_path(cfg, "outcome_feedback_registry"))
+        trades = [
+            {
+                "status": "CLOSED",
+                "pnl_r": float(r.get("result_R", 0.0) or 0.0),
+                "exit_time": r.get("created_at_utc"),
+                "result": r.get("win_loss"),
+            }
+            for r in rows
+            if r.get("outcome_closed") is True
+        ]
+        return trades
+    except Exception:  # noqa: BLE001 - fall back to the legacy paper trade file
+        data = read_json(PAPER_TRADES_PATH, [])
+        if isinstance(data, list):
+            return [t for t in data if t.get("status") == "CLOSED" or t.get("result")]
+        return []
 
 
 def _pnl_since(trades: list[dict], start_time) -> float:

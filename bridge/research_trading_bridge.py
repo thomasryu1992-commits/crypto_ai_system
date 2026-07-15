@@ -62,6 +62,7 @@ def _evaluate_pre_order_gate(
     research_signal: dict,
     risk: dict,
     market_snapshot: dict,
+    open_positions: int | None = None,
 ) -> dict:
     """Evaluate the real PreOrderRiskGate for this cycle and persist the record.
 
@@ -70,6 +71,9 @@ def _evaluate_pre_order_gate(
     gate — signed-testnet/live stay fail-closed here (B-3)."""
     stage = str(execution_stage or "paper").lower()
     profile = get_paper_profile() if stage == "paper" else {}
+    # The canonical kernel is authoritative for how many paper positions are open
+    # (max_open_positions is enforced by the gate). Fall back to the risk status.
+    open_count = int(open_positions if open_positions is not None else (risk.get("open_positions", 0) or 0))
     decision_seed = {
         "decision_id": research.get("decision_id"),
         "side": research.get("side"),
@@ -79,7 +83,7 @@ def _evaluate_pre_order_gate(
     }
     runtime_state = {
         "stage": stage,
-        "open_positions": int(risk.get("open_positions", 0) or 0),
+        "open_positions": open_count,
         "daily_pnl_r": float(risk.get("daily_pnl_r", 0.0) or 0.0),
         "daily_pnl_usdt": float(risk.get("daily_pnl_usdt", 0.0) or 0.0),
         "consecutive_losses": int(risk.get("consecutive_losses", 0) or 0),
@@ -112,7 +116,7 @@ def _evaluate_pre_order_gate(
     return gate
 
 
-def run_research_trading_bridge(execution_stage: str = "paper") -> dict:
+def run_research_trading_bridge(execution_stage: str = "paper", *, open_positions: int | None = None) -> dict:
     research = read_json(RESEARCH_DECISION_PATH, {})
     trading = read_json(TRADING_CYCLE_PATH, {})
     data_health = read_json(DATA_HEALTH_PATH, {})
@@ -120,7 +124,9 @@ def run_research_trading_bridge(execution_stage: str = "paper") -> dict:
     market_snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
     research_signal = read_json(RESEARCH_SIGNAL_PATH, {})
 
-    pre_order_risk_gate = _evaluate_pre_order_gate(execution_stage, research, research_signal, risk, market_snapshot)
+    pre_order_risk_gate = _evaluate_pre_order_gate(
+        execution_stage, research, research_signal, risk, market_snapshot, open_positions=open_positions
+    )
 
     policy = decide_trade_action(
         research,
