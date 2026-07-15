@@ -49,6 +49,17 @@ Runs the pipeline on an interval to accumulate paper outcomes on real data
 Ctrl+C stops it. For unattended runs, point Windows Task Scheduler at
 `run_pipeline.py`.
 
+### Metrics dashboard
+```bash
+py scripts/dashboard.py            # status board: cycles, performance, warnings
+py scripts/dashboard.py --json     # machine-readable
+py scripts/dashboard.py --watch 30 # refresh every 30s
+```
+Reads the scheduler's per-cycle metrics log (`scheduler_metrics.jsonl`) plus the
+latest performance report and shows uptime, trades placed, expectancy/win/
+drawdown, and health warnings (negative expectancy, stale data, signal drift,
+reconciliation mismatch, recent errors, synthetic data).
+
 ## Current stage: signed testnet (order + reconciliation verified)
 
 | Concern | State |
