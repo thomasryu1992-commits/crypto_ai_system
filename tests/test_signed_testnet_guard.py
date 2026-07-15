@@ -20,13 +20,16 @@ CONFIRM_PHRASE = "I_UNDERSTAND_THIS_PLACES_REAL_ORDERS"
 
 
 def _ready_intent():
+    # A connectivity-harness intent: exercises the hard caps (notional/daily/key
+    # scope/host) without requiring a strategy RiskGate record (P0-2 split).
     return {
         "status": "ORDER_INTENT_CREATED",
         "symbol": "BTCUSDT",
         "quantity": 0.001,
         "order_notional_usdt": 4.0,
+        "connectivity_test": True,
         "pre_order_risk_gate_approved": True,
-        "risk_gate_id": "rg_123",
+        "risk_gate_id": "connectivity_test_123",
     }
 
 
@@ -76,11 +79,27 @@ def test_guard_blocks_when_daily_cap_reached(enabled, monkeypatch):
     assert any("daily order count" in b for b in result["blocks"])
 
 
-def test_guard_repair_when_upstream_gate_missing(enabled):
+def test_connectivity_intent_is_ready_but_not_strategy(enabled):
+    result = guard.evaluate_signed_testnet_final_guard(_ready_intent())
+    assert result["status"] == "READY"
+    assert result["strategy_execution"] is False
+    assert result["risk_gate_verified"] is False
+
+
+def test_strategy_intent_without_record_is_blocked(enabled, monkeypatch):
+    # A strategy order (no connectivity flag) with a risk_gate_id that has no
+    # persisted record must be BLOCKED, not merely repairable (P0-2).
+    import crypto_ai_system.registry.risk_gate_registry as reg
+
+    monkeypatch.setattr(reg, "get_risk_gate_record", lambda rid, cfg=None: None)
     intent = _ready_intent()
-    intent["pre_order_risk_gate_approved"] = False
+    intent.pop("connectivity_test")
+    intent["risk_gate_id"] = "rg_no_record"
     result = guard.evaluate_signed_testnet_final_guard(intent)
-    assert result["status"] == "REPAIR_REQUIRED"
+    assert result["status"] == "BLOCKED"
+    assert result["strategy_execution"] is True
+    assert result["risk_gate_verified"] is False
+    assert any("strategy risk gate" in b for b in result["blocks"])
 
 
 # -- stage routing ------------------------------------------------------

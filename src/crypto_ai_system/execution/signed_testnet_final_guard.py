@@ -108,9 +108,29 @@ def evaluate_signed_testnet_final_guard(intent: dict[str, Any]) -> dict[str, Any
     if submitted_today >= max_daily:
         blocks.append(f"daily order count {submitted_today} reached cap {max_daily}")
 
-    # -- upstream cold-path gate must have approved ----------------------
-    if intent.get("pre_order_risk_gate_approved") is not True or not intent.get("risk_gate_id"):
-        repairs.append("upstream PreOrderRiskGate not approved / missing risk_gate_id")
+    # -- upstream risk gate: strategy vs connectivity (P0-2) -------------
+    # Connectivity-harness orders verify auth/signing/submission/reconciliation
+    # only. They intentionally bypass the strategy PreOrderRiskGate and MUST NOT
+    # be aggregated as strategy performance. A *strategy* order, by contrast, may
+    # not rely on a bare boolean + free-form id: it must resolve to a persisted,
+    # approved, unexpired, tamper-free RiskGate record for this stage/profile.
+    is_connectivity = bool(intent.get("connectivity_test"))
+    strategy_execution = not is_connectivity
+    risk_gate_verified = False
+    if strategy_execution:
+        try:
+            from crypto_ai_system.registry.risk_gate_registry import (
+                get_risk_gate_record,
+                verify_strategy_risk_gate,
+            )
+
+            record = get_risk_gate_record(intent.get("risk_gate_id"))
+            verdict = verify_strategy_risk_gate(record, intent, execution_stage="signed_testnet")
+        except Exception as exc:  # fail closed on any registry/lookup error
+            verdict = {"approved": False, "reasons": [f"risk_gate_lookup_error:{type(exc).__name__}"]}
+        risk_gate_verified = bool(verdict.get("approved"))
+        if not risk_gate_verified:
+            blocks.extend(f"strategy risk gate: {r}" for r in verdict.get("reasons", []))
 
     # -- intent shape ----------------------------------------------------
     if intent.get("status") != "ORDER_INTENT_CREATED":
@@ -139,4 +159,8 @@ def evaluate_signed_testnet_final_guard(intent: dict[str, Any]) -> dict[str, Any
         "notional_cap_usdt": cap,
         "submitted_today": submitted_today,
         "max_daily_order_count": max_daily,
+        # Connectivity orders are not strategy performance; a strategy order is
+        # only ready when its RiskGate record verified (P0-2).
+        "strategy_execution": strategy_execution,
+        "risk_gate_verified": risk_gate_verified,
     }
