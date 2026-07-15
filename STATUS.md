@@ -66,7 +66,9 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 5. Live canary.
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
-All of these must be set — any one missing keeps the path fail-closed:
+Create Binance USD-M **Futures testnet** API keys at
+https://testnet.binancefuture.com. All of these must be set — any one missing
+keeps the path fail-closed:
 ```
 BINANCE_API_KEY=<testnet key>
 BINANCE_API_SECRET=<testnet secret>
@@ -74,10 +76,26 @@ BINANCE_TESTNET=true
 TESTNET_SIGNED_ORDER_ENABLED=true
 SIGNED_TESTNET_PLACE_ORDER_ENABLED=true
 LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_REAL_ORDERS
+SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT=150   # see note below
 ```
 Hard caps still apply: `SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT` (default 5) and
 `SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT` (default 3). The pre-submit final guard
 (`execution/signed_testnet_final_guard.py`) re-checks all of this before signing.
+
+> **Min-notional note:** Binance USD-M Futures BTCUSDT has a minimum order
+> notional of ~100 USDT (min qty 0.001 BTC). The default cap of 5 USDT is too
+> low to place a real order — raise `SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT` to
+> ~150. This is testnet (fake) money.
+
+### Verifying a single testnet order (operator)
+```
+py scripts/check_testnet_readiness.py --probe   # config + signed read-only auth probe (no order)
+py run_testnet_order.py                          # dry preflight only
+py run_testnet_order.py --confirm                # place ONE small order, then reconcile
+```
+The runner sizes one order within the cap, submits it through the final guard
+and adapter, then prints the fill/position/balance reconciliation. Claude does
+not run this — it is an operator action with real testnet keys.
 
 ## History
 
