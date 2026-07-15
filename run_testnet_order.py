@@ -72,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Place one signed testnet order and reconcile.")
     parser.add_argument("--confirm", action="store_true", help="required to actually submit")
     parser.add_argument("--side", choices=["BUY", "SELL"], default="BUY")
+    parser.add_argument("--reduce-only", action="store_true",
+                        help="close/reduce an existing position (sends reduceOnly)")
     parser.add_argument("--notional", type=float, default=None,
                         help="target order notional in USDT (default: the configured cap)")
     parser.add_argument("--symbol", default=None, help="override symbol (canonical or Binance)")
@@ -119,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         "quantity": quantity,
         "order_notional_usdt": notional,
         "notional_usdt": notional,
+        "reduce_only": args.reduce_only,
         "pre_order_risk_gate_approved": True,
         "risk_gate_id": f"connectivity_test_{utc_now_iso()}",
         "order_intent_created": True,
