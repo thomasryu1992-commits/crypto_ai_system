@@ -171,6 +171,10 @@ SIGNED_TESTNET_MAX_ORDER_NOTIONAL_USDT = env_float("SIGNED_TESTNET_MAX_ORDER_NOT
 SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT = env_int("SIGNED_TESTNET_MAX_DAILY_ORDER_COUNT", 3)
 MAX_LIVE_TRADES_PER_DAY = env_int("MAX_LIVE_TRADES_PER_DAY", 3)
 
+# Strategy factory live routing. Shadow mode records what the active pool would
+# do each cycle without changing any order; it never drives execution on its own.
+STRATEGY_FACTORY_ROUTING_ENABLED = env_bool("STRATEGY_FACTORY_ROUTING_ENABLED", False)
+
 # Live canary preparation (read-only probe; grants no order authority)
 LIVE_READONLY_PROBE_ENABLED = env_bool("LIVE_READONLY_PROBE_ENABLED", False)
 LIVE_BINANCE_API_KEY = env_str("LIVE_BINANCE_API_KEY", "")
@@ -188,6 +192,8 @@ LATENCY_ASSUMPTION_MS = env_int("LATENCY_ASSUMPTION_MS", 750)
 MARKET_DATA_PATH = LATEST_DIR / "coinalyze_market_data.json"
 MARKET_SNAPSHOT_PATH = LATEST_DIR / "market_snapshot.json"
 MARKET_CONTEXT_PATH = LATEST_DIR / "market_context.json"
+ACTIVE_STRATEGY_POOL_PATH = LATEST_DIR / "active_strategy_pool.json"
+STRATEGY_ROUTING_PATH = LATEST_DIR / "strategy_routing.json"
 RESEARCH_RESULT_PATH = LATEST_DIR / "research_cycle_result.json"
 RESEARCH_SIGNAL_PATH = LATEST_DIR / "research_signal.json"
 RESEARCH_DECISION_PATH = LATEST_DIR / "research_decision_result.json"

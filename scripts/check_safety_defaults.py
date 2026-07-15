@@ -27,6 +27,7 @@ MUST_BE_FALSE = (
     "ENABLE_TESTNET_ORDERS",
     "TESTNET_SIGNED_ORDER_ENABLED",
     "LIVE_READONLY_PROBE_ENABLED",
+    "STRATEGY_FACTORY_ROUTING_ENABLED",
 )
 
 # Confirmation gate must be empty by default.

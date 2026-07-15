@@ -189,7 +189,7 @@ Roadmap S1–S11:
 | └ S4e | Walk-forward + regime split + BacktestAgent record | ✅ done (`backtest_agent`) |
 | S5 | Batch champion selection (relative rank **and** absolute gate) | ✅ done (`champion_selector_agent`) |
 | S6 | Active strategy pool (paper cap 5, status model) | ✅ done (`active_strategy_pool`) |
-| S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router done (`entry_strategy_router_agent`); live pipeline wiring pending |
+| S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router + shadow live wiring done; order-driving wiring pending |
 | S8 | Strategy-id outcome attribution | ✅ done (`strategy_outcome_attribution`) |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | ✅ done (`feedback/strategy_performance_agent`, `feedback/strategy_lifecycle_agent`) |
 | S11 | Continuous factory loop + diversity guard | ✅ done (`continuous_factory`) |
@@ -202,9 +202,18 @@ so a spec cannot reference a feature that will not exist at evaluation time.
 The full offline factory (S1–S11) is complete: `continuous_factory.run_factory_cycle`
 runs generate → backtest → champion → pool per generation, the lifecycle agent
 retires decayed strategies, and the router turns the active pool into entry
-candidates. The remaining integration is wiring the router into the live
-`trading_agent` hot path (behind the shared research permission and
-PreOrderRiskGate) — deliberately left as a separate, carefully-reviewed step.
+candidates.
+
+**Live wiring — increment 1 (shadow):** behind `STRATEGY_FACTORY_ROUTING_ENABLED`
+(default false, in the fail-closed safety guard), the pipeline runs a
+`StrategyRoutingAgent` after validation. It rebuilds the full feature row from
+the live candles via the same `build_feature_frame` the backtest uses
+(`runtime_feature_adapter`), routes the active pool over it, and writes
+`storage/latest/strategy_routing.json`. It is advisory — `drives_execution=false`,
+never halts the pipeline, and the default pipeline is unchanged when the flag is
+off. **Remaining:** increment 2 turns a routed candidate into an actual paper
+entry (behind the shared research permission + PreOrderRiskGate, with S8
+attribution on the outcome) — a separate, carefully-reviewed step.
 
 ## History
 

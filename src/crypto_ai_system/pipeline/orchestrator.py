@@ -27,6 +27,7 @@ from crypto_ai_system.pipeline.contracts import (
 from crypto_ai_system.pipeline.data_agent import DataAgent
 from crypto_ai_system.pipeline.feedback_agent import FeedbackAgent
 from crypto_ai_system.pipeline.research_agent import ResearchAgent
+from crypto_ai_system.pipeline.strategy_routing_agent import StrategyRoutingAgent
 from crypto_ai_system.pipeline.trading_agent import TradingAgent
 from crypto_ai_system.pipeline.validation_agent import ValidationAgent
 
@@ -43,6 +44,11 @@ def _new_cycle() -> CycleEnvelope:
 class Pipeline:
     def __init__(self) -> None:
         self.pre_trade = [DataAgent(), ResearchAgent(), ValidationAgent()]
+        # Strategy-factory routing runs after validation (so it can see the
+        # gate) but only when explicitly enabled — the default pipeline is
+        # unchanged. It is advisory (shadow) and never halts the trade path.
+        if getattr(settings, "STRATEGY_FACTORY_ROUTING_ENABLED", False):
+            self.pre_trade.append(StrategyRoutingAgent())
         self.trading = TradingAgent()
         self.feedback = FeedbackAgent()
 
