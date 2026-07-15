@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             reconfigure(encoding="utf-8", errors="replace")
 
     import config.settings as settings
-    from core.json_io import atomic_write_json
+    from core.json_io import append_jsonl, atomic_write_json
     from core.time_utils import utc_now_iso
     from crypto_ai_system.pipeline import Pipeline
     from crypto_ai_system.scheduler.loop import run_scheduler_loop
@@ -56,10 +56,12 @@ def main(argv: list[str] | None = None) -> int:
 
     cycles = 1 if args.once else args.cycles
     heartbeat_path = settings.LATEST_DIR / "scheduler_heartbeat.json"
+    metrics_log = settings.LATEST_DIR / "scheduler_metrics.jsonl"
 
     def run_cycle() -> dict:
         run = Pipeline().run_once()
         stages = {r.stage: r.status.value for r in run.results}
+        data = run.by_stage("data")
         feedback = run.by_stage("feedback")
         report = (feedback.outputs.get("performance_report") if feedback else {}) or {}
         metrics = {
@@ -73,19 +75,34 @@ def main(argv: list[str] | None = None) -> int:
             "stages": stages,
             "trade_executed": run.trade_executed,
             "halted": run.halted,
+            "data_is_synthetic": bool(data.outputs.get("data_is_synthetic")) if data else None,
             "metrics": metrics,
         }
 
     def on_result(record: dict) -> None:
         ts = utc_now_iso()
+        r = record.get("result") or {}
+        # Compact per-cycle metrics row for the dashboard.
+        row = {
+            "ts": ts,
+            "cycle": record["cycle"],
+            "ok": record["ok"],
+            "duration_s": record.get("duration_s"),
+            "stages": r.get("stages"),
+            "trade_executed": r.get("trade_executed"),
+            "halted": r.get("halted"),
+            "data_is_synthetic": r.get("data_is_synthetic"),
+            **(r.get("metrics") or {}),
+        }
+        append_jsonl(metrics_log, row)
+
         if record["ok"]:
-            r = record["result"]
-            stage_str = " ".join(f"{k}={v}" for k, v in r["stages"].items())
-            m = r["metrics"]
+            stage_str = " ".join(f"{k}={v}" for k, v in (r.get("stages") or {}).items())
+            m = r.get("metrics") or {}
             print(f"[{ts}] cycle {record['cycle']} ({record['duration_s']}s) "
-                  f"{stage_str} trade={r['trade_executed']} | "
-                  f"closed={m['closed_count']} exp={m['expectancy']} "
-                  f"elig={m['live_candidate_eligible']}")
+                  f"{stage_str} trade={r.get('trade_executed')} | "
+                  f"closed={m.get('closed_count')} exp={m.get('expectancy')} "
+                  f"elig={m.get('live_candidate_eligible')}")
         else:
             print(f"[{ts}] cycle {record['cycle']} FAILED: {record['error']}")
         atomic_write_json(heartbeat_path, {"last_cycle_at": ts, **record})
