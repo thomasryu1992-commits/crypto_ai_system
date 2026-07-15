@@ -49,6 +49,13 @@ Runs the pipeline on an interval to accumulate paper outcomes on real data
 Ctrl+C stops it. For unattended runs, point Windows Task Scheduler at
 `run_pipeline.py`.
 
+To start performance measurement from zero (e.g. after switching to real data),
+clear the accumulated outcome/paper history — it is backed up first:
+```bash
+py scripts/reset_paper_outcomes.py            # dry run: show what would clear
+py scripts/reset_paper_outcomes.py --confirm  # back up + clear (reversible)
+```
+
 ## Current stage: signed testnet (order + reconciliation verified)
 
 | Concern | State |
