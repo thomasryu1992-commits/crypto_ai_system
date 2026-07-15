@@ -85,17 +85,32 @@ class TradingAgent(Agent):
         else:
             reconciliation = run_reconciler()
 
+        # Derive real order lifecycle state — a non-empty result dict is NOT a
+        # trade (a REJECTED/NO_ORDER result is also a dict). A trade counts only
+        # when the executor actually filled (paper) or submitted (testnet).
+        order = order if isinstance(order, dict) else {}
+        order_status = order.get("status")
+        order_filled = bool(order.get("filled"))
+        order_intent_created = bool(order.get("intent", {}).get("order_intent_created")) or bool(
+            order.get("order_intent_id")
+        )
+        order_submitted = bool(order.get("external_order_submission_performed")) or (
+            order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
+        )
+        trade_executed = order_filled or order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
+
         outputs = {
             "execution_stage": execution_stage,
             "trading_cycle": trading,
             "trade_decision": trade_decision,
             "order_result": order,
             "reconciliation": reconciliation,
-            # A trade is only "executed" when a new position was permitted
-            # and the executor produced a result. No-new-position cycles
-            # still run the executor (to reconcile open state) but do not
-            # count as a placed trade.
-            "trade_executed": bool(allow_new_position and order),
+            "trade_executed": trade_executed,
+            # Lifecycle breakdown for the dashboard (not a single boolean).
+            "order_status": order_status,
+            "order_intent_created": order_intent_created,
+            "order_submitted": order_submitted,
+            "order_filled": order_filled,
         }
 
         if not allow_new_position:

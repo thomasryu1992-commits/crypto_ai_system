@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     from core.json_io import append_jsonl, atomic_write_json
     from core.time_utils import utc_now_iso
     from crypto_ai_system.pipeline import Pipeline
+    from crypto_ai_system.pipeline.exit_codes import exit_code_for, is_healthy
     from crypto_ai_system.scheduler.loop import run_scheduler_loop
 
     parser = argparse.ArgumentParser(description="Run the pipeline on a schedule.")
@@ -60,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def run_cycle() -> dict:
         run = Pipeline().run_once()
+        code, halt_reason = exit_code_for(run)
         stages = {r.stage: r.status.value for r in run.results}
         data = run.by_stage("data")
         feedback = run.by_stage("feedback")
@@ -75,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
             "stages": stages,
             "trade_executed": run.trade_executed,
             "halted": run.halted,
+            "exit_code": code,
+            "halt_reason": halt_reason,
+            "healthy": is_healthy(code),
             "data_is_synthetic": bool(data.outputs.get("data_is_synthetic")) if data else None,
             "metrics": metrics,
         }
@@ -91,6 +96,9 @@ def main(argv: list[str] | None = None) -> int:
             "stages": r.get("stages"),
             "trade_executed": r.get("trade_executed"),
             "halted": r.get("halted"),
+            "exit_code": r.get("exit_code"),
+            "halt_reason": r.get("halt_reason"),
+            "healthy": r.get("healthy", not record["ok"] is False),
             "data_is_synthetic": r.get("data_is_synthetic"),
             **(r.get("metrics") or {}),
         }
@@ -99,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         if record["ok"]:
             stage_str = " ".join(f"{k}={v}" for k, v in (r.get("stages") or {}).items())
             m = r.get("metrics") or {}
-            print(f"[{ts}] cycle {record['cycle']} ({record['duration_s']}s) "
+            halt = f" HALT({r.get('halt_reason')})" if not r.get("healthy", True) else ""
+            print(f"[{ts}] cycle {record['cycle']} ({record['duration_s']}s) exit={r.get('exit_code')}{halt} "
                   f"{stage_str} trade={r.get('trade_executed')} | "
                   f"closed={m.get('closed_count')} exp={m.get('expectancy')} "
                   f"elig={m.get('live_candidate_eligible')}")
@@ -116,10 +125,15 @@ def main(argv: list[str] | None = None) -> int:
         print("\nscheduler stopped by user")
         return 0
 
-    ok = sum(1 for r in records if r["ok"])
-    print(f"done: {ok}/{len(records)} cycles ok")
-    print(json.dumps({"cycles": len(records), "ok": ok}, indent=2))
-    return 0 if ok == len(records) else 1
+    # A cycle is unhealthy if the loop caught an exception OR the pipeline
+    # halted (fatal block / error). Task Scheduler sees a non-zero result then.
+    def _healthy(rec: dict) -> bool:
+        return bool(rec.get("ok")) and (rec.get("result") or {}).get("healthy", True)
+
+    healthy = sum(1 for r in records if _healthy(r))
+    print(f"done: {healthy}/{len(records)} cycles healthy")
+    print(json.dumps({"cycles": len(records), "healthy": healthy}, indent=2))
+    return 0 if healthy == len(records) else 1
 
 
 if __name__ == "__main__":

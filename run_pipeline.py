@@ -38,18 +38,22 @@ def main(argv: list[str] | None = None) -> int:
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
-    from crypto_ai_system.pipeline import Pipeline, StageStatus
+    from crypto_ai_system.pipeline import Pipeline
+    from crypto_ai_system.pipeline.exit_codes import exit_code_for
 
     parser = argparse.ArgumentParser(description="Run one lean trading cycle.")
     parser.add_argument("--json", action="store_true", help="emit JSON output")
     args = parser.parse_args(argv)
 
     run = Pipeline().run_once()
+    code, halt_reason = exit_code_for(run)
 
     if args.json:
         payload = {
             "trade_executed": run.trade_executed,
             "halted": run.halted,
+            "exit_code": code,
+            "halt_reason": halt_reason,
             "stages": [
                 {
                     "stage": r.stage,
@@ -65,11 +69,13 @@ def main(argv: list[str] | None = None) -> int:
         print("=== trading cycle ===")
         print(run.report())
         print("=====================")
-        print(f"trade_executed={run.trade_executed} halted={run.halted}")
+        print(f"trade_executed={run.trade_executed} halted={run.halted} exit={code}")
+        if halt_reason:
+            print(f"halt_reason: {halt_reason}")
 
-    # Exit non-zero if the pipeline halted on error/fatal block.
-    any_error = any(r.status is StageStatus.ERROR for r in run.results)
-    return 1 if any_error else 0
+    # Fatal blocks and errors return a non-zero, categorized exit code so
+    # Task Scheduler / monitoring can distinguish them from a clean cycle.
+    return code
 
 
 if __name__ == "__main__":
