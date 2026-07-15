@@ -18,6 +18,7 @@ from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
 from crypto_ai_system.execution.paper_position_kernel import (
     has_open_position,
+    load_open_position,
     open_from_execution,
     settle_open_position,
 )
@@ -87,6 +88,22 @@ class TradingAgent(Agent):
     name = "trading"
     fatal_on_error = True
 
+    def _record_strategy_outcome(self, position, settlement, ctx: PipelineContext) -> None:
+        """Attribute a closed strategy-driven paper position to its strategy (S8).
+
+        Isolated and best-effort: an attribution failure must not affect the
+        trade result that already happened."""
+        try:
+            from crypto_ai_system.feedback.strategy_feedback_step import record_strategy_outcome
+
+            now = ctx.cycle.started_at_utc if ctx.cycle else None
+            record_strategy_outcome(
+                position, settlement,
+                registry_file=str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH), now=now,
+            )
+        except Exception:  # noqa: BLE001 - attribution is best-effort
+            pass
+
     def _maybe_strategy_decision(self, ctx: PipelineContext, execution_stage: str, open_positions: int):
         """Build a strategy-driven trade decision from this cycle's router result.
 
@@ -127,6 +144,9 @@ class TradingAgent(Agent):
         #    and produce a CLOSED outcome before this cycle considers a new entry.
         settlement = None
         if is_paper:
+            # Capture the position before settling — settle clears it, and a
+            # strategy-driven close must be attributed to its strategy (S8/S9).
+            open_before = load_open_position(cfg)
             settlement = settle_open_position(
                 _latest_candle(),
                 last_close=_f(snapshot.get("last_close")),
@@ -134,6 +154,13 @@ class TradingAgent(Agent):
                 regime=str(snapshot.get("trend_bias", "unknown")),
                 cfg=cfg,
             )
+            if (
+                settlement is not None
+                and isinstance(open_before, dict)
+                and open_before.get("strategy_id")
+                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
+            ):
+                self._record_strategy_outcome(open_before, settlement, ctx)
 
         # 2. Open-position count for the gate (max_open_positions enforced there).
         open_positions = 1 if (is_paper and has_open_position(cfg)) else 0

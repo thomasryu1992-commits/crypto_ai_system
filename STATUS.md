@@ -225,9 +225,20 @@ approves; otherwise the research decision stands (fail-closed). When it is
 approved the *unchanged* order executor + paper kernel carry it, and the S8
 attribution (strategy_id / eval id / rule hash) rides the order intent → paper
 position → outcome. Verified on real artifacts: the decision assembles correctly
-and refuses order intent when the gate/permission don't approve. **Remaining:**
-consume the attributed paper outcomes into S9/S10 live (close the factory loop on
-real paper trades).
+and refuses order intent when the gate/permission don't approve.
+
+**Live wiring — increment 3 (closed loop):** when a strategy-driven paper
+position closes, the trading agent records an S8-attributed outcome
+(`strategy_feedback_step.record_strategy_outcome`) to the attributed-outcome
+registry; research-driven closes are skipped. Each feedback cycle then recomputes
+S9 rolling performance per active strategy and applies the S10 lifecycle decision
+to the pool (`run_strategy_lifecycle_feedback`) — a decayed strategy escalates
+WARNING → PROBATION → SUSPENDED, and once suspended the router stops routing it.
+Both halves are gated by the routing flag and isolated (best-effort, never break
+the trade path). Verified end-to-end: 50 losing paper trades drive a strategy to
+SUSPENDED and the router excludes it. **The factory loop is now closed on real
+paper trades** — production → selection → operation → retirement runs
+automatically; testnet/live promotion and reactivation stay manual.
 
 ## History
 
