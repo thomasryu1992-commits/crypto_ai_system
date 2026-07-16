@@ -18,7 +18,7 @@ design — the validator is still the gate.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 from crypto_ai_system.strategy_factory.strategy_spec import Direction
@@ -160,12 +160,15 @@ def _htf_trend_follow_short_entry(p: dict) -> list[dict]:
     ]
 
 
+# target_atr reaches to 8.0: the 1d sweep was monotonically better all the way to
+# the old 4.0 ceiling (+0.395R at 4.0 vs +0.198R at 2.4), i.e. the cap was cutting
+# winners short. The validator's TARGET_ATR_RANGE (10.0) still bounds it.
 _EXIT_PARAMS = {
     "stop_atr": ParamSpec(0.8, 2.0),
-    "target_atr": ParamSpec(1.6, 4.0),
+    "target_atr": ParamSpec(1.6, 8.0),
     "max_holding_bars": ParamSpec(12, 48, integer=True),
 }
-_EXIT_BASE = {"stop_atr": 1.2, "target_atr": 2.4, "max_holding_bars": 24}
+_EXIT_BASE = {"stop_atr": 1.2, "target_atr": 3.0, "max_holding_bars": 24}
 
 
 TREND_PULLBACK = StrategyTemplate(
@@ -303,3 +306,30 @@ DEFAULT_TEMPLATE_ORDER = (
     BOLLINGER_BREAKOUT, BOLLINGER_BREAKDOWN_SHORT,
     HTF_TREND_FOLLOW, HTF_TREND_FOLLOW_SHORT,
 )
+
+
+def retimed(template: StrategyTemplate, timeframe: str) -> StrategyTemplate:
+    """The same template family targeting a different candle timeframe.
+
+    Cost per trade scales inversely with the timeframe's ATR (fees are fixed while
+    the stop distance grows), so the same entry shape can be unviable on 1h and
+    viable on 1d — measured on 3y BTCUSDT: ~0.21R/trade on 1h vs ~0.031R on 1d.
+    The htf_* families cannot be retimed above their own legs (a 1d base has no
+    higher 4h view) — their features simply become indeterminate and they never
+    fire; prefer excluding them from a 1d run.
+    """
+    return replace(template, timeframe=str(timeframe))
+
+
+def templates_for_timeframe(timeframe: str) -> tuple[StrategyTemplate, ...]:
+    """The default rotation retimed to ``timeframe``.
+
+    On a timeframe at/above 4h the htf_* families are dropped: their
+    higher-timeframe legs cannot be resampled from an equal-or-higher base, so
+    they would be generated, validated, and then never match a row.
+    """
+    tf = str(timeframe)
+    order = DEFAULT_TEMPLATE_ORDER
+    if tf in {"4h", "1d"}:
+        order = tuple(t for t in order if not t.family.startswith("htf_"))
+    return tuple(retimed(t, tf) for t in order)

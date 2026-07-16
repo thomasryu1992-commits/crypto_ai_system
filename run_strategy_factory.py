@@ -140,11 +140,21 @@ def main(argv: list[str] | None = None) -> int:
               f"{DIRECTIVE_MIN_TRADES_FLOOR}; champions selected here are PROVISIONAL "
               f"(thin-sample). Grow history (e.g. --history 1500) and raise --min-trades "
               f"toward {DIRECTIVE_MIN_TRADES_FLOOR} before trusting a champion.")
+    # Generate specs on the timeframe of the candles being backtested — a spec's
+    # timeframe is part of its contract (the router evaluates it on that frame).
+    templates = None
+    if args.interval != "1h":
+        from crypto_ai_system.strategy_factory.strategy_template_library import templates_for_timeframe
+
+        templates = templates_for_timeframe(args.interval)
+        print(f"templates retimed to {args.interval} ({len(templates)} families)")
+
     result = run_factory(
         candles, pool_file=pool_file, state_file=state_file, cycles=args.cycles,
         cost=CostModel(), gate=gate, cap=args.cap, max_per_family=args.max_per_family,
         registry_file=str(settings.STRATEGY_ACTIVE_REGISTRY_PATH),
         candidate_registry_file=str(settings.STRATEGY_CANDIDATE_REGISTRY_PATH),
+        templates=templates,
         now=utc_now_iso(),
     )
     if result.get("error"):

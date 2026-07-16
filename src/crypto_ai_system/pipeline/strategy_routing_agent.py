@@ -22,7 +22,9 @@ from core.json_io import atomic_write_json, read_json
 
 from crypto_ai_system.strategy_factory.active_strategy_pool import occupying_entries
 from crypto_ai_system.strategy_factory.entry_strategy_router_agent import route_entries
-from crypto_ai_system.strategy_factory.runtime_feature_adapter import build_runtime_feature_row
+from crypto_ai_system.strategy_factory.runtime_feature_adapter import (
+    build_runtime_feature_row_for_timeframe,
+)
 
 from crypto_ai_system.pipeline.base import Agent
 from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
@@ -32,18 +34,41 @@ STATUS_NO_ACTIVE_STRATEGIES = "NO_ACTIVE_STRATEGIES"
 STATUS_NO_FEATURE_ROW = "NO_FEATURE_ROW"
 
 
-def evaluate_live_routing(pool: dict, candles: list[dict], *, now: str | None = None) -> dict[str, Any]:
-    """Build the live feature row and route the active pool over it.
+def runtime_base_timeframe() -> str:
+    """The pipeline's own candle timeframe, as a spec timeframe string."""
+    from collectors.real_market_data import to_binance_interval
 
-    Pure apart from the feature build; returns a router result (or a
-    no-active/no-data status). Never raises for empty inputs.
+    return to_binance_interval(str(getattr(settings, "TIMEFRAME", "PT1H")))
+
+
+def _pool_timeframes(pool: dict) -> set[str]:
+    return {
+        str((e.get("strategy_spec") or {}).get("timeframe") or "")
+        for e in occupying_entries(pool)
+    } - {""}
+
+
+def evaluate_live_routing(pool: dict, candles: list[dict], *, now: str | None = None) -> dict[str, Any]:
+    """Build a feature row per pool timeframe and route the active pool.
+
+    Each spec is evaluated on the timeframe it was backtested on: base-timeframe
+    specs use the pipeline's own candles, others load their series from the
+    deep-history cache. A timeframe whose row cannot be built leaves its specs
+    unevaluable (fail-closed to no-entry) without blocking the rest of the pool.
     """
     if not occupying_entries(pool):
         return {"status": STATUS_NO_ACTIVE_STRATEGIES, "order_candidate_count": 0}
-    feature_row = build_runtime_feature_row(candles)
-    if not feature_row:
+
+    base_tf = runtime_base_timeframe()
+    feature_rows = {
+        tf: build_runtime_feature_row_for_timeframe(
+            tf, candles, base_timeframe=base_tf, now=now
+        )
+        for tf in _pool_timeframes(pool)
+    }
+    if not any(feature_rows.values()):
         return {"status": STATUS_NO_FEATURE_ROW, "order_candidate_count": 0}
-    return route_entries(pool, feature_row, now=now)
+    return route_entries(pool, {}, feature_rows=feature_rows, now=now)
 
 
 class StrategyRoutingAgent(Agent):

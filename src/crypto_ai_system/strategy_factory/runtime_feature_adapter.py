@@ -19,7 +19,7 @@ be built from columns that carry real live values here.
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import pandas as pd
 
@@ -27,6 +27,12 @@ from crypto_ai_system.config import AppConfig, load_config
 from crypto_ai_system.features.feature_store import build_feature_frame, latest_feature_snapshot
 
 _MIN_CANDLES = 2
+
+_TIMEFRAME_MINUTES = {"15m": 15, "1h": 60, "4h": 240, "1d": 1440}
+
+# Bars loaded for a non-base timeframe: enough for every indicator warm-up
+# (ma50/ema50 = 50, atr_percentile window = 100) with head-room.
+RUNTIME_HISTORY_BARS = 400
 
 
 def _cfg_without_heavy_feeds(cfg: AppConfig) -> AppConfig:
@@ -71,3 +77,74 @@ def build_runtime_feature_row(
     if frame.empty:
         return {}
     return latest_feature_snapshot(frame)
+
+
+def drop_forming_bar(
+    candles: Sequence[dict[str, Any]], timeframe: str, *, now: str | None = None
+) -> list[dict[str, Any]]:
+    """Drop the last candle if it has not finished forming yet.
+
+    The venue returns the in-progress bar as the last row. The backtest evaluates
+    only *closed* bars (signal on bar i, entry at bar i+1 open), so evaluating a
+    live strategy on a half-formed daily candle would judge it on values its
+    backtest never saw. An unparseable timestamp keeps the row — the evaluator's
+    NaN handling stays the fail-closed backstop.
+    """
+    rows = list(candles)
+    minutes = _TIMEFRAME_MINUTES.get(str(timeframe))
+    if not rows or minutes is None:
+        return rows
+    last_open = pd.to_datetime(rows[-1].get("timestamp"), utc=True, errors="coerce")
+    if pd.isna(last_open):
+        return rows
+    now_ts = pd.Timestamp.now(tz="UTC") if now is None else pd.to_datetime(now, utc=True, errors="coerce")
+    if pd.isna(now_ts):
+        return rows
+    if last_open + pd.Timedelta(minutes=minutes) > now_ts:
+        return rows[:-1]
+    return rows
+
+
+def build_runtime_feature_row_for_timeframe(
+    timeframe: str,
+    base_candles: Sequence[dict[str, Any]],
+    *,
+    base_timeframe: str,
+    cfg: AppConfig | None = None,
+    now: str | None = None,
+    history_loader: Callable[[str, int], Sequence[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Latest feature row on ``timeframe`` — the frame a spec was backtested on.
+
+    A spec on the runtime base timeframe uses the pipeline's own candles
+    (unchanged behavior). Any other timeframe loads its own candle series from
+    the deep-history cache and drops the still-forming last bar, so the row is
+    built from exactly the kind of closed bars the backtest scored. Returns {}
+    when the series cannot be built — the router treats that as no-entry.
+
+    ``history_loader(timeframe, bars) -> candles`` is injectable for tests; the
+    default reads the on-disk deep-history cache (network only when stale).
+    """
+    if str(timeframe) == str(base_timeframe):
+        return build_runtime_feature_row(base_candles, cfg=cfg)
+
+    if history_loader is None:
+        def history_loader(tf: str, bars: int) -> Sequence[dict[str, Any]]:
+            import config.settings as settings
+            from collectors.real_market_data import to_binance_symbol
+            from crypto_ai_system.data.candle_history import load_candle_history
+
+            symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
+            rows, _ = load_candle_history(
+                symbol, tf, bars,
+                cache_dir=settings.HISTORY_DIR,
+                base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL,
+            )
+            return rows
+
+    try:
+        candles = history_loader(str(timeframe), RUNTIME_HISTORY_BARS)
+    except Exception:  # noqa: BLE001 - no row -> fail closed to no-entry
+        return {}
+    candles = drop_forming_bar(candles, str(timeframe), now=now)
+    return build_runtime_feature_row(candles, cfg=cfg)
