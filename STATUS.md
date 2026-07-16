@@ -86,9 +86,9 @@ py scripts/reset_paper_outcomes.py --confirm  # back up + clear (reversible)
 | Paper execution | ✅ works |
 | Signed-testnet adapter | ✅ verified — one order submitted and FILLED on testnet (2026-07-15), reconciled with zero mismatches |
 | Testnet reconciliation | ✅ verified — RECONCILED against a real testnet fill (order/position/balance matched intent) |
-| Live canary order boundary | ✅ implemented (`run_live_canary_order.py` + guard/adapter/reconcile), fail-closed; **not yet run** — awaits operator evidence (needs a live mainnet order) |
-| Live (full) order path | ❌ not implemented; trading agent refuses it |
-| Live/testnet/canary flags | 🔒 all False by default (fail-closed; guarded by `check_safety_defaults.py`) |
+| Live canary order boundary | ✅ verified — one real mainnet order FILLED and RECONCILED (2026-07-16) |
+| Live strategy (autonomous) path | ✅ implemented (L1–L6: P&L ledger + breaker, final guard, stage wiring, live gate/profile, position kernel, pipeline integration); **never enabled** — every flag fail-closed, needs promotion evidence |
+| Live/testnet/canary/strategy flags | 🔒 all False by default (fail-closed; guarded by `check_safety_defaults.py`) |
 
 ## Path to live (3 gates, not 15 phases)
 
@@ -107,8 +107,42 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 4. ✅ Testnet reconciliation implemented + verified (first order RECONCILED on testnet).
 5. ✅ Repeated-session harness (Phase 10) — `run_testnet_session.py` runs N open/close cycles with fill/slippage/latency/cost stats. **Operator step**: run several sessions (raise the daily cap) to confirm stability.
 6. ✅ Live canary preparation gate implemented (`scripts/check_live_canary_readiness.py`) — requires ≥5 clean testnet sessions plus a live **read-only** probe (key restrictions, balance, symbol filters, commission). GET-only by construction; grants no order authority. **Operator step**: run enough clean sessions, create a live read-only key (no withdrawals/transfers), then run the check with `--probe`.
-7. ✅ Live canary one-order boundary implemented — `run_live_canary_order.py` (a standalone runner, **not** wired into the pipeline) with its own final guard (`execution/live_canary_final_guard.py`), signed mainnet adapter (`execution/live_canary_adapter.py`, `fapi.binance.com` allowlist), and reconciliation. Fail-closed: separate order-capable key (`LIVE_CANARY_API_KEY`), a **distinct** confirmation phrase from testnet, a hard notional cap bounded by an absolute ceiling, a single-order daily cap, a manual kill switch, and it refuses to sign unless `live_canary_preparation.json` is READY (step 6). **Operator step**: once step 6 is READY, set the canary env and run `py run_live_canary_order.py --confirm` to place ONE real order and reconcile it. Claude does not run this or handle real keys.
-8. Live (full) promotion — after repeated clean canary orders, a live stage flag + checklist + manual approval; re-verify kill switch / notional cap / daily-loss limit at live scale.
+7. ✅ Live canary one-order boundary implemented **and verified** — one real mainnet order FILLED and RECONCILED with zero mismatches (2026-07-16) via `run_live_canary_order.py`. Each reconciled canary order is recorded as promotion evidence (`live_canary_order_registry`).
+8. ✅ Autonomous live strategy path implemented (L1–L6, disabled by default — see "Live strategy trading" below). **Operator steps to go live**: (a) accumulate ≥`LIVE_STRATEGY_MIN_CLEAN_CANARY_ORDERS` (default 3) clean canary orders; (b) set the full `LIVE_STRATEGY_*` env (separate order-capable key, its own confirmation phrase, caps, and a real daily-loss limit); (c) enable strategy routing+drive and run the scheduler. Claude does not run this or handle real keys.
+
+### Live strategy trading (autonomous, L1–L6 — implemented, never enabled)
+The pipeline can route its trading stage to `live`: a routed strategy candidate
+builds a live decision through the PreOrderRiskGate (operator-approved live
+profile + real live risk inputs), the approved gate result is persisted as a
+stage=`live` RiskGate record, and the order flows decision → intent → the L2
+final guard → the mainnet adapter, then reconciles. Layers (each fail-closed):
+
+| Layer | Module | What it enforces |
+|---|---|---|
+| L1 P&L ledger | `execution/live_pnl_ledger.py` | realized live P&L (USDT); an **unconfigured daily-loss limit blocks** |
+| L2 final guard | `execution/live_order_final_guard.py` | flags + distinct confirmation + kill switch + loss breaker + promotion gate + caps (order/daily/exposure, absolute ceiling) + **verified stage=live RiskGate record** |
+| L3 wiring | `execution_port` / `live_strategy_execution.py` | stage routing; partial config refuses loudly (never silently downgrades) |
+| L4 live gate | `research/live_profile.py` + bridge | operator-approved live profile (approval = complete env config); signal carries its hash; live gate fed real ledger/counter numbers |
+| L5 position kernel | `execution/live_position_kernel.py` | real reduceOnly closes (SL/TP/time); fail-open-position (never fabricates a close); closes exempt from breaker/kill-switch (risk reduction) but not from the structural boundary |
+| L6 integration | `pipeline/trading_agent.py` | settle-first, real exposure counting, kernel open on RECONCILED fills |
+
+Required env (any missing one keeps the path fail-closed):
+```
+LIVE_STRATEGY_ORDER_ENABLED=true
+LIVE_STRATEGY_PLACE_ORDER_ENABLED=true
+LIVE_STRATEGY_CONFIRMATION=I_UNDERSTAND_THIS_TRADES_LIVE_FUNDS_AUTONOMOUSLY
+LIVE_STRATEGY_API_KEY=<order-capable live key, no withdraw/transfer>
+LIVE_STRATEGY_API_SECRET=<...>
+LIVE_STRATEGY_MAX_ORDER_NOTIONAL_USDT=60      # <= absolute ceiling 200
+LIVE_STRATEGY_MAX_DAILY_ORDER_COUNT=2
+LIVE_STRATEGY_MAX_OPEN_NOTIONAL_USDT=120
+LIVE_STRATEGY_DAILY_LOSS_LIMIT_USDT=20        # circuit breaker; 0 blocks
+```
+Plus `STRATEGY_FACTORY_ROUTING_ENABLED` + `STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED`
+(the strategies that trade) and ≥3 clean canary orders on record. Kill switch:
+`LIVE_STRATEGY_MANUAL_KILL_SWITCH=true` halts new entries immediately (open
+positions still close). The daily-loss breaker halts entries for the day once
+today's realized live loss reaches the limit.
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
 Create Binance USD-M **Futures testnet** API keys at

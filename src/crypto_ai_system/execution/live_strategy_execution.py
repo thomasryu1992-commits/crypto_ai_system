@@ -24,6 +24,7 @@ from core.time_utils import utc_now_iso
 
 from crypto_ai_system.execution.live_canary_adapter import LiveCanaryAdapter
 from crypto_ai_system.execution.live_order_final_guard import (
+    evaluate_live_close_guard,
     evaluate_live_order_final_guard,
     record_submission,
 )
@@ -85,6 +86,54 @@ def submit_live_strategy_order(
         {"status": result["status"], "state": result["state"], "client_order_id": submit.get("client_order_id")},
     )
     return result
+
+
+def submit_live_close_order(intent: dict[str, Any]) -> dict[str, Any]:
+    """Submit a reduceOnly CLOSE of the open live position (narrow close guard).
+
+    Risk-reducing: exempt from the loss breaker / kill switch / caps (see
+    ``evaluate_live_close_guard``), and does NOT consume the daily entry-order
+    budget — a tripped daily cap must never trap an open position.
+    """
+    guard = evaluate_live_close_guard(intent)
+    result: dict[str, Any] = {
+        "created_at": utc_now_iso(),
+        "mode": "LIVE_STRATEGY_CLOSE",
+        "intent": intent,
+        "final_guard": guard,
+        "exchange_order_id": None,
+        "filled": False,
+        "external_order_submission_performed": False,
+    }
+    if not guard.get("approved"):
+        result["state"] = "REJECTED"
+        result["status"] = f"LIVE_CLOSE_{guard.get('status', 'BLOCKED')}"
+        result["mode"] = "LIVE_CLOSE_GUARD_BLOCK"
+        log_event("live_close_order_blocked", {"status": result["status"], "blocks": guard.get("blocks")}, severity="WARNING")
+        return result
+
+    adapter = _strategy_adapter()
+    submit = adapter.submit_order(intent)
+    submitted = bool(submit.get("submitted"))
+
+    result["mode"] = "LIVE_STRATEGY_CLOSE_ADAPTER"
+    result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
+    result["status"] = "LIVE_CLOSE_ORDER_SUBMITTED" if submitted else "LIVE_CLOSE_SUBMIT_FAILED"
+    result["submit_result"] = submit
+    result["exchange_order_id"] = submit.get("exchange_order_id")
+    result["client_order_id"] = submit.get("client_order_id")
+    result["external_order_submission_performed"] = submitted
+    log_event(
+        "live_close_order_attempted",
+        {"status": result["status"], "client_order_id": submit.get("client_order_id")},
+        severity="INFO" if submitted else "WARNING",
+    )
+    return result
+
+
+def query_live_order(symbol: str, client_order_id: str) -> dict[str, Any]:
+    """Signed GET of one live order's state (used to read the close fill)."""
+    return _strategy_adapter().query_order(symbol, client_order_id)
 
 
 def run_live_strategy_reconciliation() -> dict[str, Any]:

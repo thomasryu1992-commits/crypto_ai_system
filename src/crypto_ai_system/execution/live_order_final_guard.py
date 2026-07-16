@@ -97,6 +97,61 @@ def _verify_live_risk_gate(intent: dict[str, Any]) -> tuple[bool, list[str]]:
     return bool(verdict.get("approved")), [f"strategy risk gate: {r}" for r in verdict.get("reasons", [])]
 
 
+def evaluate_live_close_guard(intent: dict[str, Any]) -> dict[str, Any]:
+    """Narrower guard for a reduceOnly CLOSE of an existing live position.
+
+    A close reduces risk, so it is exempt from the checks that exist to stop NEW
+    risk: the daily-loss breaker (a tripped breaker must still be able to flatten),
+    the kill switch (kill switch = no new risk, flatten allowed), the promotion
+    gate, the caps, and the RiskGate record (the entry was already gated). What it
+    still requires is the structural boundary: the enable flags + confirmation
+    (an operator who disabled the live boundary manages the position manually),
+    the mainnet host allowlist, the key, and that the intent really is reduceOnly.
+    """
+    blocks: list[str] = []
+    repairs: list[str] = []
+
+    if not getattr(settings, "LIVE_STRATEGY_ORDER_ENABLED", False):
+        blocks.append("LIVE_STRATEGY_ORDER_ENABLED is false")
+    if not getattr(settings, "LIVE_STRATEGY_PLACE_ORDER_ENABLED", False):
+        blocks.append("LIVE_STRATEGY_PLACE_ORDER_ENABLED is false")
+    if not _confirmation_present():
+        blocks.append("live strategy confirmation phrase not present")
+
+    base_url = getattr(settings, "LIVE_STRATEGY_BASE_URL", "")
+    host = (urlparse(base_url).hostname or "").lower()
+    if host not in ALLOWED_LIVE_HOSTS:
+        blocks.append(f"base url host {host!r} is not an allowed live host")
+    if not getattr(settings, "LIVE_STRATEGY_API_KEY", "") or not getattr(settings, "LIVE_STRATEGY_API_SECRET", ""):
+        blocks.append("live strategy api key/secret not configured")
+
+    if not intent.get("reduce_only"):
+        blocks.append("close guard requires a reduceOnly intent")
+    if intent.get("status") != "ORDER_INTENT_CREATED":
+        repairs.append("intent is not in ORDER_INTENT_CREATED state")
+    if not intent.get("symbol"):
+        repairs.append("intent missing symbol")
+    try:
+        if float(intent.get("quantity") or 0) <= 0:
+            repairs.append("intent quantity missing or non-positive")
+    except (TypeError, ValueError):
+        repairs.append("intent quantity not numeric")
+
+    if blocks:
+        status = STATUS_BLOCKED
+    elif repairs:
+        status = STATUS_REPAIR_REQUIRED
+    else:
+        status = STATUS_READY
+    return {
+        "status": status,
+        "approved": status == STATUS_READY,
+        "blocks": blocks,
+        "repairs": repairs,
+        "close_guard": True,
+    }
+
+
 def evaluate_live_order_final_guard(
     intent: dict[str, Any], *, current_open_notional_usdt: float = 0.0
 ) -> dict[str, Any]:

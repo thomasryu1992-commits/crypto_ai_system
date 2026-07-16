@@ -122,11 +122,14 @@ class BinanceLiveStrategyAdapter:
     stage = "live"
 
     def submit(self, intent: dict[str, Any], *, readiness: dict[str, Any]) -> dict[str, Any]:
+        from crypto_ai_system.execution.live_position_kernel import open_live_notional_usdt
         from crypto_ai_system.execution.live_strategy_execution import submit_live_strategy_order
 
         result = submit_live_strategy_order(
             intent,
-            current_open_notional_usdt=float(intent.get("current_open_notional_usdt") or 0.0),
+            # Real exposure from the tracked live position, so the guard's
+            # open-exposure cap counts what is actually on the book.
+            current_open_notional_usdt=open_live_notional_usdt(),
         )
         result["readiness"] = readiness
         return result
