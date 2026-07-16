@@ -33,6 +33,31 @@ DEFAULT_PROFILE_ID = PAPER_PROFILE_ID
 PROFILE_VERSION = PAPER_PROFILE_VERSION
 CONFIG_VERSION = "lean_pipeline.v1"
 
+# profile_id -> the deterministic hash the gate's profile-hash check expects.
+_PROFILE_HASHES = {PAPER_PROFILE_ID: PAPER_PROFILE_SHA256}
+
+
+def _resolve_signal_profile() -> tuple[str, str]:
+    """(profile_id, profile_sha256) for this cycle's signal.
+
+    When the live-strategy stage is fully configured (same single source the
+    pipeline stage router uses), the signal carries the operator-approved live
+    profile so the live PreOrderRiskGate's hash check can pass; otherwise the
+    auto-approved paper profile.
+    """
+    try:
+        from crypto_ai_system.research.live_profile import (
+            LIVE_PROFILE_ID,
+            LIVE_PROFILE_SHA256,
+            live_stage_fully_configured,
+        )
+
+        if live_stage_fully_configured():
+            return LIVE_PROFILE_ID, LIVE_PROFILE_SHA256
+    except Exception:  # noqa: BLE001 - any doubt -> paper (fail-closed for live)
+        pass
+    return PAPER_PROFILE_ID, PAPER_PROFILE_SHA256
+
 SIGNAL_QA_REPORT_PATH = LATEST_DIR / "signal_qa_report.json"
 
 # Scenario/timing that permit a long (mirrors the decision engine bias).
@@ -85,9 +110,20 @@ def build_active_research_signal(
     research: Mapping[str, Any],
     *,
     cycle_id: str | None = None,
-    profile_id: str = DEFAULT_PROFILE_ID,
+    profile_id: str | None = None,
 ) -> dict[str, Any]:
-    """Build a ResearchSignal v2 record from the active snapshot + research result."""
+    """Build a ResearchSignal v2 record from the active snapshot + research result.
+
+    ``profile_id`` defaults to this cycle's resolved profile: the operator-approved
+    live profile when the live stage is fully configured, else the paper profile.
+    """
+    resolved_profile_id, resolved_profile_hash = _resolve_signal_profile()
+    if profile_id is None:
+        profile_id = resolved_profile_id
+    profile_hash = (
+        resolved_profile_hash if profile_id == resolved_profile_id
+        else _PROFILE_HASHES.get(profile_id)
+    )
     symbol = str(snapshot.get("symbol") or "BTCUSDT")
     timeframe = str(snapshot.get("timeframe") or "1h")
     optional_data_health = snapshot.get("optional_data_health") if isinstance(snapshot.get("optional_data_health"), dict) else {}
@@ -143,11 +179,12 @@ def build_active_research_signal(
         "source_bundle_sha256": source_bundle_sha256,
         "profile_id": profile_id,
         "profile_version": PROFILE_VERSION,
-        # Matches the approved paper profile so the gate's profile-hash check
-        # passes for paper. (For non-paper stages the bridge supplies no approved
-        # profile, so the gate blocks regardless.)
-        "profile_sha256": PAPER_PROFILE_SHA256 if profile_id == PAPER_PROFILE_ID else None,
-        "profile_hash": PAPER_PROFILE_SHA256 if profile_id == PAPER_PROFILE_ID else None,
+        # Matches the approved profile for this cycle's resolved stage (paper, or
+        # the operator-approved live profile when the live stage is fully
+        # configured) so the gate's profile-hash check can pass. An unknown
+        # profile carries no hash and the gate blocks (fail-closed).
+        "profile_sha256": profile_hash,
+        "profile_hash": profile_hash,
         "config_version": CONFIG_VERSION,
         "created_at_utc": utc_now_canonical(),
         "timestamp": snapshot.get("last_candle_time") or snapshot.get("created_at"),

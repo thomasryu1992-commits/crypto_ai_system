@@ -74,35 +74,17 @@ def _live_strategy_requested() -> bool:
     return _flag("LIVE_STRATEGY_ORDER_ENABLED")
 
 
-def _live_strategy_confirmation_present() -> bool:
-    expected = getattr(settings, "LIVE_STRATEGY_CONFIRMATION_PHRASE", "") or (
-        "I_UNDERSTAND_THIS_TRADES_LIVE_FUNDS_AUTONOMOUSLY"
-    )
-    given = getattr(settings, "LIVE_STRATEGY_CONFIRMATION", "")
-    return bool(given) and given == expected
-
-
 def _live_strategy_block_reason() -> str | None:
     """Every condition for routing the pipeline to the live stage, or why not.
 
     A partially-configured live request refuses loudly rather than silently
     downgrading to paper — an operator who flipped the live flag must know it is
-    not live. The final guard re-checks all of this (and more) before signing.
+    not live. Delegates to the single source (live_profile) shared with the
+    signal builder; the final guard re-checks all of this before signing.
     """
-    if not _flag("LIVE_STRATEGY_PLACE_ORDER_ENABLED"):
-        return "live strategy enabled without LIVE_STRATEGY_PLACE_ORDER_ENABLED — refusing"
-    if not _live_strategy_confirmation_present():
-        return "live strategy enabled without its confirmation phrase — refusing"
-    if _flag("LIVE_STRATEGY_MANUAL_KILL_SWITCH"):
-        return "live strategy kill switch is engaged — refusing"
-    try:
-        from crypto_ai_system.execution.live_promotion import live_promotion_ready
+    from crypto_ai_system.research.live_profile import live_stage_block_reason
 
-        if not live_promotion_ready():
-            return "live promotion evidence not ready (clean canary orders) — refusing"
-    except Exception:  # noqa: BLE001 - fail closed if evidence can't be read
-        return "live promotion evidence unreadable — refusing"
-    return None
+    return live_stage_block_reason()
 
 
 def resolve_execution_stage() -> tuple[str | None, str | None]:
@@ -216,14 +198,16 @@ class TradingAgent(Agent):
         trading = run_trading_cycle(allow_new_position=allow_new_position)
         trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
 
-        # Strategy-factory drive (paper only, opt-in): when a routed candidate
+        # Strategy-factory drive (paper or live, opt-in): when a routed candidate
         # exists this cycle, replace the research decision with a strategy-driven
         # one. It is still gated by research permission + PreOrderRiskGate inside
         # the builder, and only overrides when it produces an order-intent-eligible
-        # decision — otherwise the research decision stands (fail-closed).
+        # decision — otherwise the research decision stands (fail-closed). On the
+        # live stage the L2 final guard additionally requires the persisted
+        # stage='live' RiskGate record before anything is signed.
         strategy_drive = None
         if (
-            is_paper
+            (is_paper or execution_stage == "live")
             and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
             and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
         ):

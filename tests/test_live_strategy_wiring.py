@@ -28,6 +28,9 @@ def _live_env(monkeypatch, **overrides):
         "LIVE_STRATEGY_MANUAL_KILL_SWITCH": False,
         "LIVE_STRATEGY_CONFIRMATION": CONFIRM,
         "LIVE_STRATEGY_CONFIRMATION_PHRASE": CONFIRM,
+        # L4: the stage router also requires configured caps + a daily-loss limit.
+        "LIVE_STRATEGY_MAX_ORDER_NOTIONAL_USDT": 60.0,
+        "LIVE_STRATEGY_DAILY_LOSS_LIMIT_USDT": 20.0,
     }
     values.update(overrides)
     for name, val in values.items():
