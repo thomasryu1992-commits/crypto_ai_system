@@ -255,6 +255,17 @@ live paper loop end to end: populate the pool with this runner, then enable
 `STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED` (paper drive). Known gap: the breakout
 template needs a derivatives feed (funding / OI); without one it takes no trades.
 
+### Integration run — verified end to end
+Ran the real pipeline with routing enabled: all six stages run (data → research →
+validation → **strategy_routing** → trading → feedback), the router evaluates the
+live pool on the real feature row, and the common gates (validation risk guard,
+research permission, PreOrderRiskGate) enforce as designed. The drive money-path
+was verified through the real order path: a strategy decision → order executor →
+paper fill → position (carrying `strategy_id`) → settle → attributed outcome →
+S9 aggregation. This run surfaced and fixed a real gap — the strategy decision now
+carries the `decision_id` / `research_signal_id` / `profile_id` lineage the paper
+engine requires (it rejected the intent without them).
+
 ## History
 
 Pre-refactor state (the over-engineered governance/evidence apparatus) is frozen

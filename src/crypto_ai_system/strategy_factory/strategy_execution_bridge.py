@@ -124,5 +124,11 @@ def build_strategy_decision_for_cycle(
         router_result=strategy_routing, primary_spec=primary_spec, feature_row=feature_row,
         market_snapshot=market_snapshot, research_permission=permission, pre_order_risk_gate=gate,
         attribution=attribution, symbol=symbol, notional_usdt=notional,
-        execution_stage=execution_stage, now=now,
+        execution_stage=execution_stage,
+        # The cycle's data lineage the paper engine requires on the intent.
+        research_signal_id=research_signal.get("research_signal_id") or research_signal.get("signal_id"),
+        profile_id=gate.get("profile_id") or research_signal.get("profile_id"),
+        data_snapshot_id=research_signal.get("data_snapshot_id"),
+        feature_snapshot_id=research_signal.get("feature_snapshot_id"),
+        now=now,
     )

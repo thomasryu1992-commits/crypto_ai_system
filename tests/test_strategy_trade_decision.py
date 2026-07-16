@@ -139,3 +139,19 @@ def test_decision_id_deterministic():
     a = _build()
     b = _build()
     assert a["trading_decision_agent_id"] == b["trading_decision_agent_id"]
+
+
+def test_carries_paper_engine_lineage_ids():
+    # The paper execution engine rejects an intent missing decision/signal/profile
+    # ids, so the strategy decision must carry them (found by the integration run).
+    d = build_strategy_trade_decision(
+        router_result=_candidate(), primary_spec=_spec(), feature_row={"close": 100.0, "atr": 2.0},
+        market_snapshot={"last_close": 100.0}, research_permission=_perm(), pre_order_risk_gate=_gate(),
+        attribution=_attr(), research_signal_id="rs_1", profile_id="paper_1",
+        data_snapshot_id="ds_1", feature_snapshot_id="fs_1", now=NOW,
+    )
+    assert d["decision_id"] == "strategy_entry_evaluation_x"  # the strategy's eval id
+    assert d["research_signal_id"] == "rs_1"
+    assert d["profile_id"] == "paper_1"
+    assert d["data_snapshot_id"] == "ds_1"
+    assert d["feature_snapshot_id"] == "fs_1"

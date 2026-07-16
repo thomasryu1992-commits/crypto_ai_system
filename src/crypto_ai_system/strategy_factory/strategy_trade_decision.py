@@ -61,6 +61,10 @@ def build_strategy_trade_decision(
     symbol: str = "BTCUSDT",
     notional_usdt: float = 20.0,
     execution_stage: str = "paper",
+    research_signal_id: str | None = None,
+    profile_id: str | None = None,
+    data_snapshot_id: str | None = None,
+    feature_snapshot_id: str | None = None,
     now: str | None = None,
 ) -> dict[str, Any]:
     """Build a canonical trade decision from a router candidate. Fail-closed."""
@@ -129,7 +133,14 @@ def build_strategy_trade_decision(
         "order_intent_block_reason": None if allow_order_intent else (reasons[0] if reasons else "STRATEGY_ENTRY_BLOCKED"),
         "block_reasons": sorted(set(reasons)),
         "order_intent_created": False,
-        # Canonical lineage the order executor lifts onto the intent.
+        # Canonical lineage the order executor + paper engine require on the
+        # intent. decision_id is the strategy's entry-evaluation id; the cycle's
+        # research signal / profile ids carry the data lineage.
+        "decision_id": attribution.get("strategy_entry_evaluation_id"),
+        "research_signal_id": research_signal_id,
+        "profile_id": profile_id or pre_order_risk_gate.get("profile_id"),
+        "data_snapshot_id": data_snapshot_id,
+        "feature_snapshot_id": feature_snapshot_id,
         "risk_gate_id": pre_order_risk_gate.get("risk_gate_id"),
         "risk_gate_status": pre_order_risk_gate.get("status"),
         "pre_order_risk_gate": dict(pre_order_risk_gate),
