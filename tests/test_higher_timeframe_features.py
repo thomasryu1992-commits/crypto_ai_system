@@ -23,6 +23,18 @@ from crypto_ai_system.strategy_factory.runtime_feature_adapter import build_back
 _CANDLE_INDICATORS = ("macd", "macd_signal", "macd_hist", "bb_percent_b", "roc_4", "volume_zscore")
 
 
+def _identical(left: pd.Series, right: pd.Series) -> bool:
+    """Element-wise equality treating two missing values as equal.
+
+    Not ``astype(str)`` comparison: under the pandas 3+ string dtype a missing
+    value stays missing rather than becoming "nan", so NaN == NaN yields NA and a
+    warm-up row would read as a mismatch.
+    """
+    both_missing = left.isna().to_numpy() & right.isna().to_numpy()
+    equal = (left == right).fillna(False).to_numpy()
+    return bool((both_missing | equal).all())
+
+
 def _candles(n: int, *, reverse_at: float = 0.5) -> list[dict]:
     """Hourly candles that trend up then down, so both HTF directions appear."""
     ts = pd.date_range("2026-01-01", periods=n, freq="1h", tz="UTC")
@@ -77,8 +89,7 @@ def test_features_are_look_ahead_free() -> None:
     truncated = build_backtest_frame(candles[:cut]).reset_index(drop=True)
 
     for col in (*_CANDLE_INDICATORS, *HTF_COLUMNS):
-        left, right = full[col], truncated[col]
-        assert (left.astype(str) == right.astype(str)).all(), f"{col} leaks future information"
+        assert _identical(full[col], truncated[col]), f"{col} leaks future information"
 
 
 def test_unparseable_timestamps_fail_closed() -> None:
