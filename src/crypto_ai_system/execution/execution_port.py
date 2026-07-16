@@ -109,20 +109,47 @@ class BinanceTestnetAdapter:
         return result
 
 
+class BinanceLiveStrategyAdapter:
+    """Wraps the live-strategy final guard + mainnet HMAC adapter (L3).
+
+    Fails closed: unless the pre-submit final guard returns READY — which itself
+    requires a verified stage='live' RiskGate record, the L1 daily-loss breaker
+    clear, promotion evidence, and every hard cap satisfied — nothing is signed
+    or sent. The live canary stays a separate standalone boundary; this port is
+    the pipeline's strategy-driven live path.
+    """
+
+    stage = "live"
+
+    def submit(self, intent: dict[str, Any], *, readiness: dict[str, Any]) -> dict[str, Any]:
+        from crypto_ai_system.execution.live_strategy_execution import submit_live_strategy_order
+
+        result = submit_live_strategy_order(
+            intent,
+            current_open_notional_usdt=float(intent.get("current_open_notional_usdt") or 0.0),
+        )
+        result["readiness"] = readiness
+        return result
+
+
 _SIGNED_TESTNET_STAGES = {"signed_testnet", "testnet"}
 
 _PAPER_ADAPTER = PaperExecutionAdapter()
 _TESTNET_ADAPTER = BinanceTestnetAdapter()
+_LIVE_STRATEGY_ADAPTER = BinanceLiveStrategyAdapter()
 
 
 def select_adapter(stage: str | None) -> ExecutionPort | None:
-    """Return the ExecutionPort for ``stage`` (paper / signed_testnet), else None.
+    """Return the ExecutionPort for ``stage`` (paper / signed_testnet / live), else None.
 
     None means "no adapter serves this stage" — the caller falls back to its
-    fail-closed shadow/blocked handling (live is not implemented)."""
+    fail-closed shadow/blocked handling. The ``live`` port exists but is itself
+    fail-closed: its final guard blocks unless every live-strategy gate passes."""
     normalized = str(stage or "").strip().lower()
     if normalized == "paper":
         return _PAPER_ADAPTER
     if normalized in _SIGNED_TESTNET_STAGES:
         return _TESTNET_ADAPTER
+    if normalized == "live":
+        return _LIVE_STRATEGY_ADAPTER
     return None

@@ -70,14 +70,57 @@ def _confirmation_present() -> bool:
     return bool(given) and given == expected
 
 
+def _live_strategy_requested() -> bool:
+    return _flag("LIVE_STRATEGY_ORDER_ENABLED")
+
+
+def _live_strategy_confirmation_present() -> bool:
+    expected = getattr(settings, "LIVE_STRATEGY_CONFIRMATION_PHRASE", "") or (
+        "I_UNDERSTAND_THIS_TRADES_LIVE_FUNDS_AUTONOMOUSLY"
+    )
+    given = getattr(settings, "LIVE_STRATEGY_CONFIRMATION", "")
+    return bool(given) and given == expected
+
+
+def _live_strategy_block_reason() -> str | None:
+    """Every condition for routing the pipeline to the live stage, or why not.
+
+    A partially-configured live request refuses loudly rather than silently
+    downgrading to paper — an operator who flipped the live flag must know it is
+    not live. The final guard re-checks all of this (and more) before signing.
+    """
+    if not _flag("LIVE_STRATEGY_PLACE_ORDER_ENABLED"):
+        return "live strategy enabled without LIVE_STRATEGY_PLACE_ORDER_ENABLED — refusing"
+    if not _live_strategy_confirmation_present():
+        return "live strategy enabled without its confirmation phrase — refusing"
+    if _flag("LIVE_STRATEGY_MANUAL_KILL_SWITCH"):
+        return "live strategy kill switch is engaged — refusing"
+    try:
+        from crypto_ai_system.execution.live_promotion import live_promotion_ready
+
+        if not live_promotion_ready():
+            return "live promotion evidence not ready (clean canary orders) — refusing"
+    except Exception:  # noqa: BLE001 - fail closed if evidence can't be read
+        return "live promotion evidence unreadable — refusing"
+    return None
+
+
 def resolve_execution_stage() -> tuple[str | None, str | None]:
     """Decide the execution stage from config, fail-closed.
 
     Returns ``(stage, block_reason)``. When ``block_reason`` is set the caller
-    must refuse execution. ``stage`` is ``"paper"`` or ``"signed_testnet"``.
+    must refuse execution. ``stage`` is ``"paper"``, ``"signed_testnet"``, or
+    ``"live"`` (all enable flags + confirmation + promotion evidence required).
     """
     if _live_requested():
-        return None, "live trading path is not implemented — refusing (fail-closed)"
+        # The legacy live flags never route anywhere; the only live path is the
+        # explicit LIVE_STRATEGY_* set below.
+        return None, "legacy live trading flags are not a live path — refusing (fail-closed)"
+    if _live_strategy_requested():
+        reason = _live_strategy_block_reason()
+        if reason:
+            return None, reason
+        return "live", None
     if _testnet_requested() and not _confirmation_present():
         return None, "testnet order flag enabled without confirmation phrase — refusing"
     if _testnet_requested() and _confirmation_present():
@@ -191,12 +234,19 @@ class TradingAgent(Agent):
 
         order = run_order_executor(execution_stage)
 
-        # Reconcile against the venue only when a real testnet order was
+        # Reconcile against the venue only when a real external order was
         # submitted; otherwise use the paper reconciler.
-        if execution_stage == "signed_testnet" and isinstance(order, dict) and order.get(
+        externally_submitted = isinstance(order, dict) and order.get(
             "external_order_submission_performed"
-        ):
+        )
+        if execution_stage == "signed_testnet" and externally_submitted:
             reconciliation = run_signed_testnet_reconciliation()
+        elif execution_stage == "live" and externally_submitted:
+            from crypto_ai_system.execution.live_strategy_execution import (
+                run_live_strategy_reconciliation,
+            )
+
+            reconciliation = run_live_strategy_reconciliation()
         else:
             reconciliation = run_reconciler()
 

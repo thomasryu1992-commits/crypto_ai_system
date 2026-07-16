@@ -221,9 +221,9 @@ def test_submit_records_and_reconciles_when_ready(enabled, monkeypatch, tmp_path
 
 def test_pipeline_adapter_router_never_serves_live_canary():
     # The canary is a standalone boundary; the pipeline's adapter selector must
-    # not resolve a live_canary (or any live) stage.
+    # not resolve the live_canary stage. (The "live" stage now resolves to the
+    # separate live-STRATEGY port — itself fail-closed behind its final guard.)
     from crypto_ai_system.execution.execution_port import select_adapter
 
     assert select_adapter("live_canary") is None
-    assert select_adapter("live") is None
     assert select_adapter("paper") is not None

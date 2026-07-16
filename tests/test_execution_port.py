@@ -13,6 +13,7 @@ for _p in (str(ROOT / "src"), str(ROOT)):
 
 from crypto_ai_system.execution import execution_port
 from crypto_ai_system.execution.execution_port import (
+    BinanceLiveStrategyAdapter,
     BinanceTestnetAdapter,
     ExecutionPort,
     PaperExecutionAdapter,
@@ -24,7 +25,10 @@ def test_select_adapter_routes_by_stage():
     assert isinstance(select_adapter("paper"), PaperExecutionAdapter)
     assert isinstance(select_adapter("signed_testnet"), BinanceTestnetAdapter)
     assert isinstance(select_adapter("testnet"), BinanceTestnetAdapter)
-    assert select_adapter("live") is None
+    # The live stage resolves to the live-STRATEGY port (itself fail-closed
+    # behind its final guard); unknown/empty stages resolve to nothing.
+    assert isinstance(select_adapter("live"), BinanceLiveStrategyAdapter)
+    assert select_adapter("live_canary") is None
     assert select_adapter("") is None
     assert select_adapter(None) is None
 
@@ -32,6 +36,7 @@ def test_select_adapter_routes_by_stage():
 def test_adapters_conform_to_protocol():
     assert isinstance(PaperExecutionAdapter(), ExecutionPort)
     assert isinstance(BinanceTestnetAdapter(), ExecutionPort)
+    assert isinstance(BinanceLiveStrategyAdapter(), ExecutionPort)
 
 
 def test_paper_adapter_delegates_to_engine(monkeypatch):
