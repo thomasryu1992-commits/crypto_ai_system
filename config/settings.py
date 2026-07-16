@@ -20,6 +20,8 @@ LATEST_DIR = STORAGE_DIR / "latest"
 BACKUP_DIR = STORAGE_DIR / "backup"
 QUEUE_DIR = STORAGE_DIR / "queue"
 LOGS_DIR = STORAGE_DIR / "logs"
+# Deep candle history for backtesting (paged well past the venue's per-call cap).
+HISTORY_DIR = STORAGE_DIR / "history"
 DATA_DIR = PROJECT_ROOT / os.getenv("DATA_DIR", "data")
 REPORTS_DIR = PROJECT_ROOT / os.getenv("REPORTS_DIR", "reports")
 SECRETS_DIR = PROJECT_ROOT / os.getenv("SECRETS_DIR", "secrets")

@@ -72,9 +72,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-drawdown", type=float, default=12.0, help="max drawdown R")
     parser.add_argument("--min-stability", type=float, default=0.2, help="min temporal stability")
     parser.add_argument("--history", type=int, default=0,
-                        help="fetch N recent klines from the public futures API instead of the "
-                             "~200 cached candles (max 1500; 0 = use cache). More history is "
-                             "needed for a strategy to clear the trade-count gate.")
+                        help="use N recent klines from the public futures API instead of the "
+                             "cached runtime candles (0 = use cache). Paged past the venue's "
+                             "1500-per-call cap and cached on disk, so years of history are "
+                             "practical: ~26000 1h bars is ~3 years. A strategy needs this depth "
+                             "to clear the trade-count gate honestly.")
+    parser.add_argument("--refresh-history", action="store_true",
+                        help="ignore the on-disk history cache and refetch")
     parser.add_argument("--interval", default="1h", help="kline interval when --history is used")
     args = parser.parse_args(argv)
 
@@ -96,13 +100,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.history and args.history > 0:
         try:
             from collectors.real_market_data import to_binance_symbol
-            from crypto_ai_system.data.binance_futures_collector import BinanceFuturesPublicClient
+            from crypto_ai_system.data.candle_history import load_candle_history
 
             symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
-            client = BinanceFuturesPublicClient(base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL)
-            frame_df = client.klines(symbol, args.interval, min(args.history, 1500))
-            candles = frame_df.to_dict("records")
-            print(f"fetched {len(candles)} {args.interval} klines for {symbol}")
+            candles, source = load_candle_history(
+                symbol,
+                args.interval,
+                args.history,
+                cache_dir=settings.HISTORY_DIR,
+                base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL,
+                refresh=args.refresh_history,
+            )
+            span = f"{candles[0]['timestamp']} -> {candles[-1]['timestamp']}" if candles else "empty"
+            print(f"{source}: {len(candles)} {args.interval} klines for {symbol} [{span}]")
         except Exception as exc:  # noqa: BLE001
             print(f"history fetch failed ({type(exc).__name__}: {exc}); falling back to cached candles")
             candles = []
