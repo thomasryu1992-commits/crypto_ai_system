@@ -32,6 +32,27 @@ def _cfg_without_heavy_feeds(cfg: AppConfig) -> AppConfig:
     return AppConfig(root=cfg.root, settings=settings)
 
 
+def build_backtest_frame(
+    candles: Sequence[dict[str, Any]],
+    *,
+    cfg: AppConfig | None = None,
+) -> "pd.DataFrame":
+    """Return the full feature frame from OHLCV candles (the backtest input).
+
+    Same feature source as the live router — the factory backtests strategies on
+    exactly the columns they are evaluated against at runtime. Returns an empty
+    frame when there are too few candles or required columns are missing.
+    """
+    if not candles or len(candles) < _MIN_CANDLES:
+        return pd.DataFrame()
+    cfg = _cfg_without_heavy_feeds(cfg or load_config("."))
+    ohlcv = pd.DataFrame(list(candles))
+    required = {"open", "high", "low", "close", "volume", "timestamp"}
+    if not required.issubset(ohlcv.columns):
+        return pd.DataFrame()
+    return build_feature_frame(ohlcv, pd.DataFrame(), cfg)
+
+
 def build_runtime_feature_row(
     candles: Sequence[dict[str, Any]],
     *,
@@ -43,14 +64,7 @@ def build_runtime_feature_row(
     market-data candles). Returns an empty dict when there are too few candles —
     the router then produces NO_ENTRY (fail-closed).
     """
-    if not candles or len(candles) < _MIN_CANDLES:
-        return {}
-    cfg = _cfg_without_heavy_feeds(cfg or load_config("."))
-    ohlcv = pd.DataFrame(list(candles))
-    required = {"open", "high", "low", "close", "volume", "timestamp"}
-    if not required.issubset(ohlcv.columns):
-        return {}
-    frame = build_feature_frame(ohlcv, pd.DataFrame(), cfg)
+    frame = build_backtest_frame(candles, cfg=cfg)
     if frame.empty:
         return {}
     return latest_feature_snapshot(frame)

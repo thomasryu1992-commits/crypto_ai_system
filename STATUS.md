@@ -192,7 +192,7 @@ Roadmap S1–S11:
 | S7 | Multi-strategy entry router (`OR`, direction-conflict block) | ✅ router + shadow + paper-drive wiring done (opt-in, gated) |
 | S8 | Strategy-id outcome attribution | ✅ done (`strategy_outcome_attribution`) |
 | S9–S10 | Rolling performance + lifecycle (Warning→Probation→Suspend→Archive) | ✅ done (`feedback/strategy_performance_agent`, `feedback/strategy_lifecycle_agent`) |
-| S11 | Continuous factory loop + diversity guard | ✅ done (`continuous_factory`) |
+| S11 | Continuous factory loop + diversity guard | ✅ done (`continuous_factory`); runner `run_strategy_factory.py` populates the pool |
 
 A strategy spec is declarative data, never generated code: `can_submit_orders`
 and `can_modify_runtime` are hardcoded false and a spec that tries to set them is
@@ -239,6 +239,21 @@ the trade path). Verified end-to-end: 50 losing paper trades drive a strategy to
 SUSPENDED and the router excludes it. **The factory loop is now closed on real
 paper trades** — production → selection → operation → retirement runs
 automatically; testnet/live promotion and reactivation stay manual.
+
+### Running the factory (operator)
+```
+py run_strategy_factory.py --history 1500 --cycles 6   # generate + backtest + populate the pool
+py run_strategy_factory.py --status                    # show the current pool
+```
+This is the entry point that *fills* the active pool — the router/drive/lifecycle
+only read it. Each cycle generates a batch, backtests on real candles, and adds at
+most one champion to the paper pool (counters persist across runs). `--history N`
+fetches N recent klines (≈200 cached bars is too few to clear the trade-count
+gate; 1500 real BTC bars yields a qualifying trend-pullback champion). To run the
+live paper loop end to end: populate the pool with this runner, then enable
+`STRATEGY_FACTORY_ROUTING_ENABLED` (shadow) and, once confident,
+`STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED` (paper drive). Known gap: the breakout
+template needs a derivatives feed (funding / OI); without one it takes no trades.
 
 ## History
 
