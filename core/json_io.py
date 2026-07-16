@@ -1,20 +1,31 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
+_log = logging.getLogger("crypto_ai_system.json_io")
+
 
 def read_json(path: str | Path, default: Any = None) -> Any:
+    """Read a JSON file, returning ``default`` on absence or corruption.
+
+    A missing file is a normal empty-state and returns ``default`` silently. A
+    file that EXISTS but fails to parse is corruption: it still returns
+    ``default`` (so order paths stay fail-closed) but is logged at WARNING so the
+    degradation is visible instead of masquerading as a quiet no-trade cycle.
+    """
     path = Path(path)
     if not path.exists():
         return default
     try:
         with path.open("r", encoding="utf-8") as file:
             return json.load(file)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 - fail-safe, but never silent
+        _log.warning("read_json: corrupt/unreadable JSON at %s (%s); using default", path, exc)
         return default
 
 

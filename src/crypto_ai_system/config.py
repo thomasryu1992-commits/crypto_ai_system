@@ -129,18 +129,28 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     feature_store['extra_data_asof_tolerance'] = os.getenv('FEATURE_STORE_EXTRA_DATA_ASOF_TOLERANCE', feature_store.get('extra_data_asof_tolerance', '3D'))
     feature_store['research_matrix_mode'] = os.getenv('RESEARCH_FEATURE_MATRIX_MODE', feature_store.get('research_matrix_mode', 'live'))
 
+    # Single source of truth: the flat config.settings module already resolves
+    # these gate values from env (with the canonical defaults) and is consumed
+    # directly by decision_engine / signal_engine. Seed the AppConfig side from
+    # those resolved constants so a settings.yaml value cannot silently diverge
+    # from the flat half and split the pipeline's gate semantics.
+    from config import settings as _flat_settings
+
     trading_cfg = settings.setdefault('trading', {})
-    trading_cfg['use_research_signal_gate'] = _to_bool(os.getenv('USE_RESEARCH_SIGNAL_GATE', trading_cfg.get('use_research_signal_gate', True)))
-    trading_cfg['risk_level_reduced_position_multiplier'] = float(os.getenv('RISK_LEVEL_REDUCED_POSITION_MULTIPLIER', trading_cfg.get('risk_level_reduced_position_multiplier', 0.5)))
-    trading_cfg['risk_level_blocked_position_multiplier'] = float(os.getenv('RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER', trading_cfg.get('risk_level_blocked_position_multiplier', 0.0)))
+    trading_cfg['use_research_signal_gate'] = bool(_flat_settings.USE_RESEARCH_SIGNAL_GATE)
+    trading_cfg['risk_level_reduced_position_multiplier'] = float(_flat_settings.RISK_LEVEL_REDUCED_POSITION_MULTIPLIER)
+    trading_cfg['risk_level_blocked_position_multiplier'] = float(_flat_settings.RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER)
 
     backtest = settings.setdefault('backtest', {})
     backtest['maker_fee_bps'] = float(os.getenv('MAKER_FEE_BPS', backtest.get('maker_fee_bps', 0)))
     backtest['taker_fee_bps'] = float(os.getenv('TAKER_FEE_BPS', backtest.get('taker_fee_bps', 2.5)))
     backtest['slippage_bps'] = float(os.getenv('SLIPPAGE_BPS', backtest.get('slippage_bps', 3)))
 
+    # Same single-source rule as the trading gate above: the flat config.settings
+    # flags are the ones scripts/check_safety_defaults.py guards in CI, so mirror
+    # them here rather than re-resolving env against a possibly-drifting yaml.
     safety = settings.setdefault('safety', {})
-    safety['live_trading_enabled'] = _to_bool(os.getenv('LIVE_TRADING_ENABLED', safety.get('live_trading_enabled', False)))
-    safety['testnet_signed_order_enabled'] = _to_bool(os.getenv('TESTNET_SIGNED_ORDER_ENABLED', safety.get('testnet_signed_order_enabled', False)))
+    safety['live_trading_enabled'] = bool(_flat_settings.LIVE_TRADING_ENABLED)
+    safety['testnet_signed_order_enabled'] = bool(_flat_settings.TESTNET_SIGNED_ORDER_ENABLED)
 
     return AppConfig(root=root, settings=settings)
