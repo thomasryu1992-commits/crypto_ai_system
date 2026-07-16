@@ -73,6 +73,7 @@ def run_generation(
     base_seed: int = DEFAULT_BASE_SEED,
     registry_file: str | None = None,
     candidate_registry_file: str | None = None,
+    templates: Sequence | None = None,
     now: str | None = None,
 ) -> dict[str, Any]:
     """Run one generation cycle, persisting the pool and counters.
@@ -89,9 +90,12 @@ def run_generation(
     state = {"generation_seq": counters["generation_seq"], "strategy_seq": counters["strategy_seq"], "pool": pool}
     seed = base_seed + counters["generation_seq"]
 
+    cycle_kwargs: dict[str, Any] = {}
+    if templates is not None:
+        cycle_kwargs["templates"] = templates
     new_state, report = run_factory_cycle(
         state, frame, seed=seed, cost=cost, gate=gate, champion_weights=champion_weights,
-        cap=cap, max_per_family=max_per_family, now=now,
+        cap=cap, max_per_family=max_per_family, now=now, **cycle_kwargs,
     )
 
     save_pool(pool_file, new_state["pool"])
@@ -133,6 +137,7 @@ def run_factory(
     base_seed: int = DEFAULT_BASE_SEED,
     registry_file: str | None = None,
     candidate_registry_file: str | None = None,
+    templates: Sequence | None = None,
     now: str | None = None,
 ) -> dict[str, Any]:
     """Build the backtest frame from real candles and run ``cycles`` generations."""
@@ -147,7 +152,7 @@ def run_factory(
             frame, pool_file=pool_file, state_file=state_file, cost=cost, gate=gate,
             champion_weights=champion_weights, cap=cap, max_per_family=max_per_family,
             base_seed=base_seed, registry_file=registry_file,
-            candidate_registry_file=candidate_registry_file, now=now,
+            candidate_registry_file=candidate_registry_file, templates=templates, now=now,
         ))
 
     final_pool = load_pool(pool_file)

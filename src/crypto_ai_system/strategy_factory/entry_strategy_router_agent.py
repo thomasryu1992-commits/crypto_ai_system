@@ -46,8 +46,20 @@ def _routable_entries(pool: Mapping[str, Any]) -> list[dict]:
     ]
 
 
-def route_entries(pool: Mapping[str, Any], feature_row: Mapping[str, Any], *, now: str | None = None) -> dict[str, Any]:
-    """Evaluate every routable strategy against one feature row and route an entry.
+def route_entries(
+    pool: Mapping[str, Any],
+    feature_row: Mapping[str, Any],
+    *,
+    now: str | None = None,
+    feature_rows: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Evaluate every routable strategy against its feature row and route an entry.
+
+    ``feature_rows`` maps a spec timeframe to the latest feature row built on that
+    timeframe; a spec whose timeframe has no (or an empty) row is recorded as
+    unevaluable and cannot match — a 1d strategy must never be judged on a 1h row.
+    Without ``feature_rows`` every spec uses ``feature_row`` (single-timeframe
+    pools, the original behavior).
 
     Returns a router result carrying the strategy id chain. ``order_candidate_count``
     is 0 (no match or conflict) or 1 (a single entry candidate, however many
@@ -59,11 +71,21 @@ def route_entries(pool: Mapping[str, Any], feature_row: Mapping[str, Any], *, no
 
     for entry in entries:
         spec = StrategySpec.from_dict(entry["strategy_spec"])
-        result = evaluate_spec(spec, feature_row)
+        row = feature_rows.get(spec.timeframe) if feature_rows is not None else feature_row
+        if not row:
+            evaluations.append({
+                "strategy_id": entry.get("strategy_id"),
+                "matched": False,
+                "direction": None,
+                "unevaluable": f"no feature row for timeframe {spec.timeframe}",
+            })
+            continue
+        result = evaluate_spec(spec, row)
         evaluations.append({
             "strategy_id": entry.get("strategy_id"),
             "matched": result.matched,
             "direction": result.direction,
+            "timeframe": spec.timeframe,
         })
         if result.matched:
             matches.append({

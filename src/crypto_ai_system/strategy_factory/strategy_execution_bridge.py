@@ -23,7 +23,9 @@ from core.json_io import read_json
 
 from crypto_ai_system.research.paper_profile import get_paper_profile
 from crypto_ai_system.strategy_factory.entry_strategy_router_agent import STATUS_ENTRY_CANDIDATE
-from crypto_ai_system.strategy_factory.runtime_feature_adapter import build_runtime_feature_row
+from crypto_ai_system.strategy_factory.runtime_feature_adapter import (
+    build_runtime_feature_row_for_timeframe,
+)
 from crypto_ai_system.strategy_factory.strategy_outcome_attribution import build_strategy_attribution
 from crypto_ai_system.strategy_factory.strategy_trade_decision import build_strategy_trade_decision
 from crypto_ai_system.trading.pre_order_risk_gate import evaluate_pre_order_risk_gate
@@ -147,7 +149,16 @@ def build_strategy_decision_for_cycle(
     risk = read_json(settings.RISK_STATUS_PATH, {}) or {}
     market_data = read_json(settings.MARKET_DATA_PATH, {}) or {}
     candles = market_data.get("candles", []) if isinstance(market_data, dict) else []
-    feature_row = build_runtime_feature_row(candles)
+    # The decision must carry the row on the spec's own timeframe — the one the
+    # router matched on and the backtest scored.
+    from crypto_ai_system.pipeline.strategy_routing_agent import runtime_base_timeframe
+
+    feature_row = build_runtime_feature_row_for_timeframe(
+        str(primary_spec.get("timeframe") or runtime_base_timeframe()),
+        candles,
+        base_timeframe=runtime_base_timeframe(),
+        now=now,
+    )
 
     permission = build_research_permission_decision(
         research={}, signal_payload={"signal": direction}, research_signal=research_signal
