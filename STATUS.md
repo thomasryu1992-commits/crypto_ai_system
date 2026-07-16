@@ -298,6 +298,41 @@ families qualify — so the pool adapts to market direction as the factory runs.
 A strategy still trades only when the common research permission allows its
 direction (§2.2), so range/counter-trend entries also depend on that gate.
 
+## Maintenance
+
+**2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
+sweep of the post-refactor codebase. No safety default changed, no order path
+enabled; verified each step with the full suite, `check_safety_defaults.py`, and a
+live pipeline cycle. Test count 525 → 501 (legacy tests removed, new tests added
+for the guards/wiring below).
+
+- **Dead code removed.** Ghost `.pyc`-only packages (`governance`, `agents`,
+  `validation`, `ops`, `reports`) and the two entry points that `ImportError`ed
+  against them; dead root twins (`market_context_builder`, `market_snapshot_builder`,
+  `real_market_data_collector`), legacy `risk/risk_manager.py`, the `DISABLED_STUB`
+  `research_signal_profile_*` chain, and the `step209_237` runner.
+- **Legacy paper-simulation subsystem removed.** The whole `backtest/` package (a
+  closed import cluster reachable only from legacy step tests, superseded by the
+  v2/kernel path): `engine`, `metrics`, `parameter_sweep`, `paper_observation_queue`,
+  `paper_signal_replay`, `paper_trading_candidate_registry`, `strategy_matrix_execution`,
+  plus `execution/paper_execution_dry_run_bridge`, `execution/simulated_paper_order_lifecycle`,
+  `feedback/paper_lifecycle_outcome_store`. Ends the `backtest`/`backtesting` name
+  collision; `order_id_chain.chain_complete` stays covered by the v2 tests.
+- **Config unified.** `src/crypto_ai_system/config.py` now seeds the research-signal
+  gate and safety flags from the flat `config.settings` constants, so a `settings.yaml`
+  value can no longer silently diverge from the flat half and split gate semantics.
+- **Fail-visible IO.** `core.json_io.read_json` logs a WARNING when an existing file
+  fails to parse (was silently swallowed); closed-loop best-effort catches (strategy
+  attribution, S9/S10 lifecycle) `log_event` on failure instead of `pass`.
+- **§10 audit registries wired.** `factory_runner` now appends every pool decision
+  to `active_strategy_registry` and every generated candidate spec to
+  `strategy_candidate_registry` (both were code-present but never written).
+- **Feature contract honesty.** Derivative/liquidation/multi-timeframe columns are a
+  constant fallback without their feeds, so the S3 validator rejects any spec
+  referencing them (`BLOCK_RUNTIME_UNAVAILABLE_FEATURE`).
+- **`storage/latest/` pruned** 436 → 53 files; frozen pre-refactor artifacts moved to
+  `storage/archive/pre-lean/` (gitignored).
+
 ## History
 
 Pre-refactor state (the over-engineered governance/evidence apparatus) is frozen
