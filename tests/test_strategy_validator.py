@@ -69,6 +69,27 @@ def test_unknown_feature_blocked():
     assert verdict["approved_for_backtest"] is False
 
 
+def test_runtime_unavailable_feature_blocked():
+    # funding_rate is a known feature but only a constant fallback without a
+    # derivatives feed, so a spec using it must be rejected (not silently run).
+    verdict = validate_strategy(_spec(entry_rules={
+        "operator": "AND",
+        "conditions": [{"feature": "funding_rate", "comparison": ">", "value": 0.01}],
+    }))
+    assert sv.BLOCK_RUNTIME_UNAVAILABLE_FEATURE in verdict["block_reasons"]
+    assert verdict["approved_for_backtest"] is False
+
+
+def test_runtime_unavailable_value_from_blocked():
+    # A value_from reference to an unavailable feature is blocked too.
+    verdict = validate_strategy(_spec(entry_rules={
+        "operator": "AND",
+        "conditions": [{"feature": "close", "comparison": ">", "value_from": "open_interest"}],
+    }))
+    assert sv.BLOCK_RUNTIME_UNAVAILABLE_FEATURE in verdict["block_reasons"]
+    assert verdict["approved_for_backtest"] is False
+
+
 def test_invalid_categorical_label_blocked():
     verdict = validate_strategy(_spec(entry_rules={
         "operator": "AND",

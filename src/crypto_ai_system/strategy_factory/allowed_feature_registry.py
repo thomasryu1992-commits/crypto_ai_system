@@ -93,8 +93,56 @@ CATEGORICAL_FEATURES: dict[str, frozenset[str]] = {
 }
 
 
+# Features that are structurally *known* (above) but require a data feed the lean
+# runtime does not currently supply. The strategy factory builds both its backtest
+# frame and the live router row with derivatives/orderbook/multi-timeframe feeds
+# disabled, so feature_store fills these columns with a constant fallback (0, or
+# "DISABLED" for mtf_bias). A spec referencing them would not fail closed — it
+# would evaluate against fake zeros (always-true or always-false conditions) and
+# be silently degenerate in both backtest and live. Until a real feed populates
+# them, the validator rejects any spec that references one, keeping the registry's
+# "evaluable at evaluation time" guarantee honest. Remove a name from this set
+# when its feed is wired into build_backtest_frame / the runtime adapter.
+RUNTIME_UNAVAILABLE_FEATURES = frozenset(
+    {
+        # derivatives (no derivatives feed in the factory/runtime path)
+        "funding_rate",
+        "funding_zscore",
+        "open_interest",
+        "open_interest_base",
+        "oi_change_pct",
+        "oi_change_4h_pct",
+        # liquidations (same feed)
+        "long_liquidation",
+        "short_liquidation",
+        "liquidation_total",
+        "liquidation_spike_ratio",
+        "liquidation_imbalance",
+        "long_liquidation_spike",
+        "short_liquidation_spike",
+        # auxiliary composite scores (require the optional-data collectors)
+        "binance_derivatives_score",
+        "exchange_flow_score",
+        "etf_flow_score",
+        "stablecoin_liquidity_score",
+        # multi-timeframe context (disabled in the factory/runtime path)
+        "mtf_alignment_score",
+        "mtf_bias",
+    }
+)
+
+
 def is_numeric_feature(name: str) -> bool:
     return name in NUMERIC_FEATURES
+
+
+def is_runtime_available_feature(name: str) -> bool:
+    """True if ``name`` is both a known feature and populated by a live feed.
+
+    A known feature in :data:`RUNTIME_UNAVAILABLE_FEATURES` returns False: it
+    exists in the schema but is a constant fallback at evaluation time.
+    """
+    return is_allowed_feature(name) and name not in RUNTIME_UNAVAILABLE_FEATURES
 
 
 def is_categorical_feature(name: str) -> bool:

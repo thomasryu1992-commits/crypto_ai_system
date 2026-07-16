@@ -25,7 +25,9 @@ from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.backtesting.backtest_agent import AbsoluteGate
 from crypto_ai_system.backtesting.champion_selector_agent import ChampionScoreWeights
 from crypto_ai_system.backtesting.cost_model import CostModel
+from crypto_ai_system.registry.base_registry import append_registry_record
 from crypto_ai_system.strategy_factory.active_strategy_pool import (
+    ACTIVE_STRATEGY_REGISTRY_NAME,
     DEFAULT_PAPER_CAP,
     load_pool,
     occupying_entries,
@@ -36,6 +38,8 @@ from crypto_ai_system.strategy_factory.continuous_factory import (
     run_factory_cycle,
 )
 from crypto_ai_system.strategy_factory.runtime_feature_adapter import build_backtest_frame
+from crypto_ai_system.strategy_factory.strategy_registry import persist_strategy_spec
+from crypto_ai_system.strategy_factory.strategy_spec import StrategySpec
 
 DEFAULT_BASE_SEED = 1000
 
@@ -67,9 +71,19 @@ def run_generation(
     cap: int = DEFAULT_PAPER_CAP,
     max_per_family: int = DEFAULT_MAX_PER_FAMILY,
     base_seed: int = DEFAULT_BASE_SEED,
+    registry_file: str | None = None,
+    candidate_registry_file: str | None = None,
     now: str | None = None,
 ) -> dict[str, Any]:
-    """Run one generation cycle, persisting the pool and counters."""
+    """Run one generation cycle, persisting the pool and counters.
+
+    When ``registry_file`` is given, every pool decision (add / replace / reject,
+    including diversity rejections) is appended to the append-only active-strategy
+    registry — the §10 audit trail for how the pool changed over time. When
+    ``candidate_registry_file`` is given, every generated candidate spec is appended
+    to the strategy-candidate registry (§10). The pure ``run_factory_cycle`` stays
+    I/O-free; both audits are written here at the boundary.
+    """
     counters = load_counters(state_file)
     pool = load_pool(pool_file)
     state = {"generation_seq": counters["generation_seq"], "strategy_seq": counters["strategy_seq"], "pool": pool}
@@ -83,6 +97,24 @@ def run_generation(
     save_pool(pool_file, new_state["pool"])
     save_counters(state_file, generation_seq=new_state["generation_seq"],
                   strategy_seq=new_state["strategy_seq"], now=now)
+
+    generated_specs = report.pop("generated_specs", [])
+    if candidate_registry_file:
+        for spec_dict in generated_specs:
+            persist_strategy_spec(StrategySpec.from_dict(spec_dict), candidate_registry_file)
+
+    decision = report.get("pool_decision")
+    if registry_file and decision:
+        append_registry_record(
+            registry_file,
+            {"decision": decision, "generation_id": report.get("generation_id"),
+             "strategy_id": decision.get("strategy_id")},
+            registry_name=ACTIVE_STRATEGY_REGISTRY_NAME,
+            id_field="active_strategy_registry_record_id",
+            hash_field="active_strategy_registry_record_sha256",
+            id_prefix="active_strategy",
+        )
+
     report["seed"] = seed
     return report
 
@@ -99,6 +131,8 @@ def run_factory(
     cap: int = DEFAULT_PAPER_CAP,
     max_per_family: int = DEFAULT_MAX_PER_FAMILY,
     base_seed: int = DEFAULT_BASE_SEED,
+    registry_file: str | None = None,
+    candidate_registry_file: str | None = None,
     now: str | None = None,
 ) -> dict[str, Any]:
     """Build the backtest frame from real candles and run ``cycles`` generations."""
@@ -112,7 +146,8 @@ def run_factory(
         reports.append(run_generation(
             frame, pool_file=pool_file, state_file=state_file, cost=cost, gate=gate,
             champion_weights=champion_weights, cap=cap, max_per_family=max_per_family,
-            base_seed=base_seed, now=now,
+            base_seed=base_seed, registry_file=registry_file,
+            candidate_registry_file=candidate_registry_file, now=now,
         ))
 
     final_pool = load_pool(pool_file)

@@ -13,6 +13,7 @@ import config.settings as settings
 from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH, TRADE_DECISION_PATH
 
 from bridge.research_trading_bridge import run_research_trading_bridge
+from core.event_log import log_event
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
@@ -101,8 +102,12 @@ class TradingAgent(Agent):
                 position, settlement,
                 registry_file=str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH), now=now,
             )
-        except Exception:  # noqa: BLE001 - attribution is best-effort
-            pass
+        except Exception as exc:  # noqa: BLE001 - attribution is best-effort, but never silent
+            log_event(
+                "strategy_outcome_attribution_failed",
+                {"error": repr(exc)},
+                severity="WARNING",
+            )
 
     def _maybe_strategy_decision(self, ctx: PipelineContext, execution_stage: str, open_positions: int):
         """Build a strategy-driven trade decision from this cycle's router result.

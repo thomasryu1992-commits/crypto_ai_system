@@ -111,6 +111,9 @@ def run_factory_cycle(
         "champion_score": champion.get("champion_score"),
         "pool_decision": pool_decision,
         "active_pool_size": len(occupying_entries(new_pool)),
+        # Every generated candidate spec, for the §10 candidate-registry audit. The
+        # persisting runner pops this after writing so the returned report stays lean.
+        "generated_specs": batch["specs"],
         "created_at_utc": now,
     }
     return new_state, report

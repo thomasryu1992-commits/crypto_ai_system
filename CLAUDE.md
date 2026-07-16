@@ -40,9 +40,11 @@ py scripts/check_safety_defaults.py      # fail-closed flag guard (must pass)
 py reset_paper_state.py                  # reset paper trading state
 ```
 
-Data reset note: `storage/latest/paper_trades.json` accumulates paper trades and
-feeds the risk guard. Clearing it (to `[]`) resets risk history — do this when
-switching data sources so stale history does not block new positions.
+Data reset note: closed paper outcomes now live in the `outcome_feedback_registry`
+(the paper position kernel is the single source), and `risk/risk_guard.py` reads
+risk history from there — clearing `storage/latest/paper_trades.json` no longer
+resets it. To start risk/performance history from zero (e.g. after switching data
+sources), use `py scripts/reset_paper_outcomes.py --confirm` (backs up first).
 
 ## Architecture
 
@@ -94,10 +96,14 @@ The system must **fail closed**. Enforce these in code, never bypass:
   pipeline reconfigures stdout to UTF-8 in `run_pipeline.py`.
 - New tests go in `tests/`. Mark network/real-pipeline tests with
   `@pytest.mark.integration`. Prefer network-free unit tests with injected transports.
-- Commit only when asked. Branch off `main`; current work is on
-  `refactor/lean-agent-pipeline`. End commit messages with the Claude co-author trailer.
+- Commit only when asked. Branch off `main` (the lean pipeline is merged to
+  `main`). End commit messages with the Claude co-author trailer.
 
 ## Current focus
 
-Priority 1: the signed-testnet order adapter (HMAC signing + POST behind the
-existing contracts and hard caps). See `STATUS.md` "Next steps".
+The signed-testnet order adapter (HMAC signing + POST behind the existing
+contracts and hard caps) is **implemented and verified** — one order was FILLED
+and RECONCILED on testnet (2026-07-15). Remaining work is operator-driven, not new
+code: repeated clean testnet sessions, a live read-only probe, then the live
+canary one-order boundary (a separate approval + runtime). See `STATUS.md`
+"Next steps" for the current gate.

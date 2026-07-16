@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import config.settings as settings
 
+from core.event_log import log_event
 from crypto_ai_system.feedback.candidate_profile_registry import (
     run_candidate_profile_latest,
 )
@@ -46,7 +47,12 @@ class FeedbackAgent(Agent):
                 lifecycle_registry_file=str(settings.STRATEGY_LIFECYCLE_REGISTRY_PATH),
                 now=now,
             )
-        except Exception:  # noqa: BLE001 - strategy feedback is best-effort
+        except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
+            log_event(
+                "strategy_lifecycle_feedback_failed",
+                {"error": repr(exc)},
+                severity="WARNING",
+            )
             return None
 
     def execute(self, ctx: PipelineContext) -> StageResult:
