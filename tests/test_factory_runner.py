@@ -125,6 +125,25 @@ def test_run_generation_audits_pool_decision(tmp_path):
         assert records == []
 
 
+def test_run_generation_persists_candidate_specs(tmp_path):
+    # With a candidate_registry_file, every generated spec is recorded (§10),
+    # regardless of whether one becomes champion.
+    pool_file = str(tmp_path / "pool.json")
+    state_file = str(tmp_path / "state.json")
+    candidate_file = str(tmp_path / "strategy_candidate_registry.jsonl")
+    frame = build_backtest_frame(_uptrend_candles(), cfg=load_config("."))
+
+    report = run_generation(frame, pool_file=pool_file, state_file=state_file,
+                            cost=FREE, gate=GATE, candidate_registry_file=candidate_file, now=NOW)
+
+    records = load_registry_records(candidate_file)
+    assert len(records) == report["batch_accepted"] >= 1
+    assert all(r["registry_name"] == "strategy_candidate_registry" for r in records)
+    assert all("strategy_spec" in r for r in records)
+    # The returned report is not bloated with the full specs.
+    assert "generated_specs" not in report
+
+
 def test_run_generation_without_registry_writes_no_audit(tmp_path):
     # Backward-compatible: omitting registry_file skips the audit (no crash).
     pool_file = str(tmp_path / "pool.json")

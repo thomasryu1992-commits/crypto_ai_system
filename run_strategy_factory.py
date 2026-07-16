@@ -134,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         candles, pool_file=pool_file, state_file=state_file, cycles=args.cycles,
         cost=CostModel(), gate=gate, cap=args.cap, max_per_family=args.max_per_family,
         registry_file=str(settings.STRATEGY_ACTIVE_REGISTRY_PATH),
+        candidate_registry_file=str(settings.STRATEGY_CANDIDATE_REGISTRY_PATH),
         now=utc_now_iso(),
     )
     if result.get("error"):
