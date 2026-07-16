@@ -9,9 +9,12 @@ feature source for backtest and live.
 
 Multi-timeframe context and optional-data collectors are disabled here: the
 router needs the price/indicator/regime columns, not the heavy auxiliary feeds,
-and disabling them keeps this fast and side-effect-free. Derivative columns
-(funding, OI change) are absent without a derivatives feed, so a strategy that
-depends on them evaluates as indeterminate — fail-closed, no match.
+and disabling them keeps this fast and side-effect-free. With those feeds off,
+feature_store still emits the derivative/liquidation/mtf columns but fills them
+with a constant fallback (0, or "DISABLED"). A spec must therefore not reference
+them — the S3 validator rejects any that do (see
+``allowed_feature_registry.RUNTIME_UNAVAILABLE_FEATURES``), so a strategy can only
+be built from columns that carry real live values here.
 """
 
 from __future__ import annotations

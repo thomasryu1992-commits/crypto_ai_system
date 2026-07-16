@@ -27,6 +27,7 @@ from crypto_ai_system.strategy_factory.allowed_feature_registry import (
     is_allowed_feature,
     is_categorical_feature,
     is_numeric_feature,
+    is_runtime_available_feature,
 )
 from crypto_ai_system.strategy_factory.strategy_spec import SCHEMA_VERSION, StrategySpec
 from crypto_ai_system.utils.audit import stable_id
@@ -42,6 +43,7 @@ MAX_ENTRY_CONDITIONS = 8
 
 BLOCK_SCHEMA_VERSION = "BLOCK_SCHEMA_VERSION"
 BLOCK_UNKNOWN_FEATURE = "BLOCK_UNKNOWN_FEATURE"
+BLOCK_RUNTIME_UNAVAILABLE_FEATURE = "BLOCK_RUNTIME_UNAVAILABLE_FEATURE"
 BLOCK_INVALID_COMPARISON = "BLOCK_INVALID_COMPARISON"
 BLOCK_INVALID_FEATURE_VALUE = "BLOCK_INVALID_FEATURE_VALUE"
 BLOCK_VALUE_FROM_NOT_NUMERIC = "BLOCK_VALUE_FROM_NOT_NUMERIC"
@@ -69,6 +71,12 @@ def _validate_conditions(spec: StrategySpec) -> list[str]:
             # Without a known feature type the remaining checks are meaningless.
             continue
 
+        # Known but fed by a data source the runtime does not supply: evaluating it
+        # would compare against a constant fallback, not real data. Reject rather
+        # than silently produce a degenerate always-true/false condition.
+        if not is_runtime_available_feature(cond.feature):
+            reasons.append(BLOCK_RUNTIME_UNAVAILABLE_FEATURE)
+
         if cond.comparison not in allowed_comparisons_for(cond.feature):
             reasons.append(BLOCK_INVALID_COMPARISON)
 
@@ -76,6 +84,8 @@ def _validate_conditions(spec: StrategySpec) -> list[str]:
             # Comparing a feature to another feature only makes sense numerically.
             if not is_allowed_feature(cond.value_from):
                 reasons.append(BLOCK_UNKNOWN_FEATURE)
+            elif not is_runtime_available_feature(cond.value_from):
+                reasons.append(BLOCK_RUNTIME_UNAVAILABLE_FEATURE)
             elif not (is_numeric_feature(cond.feature) and is_numeric_feature(cond.value_from)):
                 reasons.append(BLOCK_VALUE_FROM_NOT_NUMERIC)
         else:

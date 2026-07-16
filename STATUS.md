@@ -247,13 +247,34 @@ py run_strategy_factory.py --status                    # show the current pool
 ```
 This is the entry point that *fills* the active pool — the router/drive/lifecycle
 only read it. Each cycle generates a batch, backtests on real candles, and adds at
-most one champion to the paper pool (counters persist across runs). `--history N`
-fetches N recent klines (≈200 cached bars is too few to clear the trade-count
-gate; 1500 real BTC bars yields a qualifying trend-pullback champion). To run the
-live paper loop end to end: populate the pool with this runner, then enable
-`STRATEGY_FACTORY_ROUTING_ENABLED` (shadow) and, once confident,
-`STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED` (paper drive). Known gap: the breakout
-template needs a derivatives feed (funding / OI); without one it takes no trades.
+most one champion to the paper pool (counters persist across runs). Every pool
+decision (add / replace / reject) is appended to the append-only
+`active_strategy_registry` audit trail. `--history N` fetches N recent klines
+(≈200 cached bars is too few to clear the trade-count gate; 1500 real BTC bars
+yields a qualifying trend-pullback champion). The absolute gate defaults are
+tuned to short history: `--min-trades` below the directive floor (100) prints a
+loud PROVISIONAL warning — a champion cleared on a thin sample is not yet
+statistically trustworthy. To run the live paper loop end to end: populate the
+pool with this runner, then enable `STRATEGY_FACTORY_ROUTING_ENABLED` (shadow)
+and, once confident, `STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED` (paper drive).
+
+Feature availability: all six shipped templates (trend/breakout/range × long/short)
+use only price-derived columns, so they trade on the runtime feature row. The
+derivative/liquidation/multi-timeframe columns exist in the schema but are a
+constant fallback without their feeds, so the S3 validator now rejects any spec
+referencing them (`BLOCK_RUNTIME_UNAVAILABLE_FEATURE`) — no silently-degenerate
+strategies. Wire a real feed and drop the name from
+`allowed_feature_registry.RUNTIME_UNAVAILABLE_FEATURES` to unlock those columns.
+
+### Scheduling the factory (operator, optional)
+```
+powershell -ExecutionPolicy Bypass -File scripts\setup_factory_task.ps1                    # daily
+powershell -ExecutionPolicy Bypass -File scripts\setup_factory_task.ps1 -IntervalMinutes 10080  # weekly
+powershell -ExecutionPolicy Bypass -File scripts\setup_factory_task.ps1 -Remove
+```
+Registers a Windows Scheduled Task (`CryptoAISystemStrategyFactory`) that runs one
+generation on an interval (directive §15: weekly→daily), logging to
+`storage\logs\strategy_factory.log`. Paper pool only — no testnet/live promotion.
 
 ### Integration run — verified end to end
 Ran the real pipeline with routing enabled: all six stages run (data → research →

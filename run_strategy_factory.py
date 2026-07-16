@@ -27,6 +27,10 @@ import json
 import sys
 from pathlib import Path
 
+# Directive §6.7: a champion should clear >=100 backtest trades before it is
+# statistically trustworthy. Runs below this are flagged provisional.
+DIRECTIVE_MIN_TRADES_FLOOR = 100
+
 
 def _bootstrap() -> None:
     root = Path(__file__).resolve().parent
@@ -116,6 +120,16 @@ def main(argv: list[str] | None = None) -> int:
         min_profit_factor=args.min_profit_factor, min_walk_forward_pass_rate=args.min_wf_pass,
         max_drawdown_r=args.max_drawdown, min_temporal_stability=args.min_stability,
     )
+    # Directive §6.7 wants >=100 backtest trades before a champion is trusted. The
+    # shipped default is far lower so the factory can produce anything at all on the
+    # short cached history — but a champion cleared on a thin sample is provisional,
+    # not statistically sound. Make that loud instead of silent.
+    thin_sample = args.min_trades < DIRECTIVE_MIN_TRADES_FLOOR
+    if thin_sample:
+        print(f"WARNING: --min-trades={args.min_trades} is below the directive floor of "
+              f"{DIRECTIVE_MIN_TRADES_FLOOR}; champions selected here are PROVISIONAL "
+              f"(thin-sample). Grow history (e.g. --history 1500) and raise --min-trades "
+              f"toward {DIRECTIVE_MIN_TRADES_FLOOR} before trusting a champion.")
     result = run_factory(
         candles, pool_file=pool_file, state_file=state_file, cycles=args.cycles,
         cost=CostModel(), gate=gate, cap=args.cap, max_per_family=args.max_per_family,
@@ -126,7 +140,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"factory error: {result['error']} (candles={result.get('candles')})")
         return 1
 
-    print(f"=== strategy factory: {result['cycles_run']} cycle(s) over {result['bars']} bars ===")
+    provisional = " [PROVISIONAL: thin-sample gate]" if thin_sample else ""
+    print(f"=== strategy factory: {result['cycles_run']} cycle(s) over {result['bars']} bars{provisional} ===")
     for r in result["reports"]:
         champ = r.get("selected_strategy_id") or "NONE"
         decision = (r.get("pool_decision") or {}).get("action") if r.get("pool_decision") else "—"
