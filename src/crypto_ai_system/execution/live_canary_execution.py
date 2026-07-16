@@ -112,6 +112,21 @@ def run_live_canary_reconciliation() -> dict[str, Any]:
         }
 
     atomic_write_json(RECONCILIATION_PATH, result)
+    # Record this canary order as live-promotion evidence: a clean (RECONCILED,
+    # zero-mismatch) order counts toward the minimum required before autonomous
+    # live strategy trading may be enabled (L5 gate).
+    try:
+        from crypto_ai_system.execution.live_promotion import record_canary_order
+
+        record_canary_order(
+            reconcile_status=result.get("status"),
+            exchange_order_id=order_result.get("exchange_order_id"),
+            client_order_id=order_result.get("client_order_id"),
+            symbol=(order_result.get("intent") or {}).get("symbol"),
+            mismatches=result.get("mismatches"),
+        )
+    except Exception as exc:  # noqa: BLE001 - evidence recording must not affect reconciliation
+        log_event("live_canary_promotion_record_failed", {"error": repr(exc)}, severity="WARNING")
     log_event(
         "live_canary_reconciliation",
         {"status": result.get("status"), "mismatches": result.get("mismatches", [])},

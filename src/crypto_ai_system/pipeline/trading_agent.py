@@ -70,14 +70,39 @@ def _confirmation_present() -> bool:
     return bool(given) and given == expected
 
 
+def _live_strategy_requested() -> bool:
+    return _flag("LIVE_STRATEGY_ORDER_ENABLED")
+
+
+def _live_strategy_block_reason() -> str | None:
+    """Every condition for routing the pipeline to the live stage, or why not.
+
+    A partially-configured live request refuses loudly rather than silently
+    downgrading to paper — an operator who flipped the live flag must know it is
+    not live. Delegates to the single source (live_profile) shared with the
+    signal builder; the final guard re-checks all of this before signing.
+    """
+    from crypto_ai_system.research.live_profile import live_stage_block_reason
+
+    return live_stage_block_reason()
+
+
 def resolve_execution_stage() -> tuple[str | None, str | None]:
     """Decide the execution stage from config, fail-closed.
 
     Returns ``(stage, block_reason)``. When ``block_reason`` is set the caller
-    must refuse execution. ``stage`` is ``"paper"`` or ``"signed_testnet"``.
+    must refuse execution. ``stage`` is ``"paper"``, ``"signed_testnet"``, or
+    ``"live"`` (all enable flags + confirmation + promotion evidence required).
     """
     if _live_requested():
-        return None, "live trading path is not implemented — refusing (fail-closed)"
+        # The legacy live flags never route anywhere; the only live path is the
+        # explicit LIVE_STRATEGY_* set below.
+        return None, "legacy live trading flags are not a live path — refusing (fail-closed)"
+    if _live_strategy_requested():
+        reason = _live_strategy_block_reason()
+        if reason:
+            return None, reason
+        return "live", None
     if _testnet_requested() and not _confirmation_present():
         return None, "testnet order flag enabled without confirmation phrase — refusing"
     if _testnet_requested() and _confirmation_present():
@@ -144,9 +169,12 @@ class TradingAgent(Agent):
         cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
         snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
         is_paper = execution_stage == "paper"
+        is_live = execution_stage == "live"
 
-        # 1. Settle any open paper position FIRST — SL/TP/time exit may close it
-        #    and produce a CLOSED outcome before this cycle considers a new entry.
+        # 1. Settle any open position FIRST — SL/TP/time exit may close it and
+        #    produce a CLOSED outcome before this cycle considers a new entry.
+        #    Paper settles by simulation; live submits a REAL reduceOnly close
+        #    (fail-open-position: a blocked/unconfirmed close stays OPEN).
         settlement = None
         if is_paper:
             # Capture the position before settling — settle clears it, and a
@@ -166,21 +194,50 @@ class TradingAgent(Agent):
                 and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
             ):
                 self._record_strategy_outcome(open_before, settlement, ctx)
+        elif is_live:
+            from crypto_ai_system.execution.live_position_kernel import (
+                load_open_live_position,
+                settle_open_live_position,
+            )
+
+            open_before = load_open_live_position(cfg)
+            settlement = settle_open_live_position(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+            if (
+                isinstance(settlement, dict)
+                and settlement.get("status") == "CLOSED"
+                and isinstance(open_before, dict)
+                and open_before.get("strategy_id")
+                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
+            ):
+                self._record_strategy_outcome(open_before, settlement, ctx)
 
         # 2. Open-position count for the gate (max_open_positions enforced there).
-        open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
+        if is_live:
+            from crypto_ai_system.execution.live_position_kernel import has_open_live_position
+
+            open_positions = 1 if has_open_live_position(cfg) else 0
+        else:
+            open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
         trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
 
-        # Strategy-factory drive (paper only, opt-in): when a routed candidate
+        # Strategy-factory drive (paper or live, opt-in): when a routed candidate
         # exists this cycle, replace the research decision with a strategy-driven
         # one. It is still gated by research permission + PreOrderRiskGate inside
         # the builder, and only overrides when it produces an order-intent-eligible
-        # decision — otherwise the research decision stands (fail-closed).
+        # decision — otherwise the research decision stands (fail-closed). On the
+        # live stage the L2 final guard additionally requires the persisted
+        # stage='live' RiskGate record before anything is signed.
         strategy_drive = None
         if (
-            is_paper
+            (is_paper or execution_stage == "live")
             and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
             and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
         ):
@@ -191,12 +248,19 @@ class TradingAgent(Agent):
 
         order = run_order_executor(execution_stage)
 
-        # Reconcile against the venue only when a real testnet order was
+        # Reconcile against the venue only when a real external order was
         # submitted; otherwise use the paper reconciler.
-        if execution_stage == "signed_testnet" and isinstance(order, dict) and order.get(
+        externally_submitted = isinstance(order, dict) and order.get(
             "external_order_submission_performed"
-        ):
+        )
+        if execution_stage == "signed_testnet" and externally_submitted:
             reconciliation = run_signed_testnet_reconciliation()
+        elif execution_stage == "live" and externally_submitted:
+            from crypto_ai_system.execution.live_strategy_execution import (
+                run_live_strategy_reconciliation,
+            )
+
+            reconciliation = run_live_strategy_reconciliation()
         else:
             reconciliation = run_reconciler()
 
@@ -210,12 +274,16 @@ class TradingAgent(Agent):
             order.get("order_intent_id")
         )
         order_submitted = bool(order.get("external_order_submission_performed")) or (
-            order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
+            order_status in {"SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED"}
         )
-        trade_executed = order_filled or order_status == "SIGNED_TESTNET_ORDER_SUBMITTED"
+        trade_executed = order_filled or order_status in {
+            "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
+        }
 
-        # 3. Open a canonical paper position from a freshly filled entry (only if
-        #    none is open — the gate's max_open_positions already enforces this).
+        # 3. Open a canonical position from a freshly filled entry (only if none
+        #    is open — the gate's max_open_positions already enforces this).
+        #    Paper opens from the simulated fill; live opens from the REAL fill
+        #    via its kernel (which requires a RECONCILED entry).
         opened = None
         if is_paper and order_filled and not has_open_position(cfg):
             opened = open_from_execution(
@@ -224,10 +292,27 @@ class TradingAgent(Agent):
                 cycle_id=cycle_id,
                 cfg=cfg,
             )
+        elif is_live and externally_submitted:
+            from crypto_ai_system.execution.live_position_kernel import (
+                has_open_live_position,
+                open_from_live_execution,
+            )
 
-        # Paper position lifecycle now flows through the kernel, not Path A.
+            if not has_open_live_position(cfg):
+                opened = open_from_live_execution(
+                    order,
+                    reconciliation if isinstance(reconciliation, dict) else {},
+                    cycle_id=cycle_id,
+                    cfg=cfg,
+                )
+
+        # Position lifecycle flows through the kernels, not Path A. A live close
+        # counts only when it actually CLOSED (a failed close stays open).
         position_opened = opened is not None
-        position_closed = settlement is not None
+        if is_live:
+            position_closed = isinstance(settlement, dict) and settlement.get("status") == "CLOSED"
+        else:
+            position_closed = settlement is not None
 
         outputs = {
             "execution_stage": execution_stage,

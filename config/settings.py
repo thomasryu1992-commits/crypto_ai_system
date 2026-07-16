@@ -214,6 +214,34 @@ LIVE_CANARY_MAX_ORDER_NOTIONAL_USDT = env_float("LIVE_CANARY_MAX_ORDER_NOTIONAL_
 LIVE_CANARY_ABSOLUTE_MAX_NOTIONAL_USDT = env_float("LIVE_CANARY_ABSOLUTE_MAX_NOTIONAL_USDT", 200.0)
 LIVE_CANARY_MAX_DAILY_ORDER_COUNT = env_int("LIVE_CANARY_MAX_DAILY_ORDER_COUNT", 1)
 
+# ---------------------------------------------------------------------------
+# Live strategy trading (autonomous, real money). Every flag here is fail-closed:
+# with no env overrides the live-strategy path cannot sign or submit anything, and
+# the daily-loss circuit breaker / kill switch halt the autonomous loop. This is a
+# separate, stricter boundary than the live canary. See execution/live_pnl_ledger.py
+# (L1) for how realized live P&L feeds the daily-loss limit.
+LIVE_STRATEGY_ORDER_ENABLED = env_bool("LIVE_STRATEGY_ORDER_ENABLED", False)
+LIVE_STRATEGY_PLACE_ORDER_ENABLED = env_bool("LIVE_STRATEGY_PLACE_ORDER_ENABLED", False)
+LIVE_STRATEGY_MANUAL_KILL_SWITCH = env_bool("LIVE_STRATEGY_MANUAL_KILL_SWITCH", False)
+LIVE_STRATEGY_CONFIRMATION = env_str("LIVE_STRATEGY_CONFIRMATION", "")
+LIVE_STRATEGY_CONFIRMATION_PHRASE = env_str(
+    "LIVE_STRATEGY_CONFIRMATION_PHRASE", "I_UNDERSTAND_THIS_TRADES_LIVE_FUNDS_AUTONOMOUSLY"
+)
+LIVE_STRATEGY_API_KEY = env_str("LIVE_STRATEGY_API_KEY", "")
+LIVE_STRATEGY_API_SECRET = env_str("LIVE_STRATEGY_API_SECRET", "")
+LIVE_STRATEGY_BASE_URL = env_str("LIVE_STRATEGY_BASE_URL", "https://fapi.binance.com")
+LIVE_STRATEGY_MAX_ORDER_NOTIONAL_USDT = env_float("LIVE_STRATEGY_MAX_ORDER_NOTIONAL_USDT", 0.0)
+LIVE_STRATEGY_ABSOLUTE_MAX_NOTIONAL_USDT = env_float("LIVE_STRATEGY_ABSOLUTE_MAX_NOTIONAL_USDT", 200.0)
+LIVE_STRATEGY_MAX_DAILY_ORDER_COUNT = env_int("LIVE_STRATEGY_MAX_DAILY_ORDER_COUNT", 0)
+LIVE_STRATEGY_MAX_OPEN_NOTIONAL_USDT = env_float("LIVE_STRATEGY_MAX_OPEN_NOTIONAL_USDT", 0.0)
+# Daily realized-loss circuit breaker (USDT, positive number). When today's live
+# realized loss reaches this, the gate blocks and the autonomous loop halts. A
+# value of 0 means "not configured" and is treated as fail-closed (blocks live).
+LIVE_STRATEGY_DAILY_LOSS_LIMIT_USDT = env_float("LIVE_STRATEGY_DAILY_LOSS_LIMIT_USDT", 0.0)
+# Promotion gate: minimum clean, fully reconciled live-canary orders required
+# before autonomous live strategy trading may be enabled.
+LIVE_STRATEGY_MIN_CLEAN_CANARY_ORDERS = env_int("LIVE_STRATEGY_MIN_CLEAN_CANARY_ORDERS", 3)
+
 LIVE_SHADOW_MODE = env_bool("LIVE_SHADOW_MODE", True)
 SLIPPAGE_ASSUMPTION_BPS = env_float("SLIPPAGE_ASSUMPTION_BPS", 8.0)
 FEE_ASSUMPTION_BPS = env_float("FEE_ASSUMPTION_BPS", 4.0)
@@ -229,6 +257,10 @@ STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH = STORAGE_DIR / "registries" / "strate
 STRATEGY_LIFECYCLE_REGISTRY_PATH = STORAGE_DIR / "registries" / "strategy_lifecycle_registry.jsonl"
 STRATEGY_ACTIVE_REGISTRY_PATH = STORAGE_DIR / "registries" / "active_strategy_registry.jsonl"
 STRATEGY_FACTORY_STATE_PATH = LATEST_DIR / "strategy_factory_state.json"
+# Live strategy trading (L1): realized live P&L ledger + derived live risk status.
+LIVE_OUTCOME_REGISTRY_PATH = STORAGE_DIR / "registries" / "live_outcome_registry.jsonl"
+LIVE_CANARY_ORDER_REGISTRY_PATH = STORAGE_DIR / "registries" / "live_canary_order_registry.jsonl"
+LIVE_RISK_STATUS_PATH = LATEST_DIR / "live_risk_status.json"
 STRATEGY_CANDIDATE_REGISTRY_PATH = STORAGE_DIR / "registries" / "strategy_candidate_registry.jsonl"
 RESEARCH_RESULT_PATH = LATEST_DIR / "research_cycle_result.json"
 RESEARCH_SIGNAL_PATH = LATEST_DIR / "research_signal.json"
