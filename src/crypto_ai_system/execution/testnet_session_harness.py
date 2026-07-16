@@ -85,6 +85,10 @@ def _leg_metrics(order_result: dict, reconciliation: dict, expected_price: float
         "order_status": order_result.get("status"),
         "exchange_order_id": order_result.get("exchange_order_id"),
         "reconcile_status": (reconciliation or {}).get("status"),
+        # Surface WHY a leg failed to reconcile (e.g. a residual position makes the
+        # filled qty not match the position size) so the report is self-diagnosing.
+        "mismatches": (reconciliation or {}).get("mismatches"),
+        "position_amt": actual.get("position_amt"),
         "expected_price": expected_price,
         "avg_fill_price": avg_fill,
         "slippage_bps": slippage_bps,

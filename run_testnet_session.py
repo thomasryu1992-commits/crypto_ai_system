@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--notional", type=float, default=None,
                         help="target notional per order (default: the configured cap)")
     parser.add_argument("--symbol", default=None, help="override symbol")
+    parser.add_argument("--force", action="store_true",
+                        help="trade even if the account is not flat (not recommended)")
     args = parser.parse_args(argv)
 
     readiness = check_config_readiness()
@@ -81,6 +83,35 @@ def main(argv: list[str] | None = None) -> int:
 
     symbol = to_binance_symbol(args.symbol or settings.SYMBOL)
     notional = args.notional if args.notional is not None else readiness["notional_cap_usdt"]
+
+    # Refuse to trade on a non-flat account. A residual position makes every open
+    # reconcile as a size mismatch (filled qty != total position), so sessions can
+    # never be clean until the position is closed. Flatten it first (fastest via the
+    # testnet web UI Positions tab, which does not consume the API daily cap).
+    def _position_amt() -> float:
+        adapter = SignedTestnetAdapter(
+            api_key=settings.BINANCE_API_KEY,
+            api_secret=settings.BINANCE_API_SECRET,
+            base_url=settings.BINANCE_TESTNET_BASE_URL,
+        )
+        result = adapter.get_positions(symbol)
+        total = 0.0
+        for pos in (result.get("response") or []):
+            if isinstance(pos, dict) and pos.get("symbol") == symbol:
+                try:
+                    total += float(pos.get("positionAmt") or 0.0)
+                except (TypeError, ValueError):
+                    pass
+        return total
+
+    open_position = _position_amt()
+    if abs(open_position) > 1e-6:
+        print(f"account NOT FLAT: {symbol} position = {open_position}. "
+              f"Close it (testnet web UI Positions -> Market Close) then re-run; "
+              f"a residual position makes every open reconcile as a mismatch.")
+        if not args.force:
+            print("refusing to trade on a dirty account. Pass --force to override.")
+            return 1
 
     public = BinanceFuturesPublicClient(base_url="https://fapi.binance.com")
 
