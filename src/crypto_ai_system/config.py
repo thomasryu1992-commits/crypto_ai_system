@@ -66,7 +66,7 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     root = Path(project_root or Path.cwd()).resolve()
     env_path = root / '.env'
     if env_path.exists():
-        load_dotenv(env_path)
+        load_dotenv(env_path, override=True)
     settings_path = root / 'config' / 'settings.yaml'
     if not settings_path.exists():
         raise FileNotFoundError(f'Missing settings file: {settings_path}')

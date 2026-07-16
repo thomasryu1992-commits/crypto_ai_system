@@ -40,7 +40,7 @@ def _bootstrap() -> None:
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(root / ".env")
+        load_dotenv(root / ".env", override=True)
     except Exception:
         pass
 
