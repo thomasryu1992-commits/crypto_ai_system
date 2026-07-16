@@ -50,8 +50,24 @@ NUMERIC_FEATURES = frozenset(
         # momentum / strength
         "rsi",
         "adx",
+        "macd",
+        "macd_signal",
+        "macd_hist",
+        "roc_4",
+        "roc_12",
+        # bollinger bands
+        "bb_upper",
+        "bb_lower",
+        "bb_width_pct",
+        "bb_width_percentile",
+        "bb_percent_b",
+        # higher-timeframe trend (resampled from the same candles; look-ahead free)
+        "htf_4h_ema_gap_pct",
+        "htf_1d_ema_gap_pct",
+        "htf_alignment_score",
         # volume
         "volume_ma20",
+        "volume_zscore",
         # mark / index basis
         "mark_price",
         "index_price",
@@ -84,12 +100,15 @@ NUMERIC_FEATURES = frozenset(
 
 # Categorical feature columns mapped to their allowed label set. market_regime
 # values come from features.regime.classify_market_regime; mtf_bias from
-# feature_store's multi-timeframe context.
+# feature_store's multi-timeframe context; htf_*_trend from
+# features.higher_timeframe (resampled bars, so backtestable).
 CATEGORICAL_FEATURES: dict[str, frozenset[str]] = {
     "market_regime": frozenset(
         {"TREND_UP", "TREND_DOWN", "RANGE", "HIGH_VOLATILITY", "LOW_VOLATILITY", "UNCLEAR"}
     ),
     "mtf_bias": frozenset({"LONG", "SHORT", "NEUTRAL", "UNKNOWN", "DISABLED"}),
+    "htf_4h_trend": frozenset({"UP", "DOWN", "FLAT"}),
+    "htf_1d_trend": frozenset({"UP", "DOWN", "FLAT"}),
 }
 
 

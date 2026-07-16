@@ -4,7 +4,19 @@ import numpy as np
 import pandas as pd
 
 from crypto_ai_system.config import AppConfig
-from crypto_ai_system.features.indicators import adx, atr, ema, rolling_percentile, rsi, sma
+from crypto_ai_system.features.higher_timeframe import add_higher_timeframe_features
+from crypto_ai_system.features.indicators import (
+    adx,
+    atr,
+    bollinger,
+    ema,
+    macd,
+    roc,
+    rolling_percentile,
+    rsi,
+    sma,
+    zscore,
+)
 from crypto_ai_system.features.regime import classify_market_regime
 from crypto_ai_system.data.price_data_loader import build_multi_timeframe_context
 from crypto_ai_system.features.additional_data_features import build_additional_feature_snapshot
@@ -54,6 +66,31 @@ def build_feature_frame(
     df['adx'] = adx(df, adx_period)
     df['volume_ma20'] = sma(df['volume'], 20)
     df['price_distance_ma20'] = (df['close'] - df['ma20']) / df['ma20']
+
+    # Candle-derived indicators: no feed, so they carry real values wherever the
+    # candles do (backtest and live alike). Warm-up stays NaN = indeterminate.
+    macd_line, macd_signal, macd_hist = macd(
+        df['close'],
+        int(cfg.get('features.macd_fast', 12)),
+        int(cfg.get('features.macd_slow', 26)),
+        int(cfg.get('features.macd_signal', 9)),
+    )
+    df['macd'] = macd_line
+    df['macd_signal'] = macd_signal
+    df['macd_hist'] = macd_hist
+
+    bb_period = int(cfg.get('features.bb_period', 20))
+    bb_std = float(cfg.get('features.bb_std', 2.0))
+    bb_upper, bb_lower, bb_width, bb_pct_b = bollinger(df['close'], bb_period, bb_std)
+    df['bb_upper'] = bb_upper
+    df['bb_lower'] = bb_lower
+    df['bb_width_pct'] = bb_width
+    df['bb_percent_b'] = bb_pct_b
+    df['bb_width_percentile'] = rolling_percentile(df['bb_width_pct'], atr_pct_window)
+
+    df['roc_4'] = roc(df['close'], int(cfg.get('features.roc_fast', 4)))
+    df['roc_12'] = roc(df['close'], int(cfg.get('features.roc_slow', 12)))
+    df['volume_zscore'] = zscore(df['volume'], int(cfg.get('features.volume_z_window', 20)))
 
     df = _merge_close_feature(df, mark, 'mark_price')
     df = _merge_close_feature(df, index, 'index_price')
@@ -114,6 +151,11 @@ def build_feature_frame(
         df['mtf_alignment_score'] = 0.0
         df['mtf_bias'] = 'DISABLED'
         df['mtf_available'] = False
+
+    # Backtestable higher-timeframe trend, resampled from these same candles.
+    # Unlike the mtf_* block above (a live scalar broadcast to every row) this is
+    # per-row and look-ahead free, so it runs unconditionally — in the factory too.
+    df = add_higher_timeframe_features(df, cfg)
 
     additional_snapshot = {}
     if isinstance(orderbook, dict):

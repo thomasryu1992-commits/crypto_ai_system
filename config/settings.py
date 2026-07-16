@@ -110,6 +110,10 @@ TELEGRAM_CHAT_ID = env_str("TELEGRAM_CHAT_ID", "")
 
 # Data health
 MAX_STALE_DATA_MINUTES = env_int("MAX_STALE_DATA_MINUTES", 180)
+# One kline call regardless of size (venue max 1500). 500 1h candles is what the
+# 1d higher-timeframe EMA needs to warm up (~10 daily bars); dropping below that
+# leaves htf_1d_* NaN and any strategy referencing it unable to fire.
+CANDLE_FETCH_LIMIT = env_int("CANDLE_FETCH_LIMIT", 500)
 MIN_CANDLE_COUNT = env_int("MIN_CANDLE_COUNT", 50)
 EXPECTED_CANDLE_INTERVAL_MINUTES = env_int("EXPECTED_CANDLE_INTERVAL_MINUTES", 60)
 MAX_ALLOWED_CANDLE_GAP_MULTIPLE = env_float("MAX_ALLOWED_CANDLE_GAP_MULTIPLE", 1.5)

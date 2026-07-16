@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from config.settings import (
     BINANCE_FUTURES_PUBLIC_BASE_URL,
+    CANDLE_FETCH_LIMIT,
     COINALYZE_API_KEY,
     COINALYZE_ENABLED,
     MARKET_DATA_PATH,
@@ -72,7 +73,7 @@ def collect_market_data() -> dict:
             from collectors.real_market_data import collect_real_market_data
 
             real = collect_real_market_data(
-                SYMBOL, TIMEFRAME, base_url=BINANCE_FUTURES_PUBLIC_BASE_URL
+                SYMBOL, TIMEFRAME, base_url=BINANCE_FUTURES_PUBLIC_BASE_URL, limit=CANDLE_FETCH_LIMIT
             )
             real["created_at"] = utc_now_iso()
             payload = real
