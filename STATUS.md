@@ -179,7 +179,7 @@ Roadmap S1–S11:
 | Phase | Scope | State |
 |---|---|---|
 | S1 | Strategy contract foundation: `StrategySpec`, status model, rule hash, allowed-feature registry, candidate registry | ✅ done (`src/crypto_ai_system/strategy_factory/`) |
-| S2 | Generation batches (4 specs/gen) from template + parameter mutation | ✅ done (`strategy_generator_agent`, `strategy_template_library`) |
+| S2 | Generation batches (4 specs/gen) from template + parameter mutation | ✅ done — 6 templates spanning long/short × trend/breakout/range (`strategy_template_library`) |
 | S3 | Validation agent (feature-exists / look-ahead / stop-loss / ranges) | ✅ done (`strategy_validator_agent`) |
 | S4 | Unified backtest engine (cost + slippage + walk-forward + regime split) — critical path, split S4a–S4e | ✅ done (`backtesting/`) |
 | ├ S4a | Spec evaluator (feature row → entry match/direction; shared with S7) | ✅ done (`strategy_evaluator`) |
@@ -265,6 +265,17 @@ paper fill → position (carrying `strategy_id`) → settle → attributed outco
 S9 aggregation. This run surfaced and fixed a real gap — the strategy decision now
 carries the `decision_id` / `research_signal_id` / `profile_id` lineage the paper
 engine requires (it rejected the intent without them).
+
+### Multi-regime template library
+The template library spans the three regimes in both directions — trend
+(`trend_pullback` / `trend_pullback_short`), breakout (`breakout` /
+`breakdown_short`), and range (`mean_reversion` / `mean_reversion_short`) — all on
+real `feature_store` columns (breakout is now price-based, no derivatives feed
+needed). The backtest decides what qualifies per market: on real BTC uptrend
+history only `trend_pullback` (long) qualifies, while on a downtrend the two short
+families qualify — so the pool adapts to market direction as the factory runs.
+A strategy still trades only when the common research permission allows its
+direction (§2.2), so range/counter-trend entries also depend on that gate.
 
 ## History
 
