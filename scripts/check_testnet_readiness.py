@@ -21,7 +21,7 @@ for _p in (str(ROOT / "src"), str(ROOT)):
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT / ".env", override=True)
 except Exception:
     pass
 
