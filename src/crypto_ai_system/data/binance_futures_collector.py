@@ -9,6 +9,9 @@ import requests
 
 from crypto_ai_system.config import AppConfig
 
+# Venue cap on rows per /fapi/v1/klines call; deeper history must be paged.
+PUBLIC_KLINE_PAGE_LIMIT = 1500
+
 
 def _utc_now_iso() -> str:
     return pd.Timestamp.utcnow().strftime('%Y-%m-%d %H:%M:%S+00:00')
@@ -187,12 +190,12 @@ class BinanceFuturesPublicClient:
             'source': 'binance_futures_public',
         }])
 
-    def klines(self, symbol: str, interval: str, limit: int) -> pd.DataFrame:
-        payload = self._get('/fapi/v1/klines', {'symbol': symbol, 'interval': interval, 'limit': limit})
+    def _kline_rows(self, payload: Any, symbol: str, interval: str) -> list[dict[str, Any]]:
         rows = []
         for item in payload or []:
             rows.append({
                 'timestamp': _to_timestamp(item[0]),
+                'open_time_ms': int(item[0]),
                 'symbol': symbol,
                 'exchange': 'binance_futures',
                 'exchange_market': symbol,
@@ -204,7 +207,60 @@ class BinanceFuturesPublicClient:
                 'volume': _number(item[5], 0.0),
                 'source': 'binance_futures_public',
             })
-        return pd.DataFrame(rows)
+        return rows
+
+    def klines(self, symbol: str, interval: str, limit: int) -> pd.DataFrame:
+        payload = self._get('/fapi/v1/klines', {'symbol': symbol, 'interval': interval, 'limit': limit})
+        frame = pd.DataFrame(self._kline_rows(payload, symbol, interval))
+        return frame.drop(columns=['open_time_ms'], errors='ignore')
+
+    def klines_history(
+        self, symbol: str, interval: str, bars: int, *, page_limit: int = PUBLIC_KLINE_PAGE_LIMIT
+    ) -> pd.DataFrame:
+        """Fetch up to ``bars`` klines, paging backward past the per-call cap.
+
+        One /fapi/v1/klines call returns at most 1500 rows, which is only ~2
+        months of 1h candles — far too few for a strategy to clear a meaningful
+        trade-count gate. Each page walks ``endTime`` to just before the oldest
+        row seen so far, so no interval arithmetic is needed and gaps in the
+        venue's history cannot desynchronise the paging.
+
+        Stops early when the venue runs out of history, and refuses to loop if a
+        page fails to move backward. The returned frame is de-duplicated and
+        oldest-first, matching ``klines``.
+        """
+        collected: list[dict[str, Any]] = []
+        end_time: int | None = None
+        oldest_seen: int | None = None
+
+        while len(collected) < bars:
+            params: dict[str, Any] = {
+                'symbol': symbol,
+                'interval': interval,
+                'limit': min(page_limit, bars - len(collected)),
+            }
+            if end_time is not None:
+                params['endTime'] = end_time
+            payload = self._get('/fapi/v1/klines', params)
+            rows = self._kline_rows(payload, symbol, interval)
+            if not rows:
+                break
+
+            collected.extend(rows)
+            page_oldest = min(int(r['open_time_ms']) for r in rows)
+            if oldest_seen is not None and page_oldest >= oldest_seen:
+                break  # no backward progress; stop rather than spin
+            oldest_seen = page_oldest
+            end_time = page_oldest - 1
+
+            if len(rows) < params['limit']:
+                break  # venue exhausted its history
+
+        if not collected:
+            return pd.DataFrame()
+        frame = pd.DataFrame(collected)
+        frame = frame.drop_duplicates(subset='open_time_ms').sort_values('open_time_ms')
+        return frame.drop(columns=['open_time_ms']).reset_index(drop=True)
 
 
 def collect_binance_futures_public(cfg: AppConfig) -> BinanceFuturesCollectorResult:
