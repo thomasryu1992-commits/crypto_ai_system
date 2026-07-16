@@ -186,6 +186,34 @@ LIVE_BINANCE_FUTURES_BASE_URL = env_str("LIVE_BINANCE_FUTURES_BASE_URL", "https:
 LIVE_BINANCE_SPOT_BASE_URL = env_str("LIVE_BINANCE_SPOT_BASE_URL", "https://api.binance.com")
 LIVE_CANARY_MIN_CLEAN_TESTNET_SESSIONS = env_int("LIVE_CANARY_MIN_CLEAN_TESTNET_SESSIONS", 5)
 
+# Live canary ORDER boundary (a single, tiny, real mainnet order after the
+# read-only preparation gate is READY). Every flag here is fail-closed: with no
+# env overrides the canary cannot sign or submit anything. This is a separate
+# approval + runtime boundary from the pipeline (which still refuses live) and
+# from the signed-testnet path (different keys, different confirmation phrase,
+# mainnet host allowlist). The first real submission is the operator's manual
+# action via run_live_canary_order.py --confirm.
+LIVE_CANARY_ENABLED = env_bool("LIVE_CANARY_ENABLED", False)
+LIVE_CANARY_PLACE_ORDER_ENABLED = env_bool("LIVE_CANARY_PLACE_ORDER_ENABLED", False)
+LIVE_CANARY_MANUAL_APPROVAL_REQUIRED = env_bool("LIVE_CANARY_MANUAL_APPROVAL_REQUIRED", True)
+LIVE_CANARY_MANUAL_KILL_SWITCH = env_bool("LIVE_CANARY_MANUAL_KILL_SWITCH", False)
+# Distinct from the testnet phrase so a testnet confirmation can never authorize
+# a live mainnet order.
+LIVE_CANARY_CONFIRMATION = env_str("LIVE_CANARY_CONFIRMATION", "")
+LIVE_CANARY_CONFIRMATION_PHRASE = env_str(
+    "LIVE_CANARY_CONFIRMATION_PHRASE", "I_UNDERSTAND_THIS_PLACES_A_REAL_LIVE_MAINNET_ORDER"
+)
+# Separate order-capable key, kept distinct from the read-only probe key
+# (LIVE_BINANCE_API_KEY) so the probe key never needs order permission.
+LIVE_CANARY_API_KEY = env_str("LIVE_CANARY_API_KEY", "")
+LIVE_CANARY_API_SECRET = env_str("LIVE_CANARY_API_SECRET", "")
+LIVE_CANARY_BASE_URL = env_str("LIVE_CANARY_BASE_URL", "https://fapi.binance.com")
+# Configurable cap the operator sets consciously; the absolute ceiling below is a
+# hard bound the configurable cap can never exceed (extra live-money guard).
+LIVE_CANARY_MAX_ORDER_NOTIONAL_USDT = env_float("LIVE_CANARY_MAX_ORDER_NOTIONAL_USDT", 5.0)
+LIVE_CANARY_ABSOLUTE_MAX_NOTIONAL_USDT = env_float("LIVE_CANARY_ABSOLUTE_MAX_NOTIONAL_USDT", 200.0)
+LIVE_CANARY_MAX_DAILY_ORDER_COUNT = env_int("LIVE_CANARY_MAX_DAILY_ORDER_COUNT", 1)
+
 LIVE_SHADOW_MODE = env_bool("LIVE_SHADOW_MODE", True)
 SLIPPAGE_ASSUMPTION_BPS = env_float("SLIPPAGE_ASSUMPTION_BPS", 8.0)
 FEE_ASSUMPTION_BPS = env_float("FEE_ASSUMPTION_BPS", 4.0)

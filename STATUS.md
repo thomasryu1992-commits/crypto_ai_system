@@ -86,8 +86,9 @@ py scripts/reset_paper_outcomes.py --confirm  # back up + clear (reversible)
 | Paper execution | ✅ works |
 | Signed-testnet adapter | ✅ verified — one order submitted and FILLED on testnet (2026-07-15), reconciled with zero mismatches |
 | Testnet reconciliation | ✅ verified — RECONCILED against a real testnet fill (order/position/balance matched intent) |
-| Live order path | ❌ not implemented; trading agent refuses it |
-| Live/testnet flags | 🔒 all False by default (fail-closed) |
+| Live canary order boundary | ✅ implemented (`run_live_canary_order.py` + guard/adapter/reconcile), fail-closed; **not yet run** — awaits operator evidence (needs a live mainnet order) |
+| Live (full) order path | ❌ not implemented; trading agent refuses it |
+| Live/testnet/canary flags | 🔒 all False by default (fail-closed; guarded by `check_safety_defaults.py`) |
 
 ## Path to live (3 gates, not 15 phases)
 
@@ -106,7 +107,8 @@ hot-path risk gate) is enforced in code, not in evidence artifacts.
 4. ✅ Testnet reconciliation implemented + verified (first order RECONCILED on testnet).
 5. ✅ Repeated-session harness (Phase 10) — `run_testnet_session.py` runs N open/close cycles with fill/slippage/latency/cost stats. **Operator step**: run several sessions (raise the daily cap) to confirm stability.
 6. ✅ Live canary preparation gate implemented (`scripts/check_live_canary_readiness.py`) — requires ≥5 clean testnet sessions plus a live **read-only** probe (key restrictions, balance, symbol filters, commission). GET-only by construction; grants no order authority. **Operator step**: run enough clean sessions, create a live read-only key (no withdrawals/transfers), then run the check with `--probe`.
-7. Live canary one-order boundary (separate approval + runtime, after step 6 is READY).
+7. ✅ Live canary one-order boundary implemented — `run_live_canary_order.py` (a standalone runner, **not** wired into the pipeline) with its own final guard (`execution/live_canary_final_guard.py`), signed mainnet adapter (`execution/live_canary_adapter.py`, `fapi.binance.com` allowlist), and reconciliation. Fail-closed: separate order-capable key (`LIVE_CANARY_API_KEY`), a **distinct** confirmation phrase from testnet, a hard notional cap bounded by an absolute ceiling, a single-order daily cap, a manual kill switch, and it refuses to sign unless `live_canary_preparation.json` is READY (step 6). **Operator step**: once step 6 is READY, set the canary env and run `py run_live_canary_order.py --confirm` to place ONE real order and reconcile it. Claude does not run this or handle real keys.
+8. Live (full) promotion — after repeated clean canary orders, a live stage flag + checklist + manual approval; re-verify kill switch / notional cap / daily-loss limit at live scale.
 
 ### Enabling the signed-testnet path (operator, on a testnet account only)
 Create Binance USD-M **Futures testnet** API keys at
@@ -163,6 +165,31 @@ the probe fails closed if the key allows withdrawals or transfers. The written
 report (`storage/latest/live_canary_preparation.json`) is evidence only — every
 order-authority flag in it is hardcoded false, and the live canary order itself
 remains a separate approval and runtime boundary.
+
+### Live canary order (operator — places ONE real mainnet order)
+Only after the preparation report is READY. This is a separate boundary from the
+pipeline (which still refuses live) and uses a **different** key and confirmation
+phrase than testnet, so nothing about the testnet path can authorize it.
+```
+py run_live_canary_order.py             # dry preflight: shows the guard verdict, no order
+py run_live_canary_order.py --confirm   # place ONE real order + reconcile
+```
+All fail-closed; every one of these must be set (any missing one blocks):
+```
+LIVE_CANARY_ENABLED=true
+LIVE_CANARY_PLACE_ORDER_ENABLED=true
+LIVE_CANARY_CONFIRMATION=I_UNDERSTAND_THIS_PLACES_A_REAL_LIVE_MAINNET_ORDER
+LIVE_CANARY_API_KEY=<order-capable live key, no withdraw/transfer>
+LIVE_CANARY_API_SECRET=<...>
+LIVE_CANARY_MAX_ORDER_NOTIONAL_USDT=150   # BTCUSDT min notional ~100; <= absolute ceiling 200
+```
+The final guard (`execution/live_canary_final_guard.py`) re-checks all of this
+before signing: enable flags, the distinct confirmation, the kill switch
+(`LIVE_CANARY_MANUAL_KILL_SWITCH`), a mainnet-host allowlist, the configured cap
+bounded by `LIVE_CANARY_ABSOLUTE_MAX_NOTIONAL_USDT` (200), a single-order daily
+cap (`LIVE_CANARY_MAX_DAILY_ORDER_COUNT`, default 1), and that
+`live_canary_preparation.json` is READY. Use a **separate** order-capable key
+from the read-only probe key. Claude does not run this or handle real keys.
 
 ## Strategy Factory (continuous strategy production → selection → retirement)
 
