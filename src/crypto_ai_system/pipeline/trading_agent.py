@@ -195,11 +195,16 @@ class TradingAgent(Agent):
             ):
                 self._record_strategy_outcome(open_before, settlement, ctx)
         elif is_live:
+            from crypto_ai_system.execution.live_pnl_ledger import live_risk_snapshot
             from crypto_ai_system.execution.live_position_kernel import (
                 load_open_live_position,
                 settle_open_live_position,
             )
 
+            # Persist today's realized live P&L + breaker state each cycle so the
+            # operator (and dashboard) can watch it and the daily-loss circuit
+            # breaker's input is fresh.
+            live_risk_snapshot()
             open_before = load_open_live_position(cfg)
             settlement = settle_open_live_position(
                 _latest_candle(),

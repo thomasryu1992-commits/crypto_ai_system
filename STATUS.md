@@ -144,6 +144,64 @@ Plus `STRATEGY_FACTORY_ROUTING_ENABLED` + `STRATEGY_FACTORY_ROUTING_DRIVE_ENABLE
 positions still close). The daily-loss breaker halts entries for the day once
 today's realized live loss reaches the limit.
 
+### Operator go-live checklist (real money — do NOT skip a step)
+
+Work top to bottom on ONE machine (evidence lives in gitignored `storage/`). The
+code is done and fail-closed; this is entirely operator judgement + real keys.
+Claude does not run these or handle real secrets.
+
+**Gate 0 — Earn confidence in the strategies (before any live money)**
+- [ ] Paper on real data shows **positive expectancy** over a sustained window —
+      `py scripts/paper_performance_summary.py` (don't go live on a negative edge).
+- [ ] The active pool is populated with champions you trust —
+      `py run_strategy_factory.py --status`.
+- [ ] Testnet drive sanity: run the pipeline with routing+drive on testnet-scale
+      and confirm strategy entries reconcile cleanly.
+
+**Gate 1 — Preparation is READY** (from the canary section above)
+- [ ] `py scripts/check_live_canary_readiness.py --probe` → `preparation READY`
+      (≥5 clean testnet sessions + a live read-only probe).
+
+**Gate 2 — Promotion evidence: ≥3 clean live-canary orders**
+- [ ] Place canary orders until 3 are clean (each reconciled canary is
+      auto-recorded): `py run_live_canary_order.py --confirm` (daily cap 1, so
+      across ≥3 days or raise `LIVE_CANARY_MAX_DAILY_ORDER_COUNT`). **Close each
+      canary position on the venue** afterwards — canaries only open.
+- [ ] Verify the count: the `live_canary_order_registry` holds ≥3 `clean: true`
+      rows (or just proceed — the final guard blocks if short).
+
+**Gate 3 — Configure the live-strategy boundary (conservative first)**
+- [ ] Create a SEPARATE order-capable live key: enable Futures, **disable
+      withdrawals + internal transfer**, ideally IP-whitelisted. Keep it distinct
+      from the read-only probe key and the canary key.
+- [ ] Set the full `LIVE_STRATEGY_*` env (above). Start SMALL:
+      `MAX_ORDER_NOTIONAL_USDT` near the venue minimum (~65), `MAX_DAILY_ORDER_COUNT=1`,
+      `MAX_OPEN_NOTIONAL_USDT` = one position, `DAILY_LOSS_LIMIT_USDT` low (e.g. 20).
+- [ ] Enable `STRATEGY_FACTORY_ROUTING_ENABLED` + `STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED`.
+
+**Gate 4 — Dry-verify the gate before any autonomous run**
+- [ ] `py scripts/check_safety_defaults.py` now FAILS (expected — you enabled live).
+- [ ] Run ONE pipeline cycle and confirm the trading stage resolves to `live`
+      (not a refusal): `py run_pipeline.py` — a refusal message means a missing
+      piece; fix it before continuing.
+
+**Gate 5 — First supervised live cycles**
+- [ ] Run the scheduler and **watch the first entries/closes live** —
+      `py run_scheduler.py --interval 900` (or `--once` a few times). Confirm each
+      live entry reconciles and the position closes on SL/TP/time.
+- [ ] Watch `storage/latest/live_risk_status.json` (today's realized P&L) and the
+      dashboard; confirm the daily-loss breaker and open-exposure cap behave.
+
+**Standing controls (know these cold before you start)**
+- **Stop new entries now:** set `LIVE_STRATEGY_MANUAL_KILL_SWITCH=true` (open
+  positions keep closing) — or unset any `LIVE_STRATEGY_*` flag.
+- **Daily-loss breaker:** entries halt for the UTC day once realized live loss
+  reaches `LIVE_STRATEGY_DAILY_LOSS_LIMIT_USDT`; resumes next UTC day.
+- **A stuck position** (close blocked/unconfirmed) stays OPEN and is retried each
+  cycle — you can always flatten manually on the venue; that never depends on
+  this code.
+- Raise caps only after several clean, profitable live days.
+
 ### Enabling the signed-testnet path (operator, on a testnet account only)
 Create Binance USD-M **Futures testnet** API keys at
 https://testnet.binancefuture.com. All of these must be set — any one missing
