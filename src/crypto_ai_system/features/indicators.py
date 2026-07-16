@@ -50,6 +50,44 @@ def adx(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return dx.rolling(period, min_periods=period).mean()
 
 
+def macd(
+    close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """MACD line, signal line, histogram. NaN until the slow EMA has warmed up."""
+    macd_line = ema(close, fast) - ema(close, slow)
+    signal_line = macd_line.ewm(span=signal, adjust=False, min_periods=signal).mean()
+    return macd_line, signal_line, macd_line - signal_line
+
+
+def bollinger(
+    close: pd.Series, period: int = 20, num_std: float = 2.0
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+    """Upper, lower, width (% of mid), and %B (position within the band).
+
+    %B is 1.0 at the upper band and 0.0 at the lower; a zero-width band leaves it
+    NaN rather than dividing by zero, so a flat series stays indeterminate.
+    """
+    mid = sma(close, period)
+    std = close.rolling(period, min_periods=period).std()
+    upper = mid + num_std * std
+    lower = mid - num_std * std
+    width_pct = (upper - lower) / mid.replace(0, np.nan)
+    percent_b = (close - lower) / (upper - lower).replace(0, np.nan)
+    return upper, lower, width_pct, percent_b
+
+
+def roc(close: pd.Series, period: int) -> pd.Series:
+    """Rate of change over ``period`` bars, as a fraction (0.01 == +1%)."""
+    return close.pct_change(period).replace([np.inf, -np.inf], np.nan)
+
+
+def zscore(series: pd.Series, window: int) -> pd.Series:
+    """Rolling z-score. Zero-variance windows stay NaN (indeterminate)."""
+    mean = series.rolling(window, min_periods=window).mean()
+    std = series.rolling(window, min_periods=window).std().replace(0, np.nan)
+    return ((series - mean) / std).replace([np.inf, -np.inf], np.nan)
+
+
 def rolling_percentile(series: pd.Series, window: int = 100) -> pd.Series:
     def pct_rank(x):
         if len(x) == 0:

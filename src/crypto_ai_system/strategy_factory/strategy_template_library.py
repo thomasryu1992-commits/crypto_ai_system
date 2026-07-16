@@ -9,9 +9,11 @@ is doing. Which ones actually qualify is decided by the backtest on real history
 in a long uptrend the long-trend families win and the shorts don't, and the pool
 adapts as conditions change.
 
-Every template references only real ``feature_store`` columns (no derivatives
-feed is assumed), so a mutated instance is evaluable and lands inside the S3
-validator's ranges by design — the validator is still the gate.
+Every template references only ``feature_store`` columns that carry real values at
+runtime — candle-derived indicators (MACD, Bollinger, ROC, volume z-score) and the
+resampled higher-timeframe trend, never a feed the lean runtime does not supply.
+So a mutated instance is evaluable and lands inside the S3 validator's ranges by
+design — the validator is still the gate.
 """
 
 from __future__ import annotations
@@ -107,6 +109,57 @@ def _mean_reversion_short_entry(p: dict) -> list[dict]:
     ]
 
 
+def _macd_momentum_entry(p: dict) -> list[dict]:
+    # MACD above its signal with a positive, strengthening histogram in an uptrend.
+    return [
+        {"feature": "macd_hist", "comparison": ">", "value": 0.0},
+        {"feature": "macd", "comparison": ">", "value_from": "macd_signal"},
+        {"feature": "adx", "comparison": ">=", "value": p["adx_min"]},
+    ]
+
+
+def _macd_momentum_short_entry(p: dict) -> list[dict]:
+    return [
+        {"feature": "macd_hist", "comparison": "<", "value": 0.0},
+        {"feature": "macd", "comparison": "<", "value_from": "macd_signal"},
+        {"feature": "adx", "comparison": ">=", "value": p["adx_min"]},
+    ]
+
+
+def _bollinger_breakout_entry(p: dict) -> list[dict]:
+    # Price pushing the upper band out of a (relatively) tight band — expansion.
+    return [
+        {"feature": "bb_percent_b", "comparison": ">=", "value": p["percent_b_min"]},
+        {"feature": "volume_zscore", "comparison": ">=", "value": p["volume_z_min"]},
+        {"feature": "ma20", "comparison": ">", "value_from": "ma50"},
+    ]
+
+
+def _bollinger_breakdown_short_entry(p: dict) -> list[dict]:
+    return [
+        {"feature": "bb_percent_b", "comparison": "<=", "value": p["percent_b_max"]},
+        {"feature": "volume_zscore", "comparison": ">=", "value": p["volume_z_min"]},
+        {"feature": "ma20", "comparison": "<", "value_from": "ma50"},
+    ]
+
+
+def _htf_trend_follow_entry(p: dict) -> list[dict]:
+    # Base-timeframe pullback taken only when 4h and 1d agree upward.
+    return [
+        {"feature": "htf_alignment_score", "comparison": ">=", "value": p["alignment_min"]},
+        {"feature": "htf_1d_trend", "comparison": "==", "value": "UP"},
+        {"feature": "rsi", "comparison": "<=", "value": p["rsi_max"]},
+    ]
+
+
+def _htf_trend_follow_short_entry(p: dict) -> list[dict]:
+    return [
+        {"feature": "htf_alignment_score", "comparison": "<=", "value": p["alignment_max"]},
+        {"feature": "htf_1d_trend", "comparison": "==", "value": "DOWN"},
+        {"feature": "rsi", "comparison": ">=", "value": p["rsi_min"]},
+    ]
+
+
 _EXIT_PARAMS = {
     "stop_atr": ParamSpec(0.8, 2.0),
     "target_atr": ParamSpec(1.6, 4.0),
@@ -169,10 +222,75 @@ MEAN_REVERSION_SHORT = StrategyTemplate(
     entry_builder=_mean_reversion_short_entry,
 )
 
+MACD_MOMENTUM = StrategyTemplate(
+    family="macd_momentum",
+    direction=Direction.LONG,
+    timeframe="1h",
+    param_space={"adx_min": ParamSpec(15.0, 30.0), **_EXIT_PARAMS},
+    base_params={"adx_min": 20.0, **_EXIT_BASE},
+    entry_builder=_macd_momentum_entry,
+)
+
+MACD_MOMENTUM_SHORT = StrategyTemplate(
+    family="macd_momentum_short",
+    direction=Direction.SHORT,
+    timeframe="1h",
+    param_space={"adx_min": ParamSpec(15.0, 30.0), **_EXIT_PARAMS},
+    base_params={"adx_min": 20.0, **_EXIT_BASE},
+    entry_builder=_macd_momentum_short_entry,
+)
+
+BOLLINGER_BREAKOUT = StrategyTemplate(
+    family="bollinger_breakout",
+    direction=Direction.LONG,
+    timeframe="1h",
+    param_space={
+        "percent_b_min": ParamSpec(0.9, 1.1),
+        "volume_z_min": ParamSpec(0.5, 2.0),
+        **_EXIT_PARAMS,
+    },
+    base_params={"percent_b_min": 1.0, "volume_z_min": 1.0, **_EXIT_BASE},
+    entry_builder=_bollinger_breakout_entry,
+)
+
+BOLLINGER_BREAKDOWN_SHORT = StrategyTemplate(
+    family="bollinger_breakdown_short",
+    direction=Direction.SHORT,
+    timeframe="1h",
+    param_space={
+        "percent_b_max": ParamSpec(-0.1, 0.1),
+        "volume_z_min": ParamSpec(0.5, 2.0),
+        **_EXIT_PARAMS,
+    },
+    base_params={"percent_b_max": 0.0, "volume_z_min": 1.0, **_EXIT_BASE},
+    entry_builder=_bollinger_breakdown_short_entry,
+)
+
+HTF_TREND_FOLLOW = StrategyTemplate(
+    family="htf_trend_follow",
+    direction=Direction.LONG,
+    timeframe="1h",
+    param_space={"alignment_min": ParamSpec(0.5, 1.0), "rsi_max": ParamSpec(45.0, 65.0), **_EXIT_PARAMS},
+    base_params={"alignment_min": 1.0, "rsi_max": 55.0, **_EXIT_BASE},
+    entry_builder=_htf_trend_follow_entry,
+)
+
+HTF_TREND_FOLLOW_SHORT = StrategyTemplate(
+    family="htf_trend_follow_short",
+    direction=Direction.SHORT,
+    timeframe="1h",
+    param_space={"alignment_max": ParamSpec(-1.0, -0.5), "rsi_min": ParamSpec(35.0, 55.0), **_EXIT_PARAMS},
+    base_params={"alignment_max": -1.0, "rsi_min": 45.0, **_EXIT_BASE},
+    entry_builder=_htf_trend_follow_short_entry,
+)
+
 TEMPLATES: dict[str, StrategyTemplate] = {
     t.family: t for t in (
         TREND_PULLBACK, TREND_PULLBACK_SHORT, BREAKOUT, BREAKDOWN_SHORT,
         MEAN_REVERSION, MEAN_REVERSION_SHORT,
+        MACD_MOMENTUM, MACD_MOMENTUM_SHORT,
+        BOLLINGER_BREAKOUT, BOLLINGER_BREAKDOWN_SHORT,
+        HTF_TREND_FOLLOW, HTF_TREND_FOLLOW_SHORT,
     )
 }
 
@@ -181,4 +299,7 @@ TEMPLATES: dict[str, StrategyTemplate] = {
 DEFAULT_TEMPLATE_ORDER = (
     TREND_PULLBACK, TREND_PULLBACK_SHORT, BREAKOUT, BREAKDOWN_SHORT,
     MEAN_REVERSION, MEAN_REVERSION_SHORT,
+    MACD_MOMENTUM, MACD_MOMENTUM_SHORT,
+    BOLLINGER_BREAKOUT, BOLLINGER_BREAKDOWN_SHORT,
+    HTF_TREND_FOLLOW, HTF_TREND_FOLLOW_SHORT,
 )
