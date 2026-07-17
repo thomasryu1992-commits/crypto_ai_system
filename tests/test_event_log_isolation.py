@@ -42,7 +42,12 @@ def test_real_event_log_does_not_grow():
 
 
 def _sources() -> list[Path]:
-    skip = {".git", "__pycache__", "archive", ".venv", "tests"}
+    """Runtime modules only.
+
+    ``scripts/`` is excluded: maintenance tools are hand-run rather than reached
+    through the pipeline paths the suite drives, and they take an explicit
+    --path. ``settings.py`` owns the filename by definition."""
+    skip = {".git", "__pycache__", "archive", ".venv", "tests", "scripts"}
     return [
         path
         for path in ROOT.rglob("*.py")
