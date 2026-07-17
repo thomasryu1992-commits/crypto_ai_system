@@ -133,6 +133,11 @@ MAX_OPEN_POSITIONS = env_int("MAX_OPEN_POSITIONS", 1)
 DAILY_MAX_LOSS_R = env_float(["DAILY_MAX_LOSS_R", "MAX_DAILY_LOSS_R"], -2.0)
 WEEKLY_MAX_LOSS_R = env_float(["WEEKLY_MAX_LOSS_R", "MAX_WEEKLY_LOSS_R"], -5.0)
 MAX_CONSECUTIVE_LOSSES = env_int("MAX_CONSECUTIVE_LOSSES", 3)
+
+# Counterfactual tracking: shadow the trades the gates blocked so an
+# over-conservative gate becomes measurable. Observational only — it opens no
+# position and touches no order path, so it defaults on.
+COUNTERFACTUAL_TRACKING_ENABLED = env_bool("COUNTERFACTUAL_TRACKING_ENABLED", True)
 MAX_DRAWDOWN_PCT = env_float("MAX_DRAWDOWN_PCT", -10.0)
 
 # ATR / execution safety

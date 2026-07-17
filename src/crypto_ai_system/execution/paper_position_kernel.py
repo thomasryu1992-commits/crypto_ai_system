@@ -138,7 +138,7 @@ def open_from_execution(
     return position
 
 
-def _settle(
+def settle_trade_plan(
     position: dict[str, Any],
     candle: Mapping[str, Any] | None,
     last_close: float | None,
@@ -147,7 +147,13 @@ def _settle(
 ) -> tuple[str | None, float | None, float | None]:
     """Return (close_reason, exit_price, result_R) or (None, None, None) if still open.
 
-    Precedence: manual exit -> intrabar SL/TP (pessimistic SL-first) -> time exit."""
+    Precedence: manual exit -> intrabar SL/TP (pessimistic SL-first) -> time exit.
+
+    Public because the counterfactual tracker settles shadow (blocked) trade plans
+    with it: a blocked signal's hypothetical result is only comparable to a real
+    paper outcome if both are produced by this exact math. ``position`` needs only
+    the plan fields (direction/entry_price/stop_loss/take_profit/risk) and is
+    mutated in place to advance ``holding_candles``."""
     direction = position["direction"]
     entry = _f(position["entry_price"])
     sl = _f(position["stop_loss"])
@@ -196,7 +202,7 @@ def settle_open_position(
         return None
 
     max_hold = MAX_HOLD_BARS.get(timeframe, DEFAULT_MAX_HOLD_BARS)
-    reason, exit_price, result_r = _settle(position, candle, last_close, max_hold, manual_exit)
+    reason, exit_price, result_r = settle_trade_plan(position, candle, last_close, max_hold, manual_exit)
     if reason is None:
         position["last_seen_price"] = last_close
         _save_position(cfg, position)

@@ -10,7 +10,12 @@ to run the execution stage.
 from __future__ import annotations
 
 import config.settings as settings
-from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH, TRADE_DECISION_PATH
+from config.settings import (
+    MARKET_DATA_PATH,
+    MARKET_SNAPSHOT_PATH,
+    RESEARCH_SIGNAL_PATH,
+    TRADE_DECISION_PATH,
+)
 
 from bridge.research_trading_bridge import run_research_trading_bridge
 from core.event_log import log_event
@@ -22,6 +27,10 @@ from crypto_ai_system.execution.paper_position_kernel import (
     load_open_position,
     open_from_execution,
     settle_open_position,
+)
+from crypto_ai_system.feedback.counterfactual_tracker import (
+    record_blocked_signal,
+    settle_counterfactuals,
 )
 from crypto_ai_system.execution.reconciler import run_reconciler
 from crypto_ai_system.execution.signed_testnet_reconciliation import (
@@ -156,6 +165,49 @@ class TradingAgent(Agent):
         except Exception:  # noqa: BLE001 - never let the drive path break research
             return None
 
+    def _settle_counterfactuals(self, cfg, snapshot: dict) -> list[dict]:
+        """Advance the shadow book of trades the gates blocked.
+
+        Best-effort: counterfactual bookkeeping is observational, so a failure
+        here must never disturb real execution."""
+        if not _flag("COUNTERFACTUAL_TRACKING_ENABLED", True):
+            return []
+        try:
+            return settle_counterfactuals(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
+            log_event(
+                "counterfactual_settle_failed",
+                {"error": repr(exc)},
+                severity="WARNING",
+            )
+            return []
+
+    def _record_counterfactual(self, cfg, trade_decision: dict, snapshot: dict, cycle_id):
+        """Shadow a signal the system wanted but did not take."""
+        if not _flag("COUNTERFACTUAL_TRACKING_ENABLED", True):
+            return None
+        try:
+            return record_blocked_signal(
+                trade_decision,
+                market_snapshot=snapshot,
+                research_signal=read_json(RESEARCH_SIGNAL_PATH, {}),
+                cycle_id=cycle_id,
+                cfg=cfg,
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
+            log_event(
+                "counterfactual_record_failed",
+                {"error": repr(exc)},
+                severity="WARNING",
+            )
+            return None
+
     def execute(self, ctx: PipelineContext) -> StageResult:
         # Fail-closed stage routing. The executor's final guard is the last
         # gate before anything is signed.
@@ -222,6 +274,11 @@ class TradingAgent(Agent):
             ):
                 self._record_strategy_outcome(open_before, settlement, ctx)
 
+        # 1b. Settle the shadow book on the same candle. These are the trades the
+        #     gates blocked; settling them with the kernel's exit math is what
+        #     makes "the gate cost us 3R" a measurement rather than a guess.
+        counterfactuals_settled = self._settle_counterfactuals(cfg, snapshot)
+
         # 2. Open-position count for the gate (max_open_positions enforced there).
         if is_live:
             from crypto_ai_system.execution.live_position_kernel import has_open_live_position
@@ -285,6 +342,16 @@ class TradingAgent(Agent):
             "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
         }
 
+        # 2b. The signal wanted a trade and did not get one — shadow it, whatever
+        #     stopped it. Recording keys off what actually happened (no trade),
+        #     not off any single gate's verdict, so blocks upstream of the bridge
+        #     are captured too.
+        counterfactual_opened = None
+        if not trade_executed:
+            counterfactual_opened = self._record_counterfactual(
+                cfg, trade_decision, snapshot, cycle_id
+            )
+
         # 3. Open a canonical position from a freshly filled entry (only if none
         #    is open — the gate's max_open_positions already enforces this).
         #    Paper opens from the simulated fill; live opens from the REAL fill
@@ -336,6 +403,10 @@ class TradingAgent(Agent):
             "position_opened": position_opened,
             "position_closed": position_closed,
             "position_settlement": settlement,
+            # What the gates turned away this cycle, and which shadow trades the
+            # candle resolved.
+            "counterfactual_opened": counterfactual_opened,
+            "counterfactuals_settled": counterfactuals_settled,
         }
 
         if not allow_new_position:
