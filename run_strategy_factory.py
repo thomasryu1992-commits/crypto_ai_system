@@ -88,6 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--refresh-history", action="store_true",
                         help="ignore the on-disk history cache and refetch")
     parser.add_argument("--interval", default="1h", help="kline interval when --history is used")
+    parser.add_argument("--symbol", default=None,
+                        help="venue symbol to generate/backtest for (e.g. ETHUSDT). Defaults to "
+                             "the runtime SYMBOL. Requires --history: another symbol's candles "
+                             "never live in the runtime cache. Each symbol is selected on ITS OWN "
+                             "history - transplanting BTC-tuned parameters measured +0.17R on BTC "
+                             "but ~0 on ETH and negative on XRP/ADA.")
     args = parser.parse_args(argv)
 
     pool_file = str(settings.ACTIVE_STRATEGY_POOL_PATH)
@@ -100,17 +106,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"next generation: GEN-{counters['generation_seq']:03d} | next strategy id: S{counters['strategy_seq']:03d}")
         print(f"active pool ({len(occupying_entries(pool))}):")
         for e in pool.get("active_strategies", []):
-            fam = (e.get("strategy_spec") or {}).get("strategy_family")
-            print(f"  {e.get('strategy_id')} [{fam}] {e.get('status')} from {e.get('generation_id')}")
+            spec = e.get("strategy_spec") or {}
+            fam = spec.get("strategy_family")
+            scope = spec.get("symbol_scope") or ["?"]
+            print(f"  {e.get('strategy_id')} [{fam} @ {scope[0]} {spec.get('timeframe')}] "
+                  f"{e.get('status')} from {e.get('generation_id')}")
         return 0
+
+    from collectors.real_market_data import to_binance_symbol
+
+    symbol = to_binance_symbol(args.symbol or getattr(settings, "SYMBOL", "BTC-PERP"))
+    if args.symbol and not (args.history and args.history > 0):
+        print("--symbol requires --history: the runtime candle cache only ever holds "
+              "the runtime symbol, so another symbol must fetch its own history.")
+        return 1
 
     candles: list = []
     if args.history and args.history > 0:
         try:
-            from collectors.real_market_data import to_binance_symbol
             from crypto_ai_system.data.candle_history import load_candle_history
 
-            symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
             candles, source = load_candle_history(
                 symbol,
                 args.interval,
@@ -165,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         registry_file=str(settings.STRATEGY_ACTIVE_REGISTRY_PATH),
         candidate_registry_file=str(settings.STRATEGY_CANDIDATE_REGISTRY_PATH),
         templates=templates,
+        symbol=symbol,
         now=utc_now_iso(),
     )
     if result.get("error"):

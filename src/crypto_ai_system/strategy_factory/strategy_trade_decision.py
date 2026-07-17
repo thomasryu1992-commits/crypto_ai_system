@@ -74,7 +74,18 @@ def build_strategy_trade_decision(
     if router_result.get("status") != STATUS_ENTRY_CANDIDATE or direction not in {"LONG", "SHORT"}:
         reasons.append(BLOCK_NOT_A_CANDIDATE)
 
-    entry = _f(market_snapshot.get("last_close")) or _f(feature_row.get("close"))
+    # The entry must be priced at the STRATEGY's market. The snapshot only knows
+    # the runtime symbol, so its last_close is used only when the decision is for
+    # that same market; otherwise the spec's own feature row (its last closed
+    # bar) is the one honest price available.
+    from collectors.real_market_data import to_binance_symbol
+
+    snapshot_symbol = str(market_snapshot.get("symbol") or "")
+    same_market = not snapshot_symbol or to_binance_symbol(snapshot_symbol) == to_binance_symbol(symbol)
+    if same_market:
+        entry = _f(market_snapshot.get("last_close")) or _f(feature_row.get("close"))
+    else:
+        entry = _f(feature_row.get("close"))
     if entry is None or entry <= 0:
         reasons.append(BLOCK_NO_PRICE)
     atr = _f(feature_row.get("atr"))

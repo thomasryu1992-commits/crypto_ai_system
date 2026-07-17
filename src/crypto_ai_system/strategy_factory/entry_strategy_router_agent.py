@@ -46,6 +46,15 @@ def _routable_entries(pool: Mapping[str, Any]) -> list[dict]:
     ]
 
 
+def feature_row_key(symbol: str, timeframe: str) -> str:
+    """The key ``feature_rows`` is indexed by: one row per (symbol, timeframe)."""
+    return f"{symbol}|{timeframe}"
+
+
+def _spec_symbol(spec: StrategySpec) -> str:
+    return str(spec.symbol_scope[0]) if spec.symbol_scope else ""
+
+
 def route_entries(
     pool: Mapping[str, Any],
     feature_row: Mapping[str, Any],
@@ -55,15 +64,16 @@ def route_entries(
 ) -> dict[str, Any]:
     """Evaluate every routable strategy against its feature row and route an entry.
 
-    ``feature_rows`` maps a spec timeframe to the latest feature row built on that
-    timeframe; a spec whose timeframe has no (or an empty) row is recorded as
-    unevaluable and cannot match — a 1d strategy must never be judged on a 1h row.
-    Without ``feature_rows`` every spec uses ``feature_row`` (single-timeframe
-    pools, the original behavior).
+    ``feature_rows`` maps ``feature_row_key(symbol, timeframe)`` to the latest
+    feature row built on that pair; a spec whose pair has no (or an empty) row is
+    recorded as unevaluable and cannot match — an ETH daily strategy must never be
+    judged on a BTC hourly row. Without ``feature_rows`` every spec uses
+    ``feature_row`` (single-symbol single-timeframe pools, the original behavior).
 
-    Returns a router result carrying the strategy id chain. ``order_candidate_count``
-    is 0 (no match or conflict) or 1 (a single entry candidate, however many
-    strategies agreed).
+    Direction conflicts are per symbol — BTC LONG and ETH SHORT coexist; a LONG
+    and a SHORT on the *same* symbol fail closed, and that symbol's matches are
+    excluded while the rest of the pool still routes. Still one order per cycle:
+    the strongest surviving champion wins.
     """
     entries = _routable_entries(pool)
     evaluations: list[dict[str, Any]] = []
@@ -71,13 +81,17 @@ def route_entries(
 
     for entry in entries:
         spec = StrategySpec.from_dict(entry["strategy_spec"])
-        row = feature_rows.get(spec.timeframe) if feature_rows is not None else feature_row
+        symbol = _spec_symbol(spec)
+        if feature_rows is not None:
+            row = feature_rows.get(feature_row_key(symbol, spec.timeframe))
+        else:
+            row = feature_row
         if not row:
             evaluations.append({
                 "strategy_id": entry.get("strategy_id"),
                 "matched": False,
                 "direction": None,
-                "unevaluable": f"no feature row for timeframe {spec.timeframe}",
+                "unevaluable": f"no feature row for {symbol} {spec.timeframe}",
             })
             continue
         result = evaluate_spec(spec, row)
@@ -85,6 +99,7 @@ def route_entries(
             "strategy_id": entry.get("strategy_id"),
             "matched": result.matched,
             "direction": result.direction,
+            "symbol": symbol,
             "timeframe": spec.timeframe,
         })
         if result.matched:
@@ -92,6 +107,7 @@ def route_entries(
                 "strategy_id": entry.get("strategy_id"),
                 "strategy_rule_hash": entry.get("strategy_rule_hash"),
                 "direction": result.direction,
+                "symbol": symbol,
                 "champion_score": entry.get("champion_score"),
             })
 
@@ -110,26 +126,39 @@ def route_entries(
     if not matches:
         return {**base, "status": STATUS_NO_ENTRY}
 
-    directions = {m["direction"] for m in matches}
-    if len(directions) > 1:
+    # Conflicts are judged within a symbol; a conflicted symbol's matches are
+    # removed rather than blocking every other symbol's honest candidate.
+    by_symbol: dict[str, list[dict[str, Any]]] = {}
+    for m in matches:
+        by_symbol.setdefault(m["symbol"], []).append(m)
+    conflicted = {
+        sym: sorted({m["direction"] for m in group if m["direction"]})
+        for sym, group in by_symbol.items()
+        if len({m["direction"] for m in group}) > 1
+    }
+    survivors = [m for m in matches if m["symbol"] not in conflicted]
+
+    if conflicted and not survivors:
         return {
             **base,
             "status": STATUS_BLOCKED,
             "block_reason": BLOCK_DIRECTION_CONFLICT,
-            "conflicting_directions": sorted(d for d in directions if d),
+            "conflicting_directions": sorted(d for ds in conflicted.values() for d in ds),
+            "conflicted_symbols": sorted(conflicted),
         }
 
-    direction = directions.pop()
     # Primary strategy: strongest champion score, then id for determinism.
     primary = max(
-        matches,
+        survivors,
         key=lambda m: (m["champion_score"] if m["champion_score"] is not None else -math.inf, m["strategy_id"] or ""),
     )
     return {
         **base,
         "status": STATUS_ENTRY_CANDIDATE,
-        "direction": direction,
+        "direction": primary["direction"],
+        "symbol": primary["symbol"],
         "order_candidate_count": 1,  # one order regardless of how many agreed
         "primary_strategy_id": primary["strategy_id"],
         "primary_strategy_rule_hash": primary["strategy_rule_hash"],
+        "conflicted_symbols": sorted(conflicted) if conflicted else [],
     }
