@@ -1,8 +1,15 @@
 @echo off
-REM One strategy-factory generation for Windows Task Scheduler.
-REM Fetches a longer history for a sounder backtest sample, degrading to the
-REM cached candles if the public API is unreachable. Logs to
+REM One strategy-factory generation per symbol for Windows Task Scheduler.
+REM Must match the pool's operating regime or it corrodes it: 1d candles (1h
+REM cost ~0.21R/trade kills every edge), the directive's honest gates (the
+REM shipped CLI defaults are thin-sample), and a cap at least as large as the
+REM standing pool - a smaller cap makes every scheduled champion displace a
+REM current member via cross-symbol score comparison. Logs to
 REM storage\logs\strategy_factory.log.
 cd /d "%~dp0.."
 if not exist "storage\logs" mkdir "storage\logs"
-py run_strategy_factory.py --cycles 1 --history 1500 >> "storage\logs\strategy_factory.log" 2>&1
+for %%S in (BTCUSDT ETHUSDT BNBUSDT DOGEUSDT SOLUSDT) do (
+  py run_strategy_factory.py --symbol %%S --history 2200 --interval 1d --cycles 2 --cap 15 ^
+    --min-trades 100 --min-expectancy 0.1 --min-profit-factor 1.15 ^
+    --min-wf-pass 0.7 --max-drawdown 10.0 --min-stability 0.3 >> "storage\logs\strategy_factory.log" 2>&1
+)
