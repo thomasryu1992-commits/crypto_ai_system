@@ -18,6 +18,7 @@ from crypto_ai_system.feedback.gate_calibration_report import (
     run_gate_calibration_report_latest,
 )
 from crypto_ai_system.feedback.outcome_analytics_v2 import run_outcome_analytics_latest
+from crypto_ai_system.feedback.performance_digest import run_performance_digest_latest
 from crypto_ai_system.feedback.performance_report_generator import (
     run_performance_report_latest,
 )
@@ -75,12 +76,26 @@ class FeedbackAgent(Agent):
             )
             return None
 
+    def _performance_digest(self):
+        """Bucket outcomes by week/month so a decaying edge shows up as a trend
+        instead of being averaged away. Best-effort and review-only."""
+        try:
+            return run_performance_digest_latest()
+        except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
+            log_event(
+                "performance_digest_failed",
+                {"error": repr(exc)},
+                severity="WARNING",
+            )
+            return None
+
     def execute(self, ctx: PipelineContext) -> StageResult:
         outcome = run_outcome_analytics_latest()
         performance = run_performance_report_latest()
         candidate = run_candidate_profile_latest()
         strategy_lifecycle = self._strategy_lifecycle(ctx)
         gate_calibration = self._gate_calibration()
+        digest = self._performance_digest()
 
         return self.ok(
             outcome=outcome,
@@ -88,4 +103,5 @@ class FeedbackAgent(Agent):
             candidate_profile=candidate,
             strategy_lifecycle=strategy_lifecycle,
             gate_calibration=gate_calibration,
+            performance_digest=digest,
         )
