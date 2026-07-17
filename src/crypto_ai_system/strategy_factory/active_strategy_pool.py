@@ -100,8 +100,14 @@ def paper_active_specs(pool: dict) -> list[dict]:
     ]
 
 
-def _make_entry(spec: dict, champion_score: float | None, generation_id: str | None, now: str) -> dict:
-    return {
+def _make_entry(
+    spec: dict,
+    champion_score: float | None,
+    generation_id: str | None,
+    now: str,
+    robustness: dict | None = None,
+) -> dict:
+    entry = {
         "strategy_id": spec["strategy_id"],
         "strategy_rule_hash": spec["strategy_rule_hash"],
         "status": StrategyStatus.PAPER_ACTIVE.value,
@@ -112,6 +118,15 @@ def _make_entry(spec: dict, champion_score: float | None, generation_id: str | N
         "added_at_utc": now,
         "updated_at_utc": now,
     }
+    # The backtest record is not persisted anywhere, so without this the overfitting
+    # verdict would die with the cycle that computed it. An operator reading the
+    # pool needs to know which occupants were only ever provisional.
+    if robustness is not None:
+        entry["robustness_verdict"] = robustness.get("verdict")
+        entry["robustness_score"] = robustness.get("robustness_score")
+        entry["trades_per_parameter"] = robustness.get("trades_per_parameter")
+        entry["robustness_warnings"] = robustness.get("warnings") or []
+    return entry
 
 
 def set_status(pool: dict, strategy_id: str, new_status: StrategyStatus | str, *, now: str | None = None) -> tuple[dict, bool]:
@@ -137,6 +152,7 @@ def add_champion(
     cap: int = DEFAULT_PAPER_CAP,
     min_improvement: float = DEFAULT_MIN_IMPROVEMENT,
     now: str | None = None,
+    robustness: dict | None = None,
 ) -> tuple[dict, dict]:
     """Try to add a champion spec to the paper pool.
 
@@ -159,7 +175,7 @@ def add_champion(
 
     occupying = occupying_entries(pool)
     if len(occupying) < cap:
-        new_pool = {**pool, "active_strategies": _entries(pool) + [_make_entry(spec, champion_score, generation_id, now)]}
+        new_pool = {**pool, "active_strategies": _entries(pool) + [_make_entry(spec, champion_score, generation_id, now, robustness)]}
         return new_pool, {"action": ACTION_ADDED, "strategy_id": strategy_id,
                           "occupied_after": len(occupying) + 1, "cap": cap}
 
@@ -174,7 +190,7 @@ def add_champion(
                       "reason": "pool full and champion not sufficiently better than the weakest occupant"}
 
     displaced_pool, _ = set_status(pool, weakest["strategy_id"], StrategyStatus.SUSPENDED, now=now)
-    new_pool = {**displaced_pool, "active_strategies": _entries(displaced_pool) + [_make_entry(spec, champion_score, generation_id, now)]}
+    new_pool = {**displaced_pool, "active_strategies": _entries(displaced_pool) + [_make_entry(spec, champion_score, generation_id, now, robustness)]}
     return new_pool, {"action": ACTION_REPLACED, "strategy_id": strategy_id,
                       "displaced_strategy_id": weakest["strategy_id"],
                       "displaced_score": weakest_score, "champion_score": champion_score, "cap": cap}

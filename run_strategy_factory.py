@@ -71,6 +71,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-wf-pass", type=float, default=0.5, help="min walk-forward pass rate")
     parser.add_argument("--max-drawdown", type=float, default=12.0, help="max drawdown R")
     parser.add_argument("--min-stability", type=float, default=0.2, help="min temporal stability")
+    parser.add_argument("--min-trades-per-param", type=float, default=None,
+                        help="overfitting gate: min backtest trades per fitted parameter (a spec "
+                             "carries ~4-6). Off by default because short history cannot meet it; "
+                             "~10 is where an estimate starts to mean something. Needs --history.")
+    parser.add_argument("--min-robustness", type=float, default=None,
+                        help="overfitting gate: min robustness score 0..1 (sample per parameter, "
+                             "walk-forward consistency, regime breadth, parsimony, cost survival). "
+                             "Off by default; the score is always reported.")
     parser.add_argument("--history", type=int, default=0,
                         help="use N recent klines from the public futures API instead of the "
                              "cached runtime candles (0 = use cache). Paged past the venue's "
@@ -129,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
         min_trade_count=args.min_trades, min_expectancy_r=args.min_expectancy,
         min_profit_factor=args.min_profit_factor, min_walk_forward_pass_rate=args.min_wf_pass,
         max_drawdown_r=args.max_drawdown, min_temporal_stability=args.min_stability,
+        min_trades_per_parameter=args.min_trades_per_param,
+        min_robustness_score=args.min_robustness,
     )
     # Directive §6.7 wants >=100 backtest trades before a champion is trusted. The
     # shipped default is far lower so the factory can produce anything at all on the
@@ -165,9 +175,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"=== strategy factory: {result['cycles_run']} cycle(s) over {result['bars']} bars{provisional} ===")
     for r in result["reports"]:
         champ = r.get("selected_strategy_id") or "NONE"
-        decision = (r.get("pool_decision") or {}).get("action") if r.get("pool_decision") else "—"
+        decision = (r.get("pool_decision") or {}).get("action") if r.get("pool_decision") else "-"
+        rob = r.get("champion_robustness") or {}
+        verdict = ""
+        if rob:
+            verdict = (f" | robustness {rob['verdict']} {rob['robustness_score']:.2f} "
+                       f"({rob['trades_per_parameter']:.1f} trades/param over {rob['free_parameters']})")
         print(f"  {r['generation_id']} (seed {r['seed']}): {r['qualified_count']}/{r['batch_accepted']} qualified "
-              f"-> champion {champ} [{decision}] | active pool: {r['active_pool_size']}")
+              f"-> champion {champ} [{decision}] | active pool: {r['active_pool_size']}{verdict}")
+        for warning in rob.get("warnings") or []:
+            print(f"      ! {warning}")
     print(f"active pool now ({result['active_pool_size']}):")
     for e in result["active_strategies"]:
         print(f"  {e['strategy_id']} [{e['strategy_family']}] {e['status']} from {e['generation_id']}")

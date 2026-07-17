@@ -81,9 +81,13 @@ def run_factory_cycle(
     new_pool = pool
     pool_decision: dict[str, Any] | None = None
     selected_id = champion.get("selected_strategy_id")
+    champion_robustness: dict[str, Any] | None = None
 
     if selected_id is not None:
         spec = next(s for s in batch["specs"] if s["strategy_id"] == selected_id)
+        champion_robustness = next(
+            (r.get("robustness") for r in records if r["strategy_id"] == selected_id), None
+        )
         family = spec["strategy_family"]
         if family_count(pool, family) >= max_per_family:
             pool_decision = {
@@ -96,6 +100,7 @@ def run_factory_cycle(
             new_pool, pool_decision = add_champion(
                 pool, spec, champion.get("champion_score"),
                 generation_id=generation_id, cap=cap, now=now,
+                robustness=champion_robustness,
             )
 
     new_state = {
@@ -109,6 +114,7 @@ def run_factory_cycle(
         "qualified_count": champion.get("qualified_count", 0),
         "selected_strategy_id": selected_id,
         "champion_score": champion.get("champion_score"),
+        "champion_robustness": champion_robustness,
         "pool_decision": pool_decision,
         "active_pool_size": len(occupying_entries(new_pool)),
         # Every generated candidate spec, for the §10 candidate-registry audit. The

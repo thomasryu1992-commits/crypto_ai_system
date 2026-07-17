@@ -22,6 +22,7 @@ from crypto_ai_system.backtesting.cost_model import CostModel
 from crypto_ai_system.backtesting.execution_simulator import simulate_strategy
 from crypto_ai_system.backtesting.performance_metrics import compute_backtest_metrics
 from crypto_ai_system.backtesting.regime_evaluator import regime_breakdown
+from crypto_ai_system.backtesting.robustness_scorer import score_robustness
 from crypto_ai_system.backtesting.walk_forward import run_walk_forward
 from crypto_ai_system.strategy_factory.strategy_spec import StrategySpec
 from crypto_ai_system.utils.audit import stable_id, utc_now_canonical
@@ -31,7 +32,12 @@ from crypto_ai_system.utils.audit import stable_id, utc_now_canonical
 class AbsoluteGate:
     """Absolute performance thresholds (directive §6.7). A strategy must clear
     all of them to qualify; batch ranking (S5) only chooses among those that do.
-    Defaults follow the directive; callers tune them for smaller samples."""
+    Defaults follow the directive; callers tune them for smaller samples.
+
+    The two robustness thresholds are None (off) by default: the score is always
+    computed and reported, but enforcing it is an opt-in the operator makes once
+    the history is deep enough to clear it honestly. Turning them on without that
+    history would reject every candidate rather than improve any."""
 
     min_trade_count: int = 100
     min_expectancy_r: float = 0.10
@@ -39,10 +45,16 @@ class AbsoluteGate:
     min_walk_forward_pass_rate: float = 0.70
     max_drawdown_r: float = 10.0
     min_temporal_stability: float = 0.30
+    min_trades_per_parameter: float | None = None
+    min_robustness_score: float | None = None
 
 
 def evaluate_absolute_gate(
-    metrics: dict[str, Any], walk_forward: dict[str, Any], gate: AbsoluteGate
+    metrics: dict[str, Any],
+    walk_forward: dict[str, Any],
+    gate: AbsoluteGate,
+    *,
+    robustness: dict[str, Any] | None = None,
 ) -> list[str]:
     """Return the list of failed gate checks (empty means qualified)."""
     failures: list[str] = []
@@ -72,6 +84,18 @@ def evaluate_absolute_gate(
     if stability is None or stability < gate.min_temporal_stability:
         failures.append("temporal_stability_below_min")
 
+    if robustness is not None:
+        if (
+            gate.min_trades_per_parameter is not None
+            and robustness["trades_per_parameter"] < gate.min_trades_per_parameter
+        ):
+            failures.append("trades_per_parameter_below_min")
+        if (
+            gate.min_robustness_score is not None
+            and robustness["robustness_score"] < gate.min_robustness_score
+        ):
+            failures.append("robustness_score_below_min")
+
     return sorted(set(failures))
 
 
@@ -97,7 +121,10 @@ def run_backtest_agent(
         spec, frame, cost=cost, n_windows=n_windows, equity=equity, risk_pct=risk_pct
     )
     regimes = regime_breakdown(result["trades"])
-    gate_failures = evaluate_absolute_gate(metrics, walk_forward, gate)
+    # How believable the numbers above are, given how many were fitted to produce
+    # them. Always measured; gates only on it when the operator opted in.
+    robustness = score_robustness(spec, metrics, walk_forward, regimes)
+    gate_failures = evaluate_absolute_gate(metrics, walk_forward, gate, robustness=robustness)
 
     record: dict[str, Any] = {
         "strategy_id": spec.strategy_id,
@@ -110,6 +137,7 @@ def run_backtest_agent(
         "metrics": metrics,
         "walk_forward": walk_forward,
         "regime_breakdown": regimes,
+        "robustness": robustness,
         "absolute_gate": {
             "min_trade_count": gate.min_trade_count,
             "min_expectancy_r": gate.min_expectancy_r,
@@ -117,6 +145,8 @@ def run_backtest_agent(
             "min_walk_forward_pass_rate": gate.min_walk_forward_pass_rate,
             "max_drawdown_r": gate.max_drawdown_r,
             "min_temporal_stability": gate.min_temporal_stability,
+            "min_trades_per_parameter": gate.min_trades_per_parameter,
+            "min_robustness_score": gate.min_robustness_score,
         },
         "gate_failures": gate_failures,
         "qualified": not gate_failures,
