@@ -93,3 +93,39 @@ def load_candle_history(
     if rows:
         _write_cache(path, symbol, interval, rows)
     return rows, "fetch"
+
+
+# Funding is charged every 8h; a cache newer than one funding period + slack is
+# current for any backtest or runtime evaluation.
+FUNDING_MAX_AGE_HOURS = 9.0
+
+
+def load_funding_history(
+    symbol: str,
+    records: int,
+    *,
+    cache_dir: Path,
+    base_url: str = "https://fapi.binance.com",
+    refresh: bool = False,
+    max_age_hours: float = FUNDING_MAX_AGE_HOURS,
+    client: BinanceFuturesPublicClient | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Return ``(funding_events, source)``, newest ``records`` rows, oldest first.
+
+    Same shape and cache discipline as ``load_candle_history``; the series is the
+    venue's 8h funding events (``timestamp`` = fundingTime, ``funding_rate``).
+    Raises on a required fetch failing — the caller decides how to fail closed.
+    """
+    path = _cache_path(cache_dir, symbol, "funding")
+
+    if not refresh and path.exists():
+        cached = _read_cache(path)
+        if len(cached) >= records and _newest_age_hours(cached) <= max_age_hours:
+            return cached[-records:], "cache"
+
+    client = client or BinanceFuturesPublicClient(base_url=base_url)
+    frame = client.funding_rate_history(symbol, records)
+    rows = frame.to_dict("records") if not frame.empty else []
+    if rows:
+        _write_cache(path, symbol, "funding", rows)
+    return rows, "fetch"

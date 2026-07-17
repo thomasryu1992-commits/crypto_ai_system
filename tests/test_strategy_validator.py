@@ -70,14 +70,24 @@ def test_unknown_feature_blocked():
 
 
 def test_runtime_unavailable_feature_blocked():
-    # funding_rate is a known feature but only a constant fallback without a
-    # derivatives feed, so a spec using it must be rejected (not silently run).
+    # open_interest is a known feature but only a constant fallback without an
+    # OI feed, so a spec using it must be rejected (not silently run).
     verdict = validate_strategy(_spec(entry_rules={
         "operator": "AND",
-        "conditions": [{"feature": "funding_rate", "comparison": ">", "value": 0.01}],
+        "conditions": [{"feature": "open_interest", "comparison": ">", "value": 1.0}],
     }))
     assert sv.BLOCK_RUNTIME_UNAVAILABLE_FEATURE in verdict["block_reasons"]
     assert verdict["approved_for_backtest"] is False
+
+
+def test_funding_features_are_runtime_available():
+    # The 8h funding-event series is aligned onto every frame by the feature
+    # adapter, so funding specs are evaluable (and must validate).
+    verdict = validate_strategy(_spec(entry_rules={
+        "operator": "AND",
+        "conditions": [{"feature": "funding_zscore", "comparison": ">=", "value": 1.5}],
+    }))
+    assert verdict["approved_for_backtest"] is True, verdict["block_reasons"]
 
 
 def test_runtime_unavailable_value_from_blocked():
