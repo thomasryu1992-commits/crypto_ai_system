@@ -16,7 +16,7 @@ from crypto_ai_system.storage.latest import write_latest
 from crypto_ai_system.storage.paths import ensure_storage_dirs
 from crypto_ai_system.storage.raw_store import store_raw_bundle
 from crypto_ai_system.storage.normalized_store import store_normalized_frames
-from crypto_ai_system.storage.jsonl import append_jsonl
+from core.event_log import log_event
 from crypto_ai_system.features.research_feature_matrix import persist_feature_store_outputs
 from crypto_ai_system.data.data_snapshot_manifest import (
     annotate_feature_frames_with_optional_health,
@@ -129,7 +129,7 @@ def collect_additional_data_package(cfg: AppConfig, *, persist: bool = False) ->
         write_latest(paths['latest'] / 'additional_feature_snapshot.json', feature_snapshot)
         write_latest(paths['latest'] / 'optional_data_health.json', optional_data_health)
         write_latest(paths['latest'] / 'data_snapshot_manifest.json', data_snapshot_manifest)
-        append_jsonl(paths['logs'] / 'event_log.jsonl', {'type': 'additional_data_collect', **summary_with_files})
+        log_event('additional_data_collect', dict(summary_with_files))
 
     return package
 

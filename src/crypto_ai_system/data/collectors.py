@@ -15,7 +15,7 @@ from crypto_ai_system.data.price_data_loader import (
     select_primary_ohlcv_from_price_bundle,
 )
 from crypto_ai_system.data.symbol_mapper import get_coinalyze_symbol, get_market_identity
-from crypto_ai_system.storage.jsonl import append_jsonl
+from core.event_log import log_event
 from crypto_ai_system.storage.paths import ensure_storage_dirs
 
 
@@ -123,7 +123,7 @@ def collect_extended_market_bundle(cfg: AppConfig) -> Tuple[pd.DataFrame, pd.Dat
 
     try:
         ohlcv, derivatives, mark, index, orderbook, source = _try_collect_extended(cfg, limit)
-        append_jsonl(paths['logs'] / 'event_log.jsonl', {'type': 'data_collect', 'source': 'extended', 'rows': len(ohlcv), 'market': market.exchange_market})
+        log_event('data_collect', {'source': 'extended', 'rows': len(ohlcv), 'market': market.exchange_market})
     except Exception as exc:
         if not allow_fallback:
             raise
@@ -153,8 +153,7 @@ def collect_extended_market_bundle(cfg: AppConfig) -> Tuple[pd.DataFrame, pd.Dat
             orderbook['fallback_profile_id'] = fallback_profile.get('profile_id')
             orderbook['fallback_profile_role'] = fallback_profile.get('role')
             orderbook['fallback_allows_live_execution'] = bool(fallback_profile.get('allow_live_execution', False))
-            append_jsonl(paths['logs'] / 'event_log.jsonl', {
-                'type': 'data_collect_fallback',
+            log_event('data_collect_fallback', {
                 'source': source,
                 'reason': str(exc),
                 'rows': len(ohlcv),
@@ -174,7 +173,7 @@ def collect_extended_market_bundle(cfg: AppConfig) -> Tuple[pd.DataFrame, pd.Dat
             orderbook['fallback_profile_id'] = sample_profile.get('profile_id', 'sample_extended_research')
             orderbook['fallback_profile_role'] = sample_profile.get('role', 'RESEARCH_BACKTEST_ONLY')
             orderbook['fallback_allows_live_execution'] = bool(sample_profile.get('allow_live_execution', False))
-            append_jsonl(paths['logs'] / 'event_log.jsonl', {'type': 'data_collect_fallback', 'source': 'sample_extended', 'reason': str(exc), 'rows': len(ohlcv), 'fallback_profile_id': sample_profile.get('profile_id', 'sample_extended_research'), 'fallback_profile_role': sample_profile.get('role', 'RESEARCH_BACKTEST_ONLY'), 'fallback_allows_live_execution': bool(sample_profile.get('allow_live_execution', False))})
+            log_event('data_collect_fallback', {'source': 'sample_extended', 'reason': str(exc), 'rows': len(ohlcv), 'fallback_profile_id': sample_profile.get('profile_id', 'sample_extended_research'), 'fallback_profile_role': sample_profile.get('role', 'RESEARCH_BACKTEST_ONLY'), 'fallback_allows_live_execution': bool(sample_profile.get('allow_live_execution', False))})
 
     ohlcv, report = validate_ohlcv(ohlcv, name=f'{source}_ohlcv')
     contract_reports.append(report.to_dict())
@@ -190,9 +189,9 @@ def collect_extended_market_bundle(cfg: AppConfig) -> Tuple[pd.DataFrame, pd.Dat
                 contract_reports.append(coi_report.to_dict())
                 derivatives = _merge_derivatives(derivatives, coi)
                 coinalyze_rows = len(coi)
-                append_jsonl(paths['logs'] / 'event_log.jsonl', {'type': 'data_collect_enrichment', 'source': 'coinalyze', 'rows': coinalyze_rows})
+                log_event('data_collect_enrichment', {'source': 'coinalyze', 'rows': coinalyze_rows})
         except Exception as exc:
-            append_jsonl(paths['logs'] / 'event_log.jsonl', {'type': 'data_collect_enrichment_skipped', 'source': 'coinalyze', 'reason': str(exc)})
+            log_event('data_collect_enrichment_skipped', {'source': 'coinalyze', 'reason': str(exc)})
 
     orderbook = dict(orderbook or {})
     orderbook['coinalyze_rows'] = coinalyze_rows

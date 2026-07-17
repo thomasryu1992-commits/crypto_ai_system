@@ -6,6 +6,30 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _isolated_event_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep test telemetry out of the operator's event log.
+
+    ``log_event`` writes to ``config.settings.EVENT_LOG_PATH``, so any test that
+    drives a pipeline path appends to the real ``storage/logs/event_log.jsonl``.
+    A single suite run added 74 rows — among them deliberately provoked failures
+    (``counterfactual_settle_failed``, ``live_strategy_order_blocked``,
+    ``live_position_close_failed``) that are indistinguishable from real
+    incidents to anyone grepping the log for trouble.
+
+    ``core/event_log.py`` is the only module that resolves the log path, and it
+    binds the constant at import, so rebinding it there redirects every event a
+    test can produce — including the fallback path, which derives from the same
+    global. ``test_event_log_isolation`` guards that single-writer property,
+    which is what makes this fixture sufficient.
+    """
+    import core.event_log as event_log
+
+    log_path = tmp_path / "event_log.jsonl"
+    monkeypatch.setattr(event_log, "EVENT_LOG_PATH", log_path)
+    return log_path
+
+
 @pytest.fixture
 def isolated_project_root(tmp_path: Path) -> Path:
     """Minimal per-test project root for Step209~237 artifact writes.
