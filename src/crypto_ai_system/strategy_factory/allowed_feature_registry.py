@@ -124,9 +124,10 @@ CATEGORICAL_FEATURES: dict[str, frozenset[str]] = {
 # when its feed is wired into build_backtest_frame / the runtime adapter.
 RUNTIME_UNAVAILABLE_FEATURES = frozenset(
     {
-        # derivatives (no derivatives feed in the factory/runtime path)
-        "funding_rate",
-        "funding_zscore",
+        # funding_rate / funding_zscore are NOT listed: the feature adapter aligns
+        # the real 8h funding-event series (deep-history cache) onto every frame,
+        # and a load failure leaves them NaN (indeterminate), never a constant.
+        # open interest / liquidations still have no feed
         "open_interest",
         "open_interest_base",
         "oi_change_pct",

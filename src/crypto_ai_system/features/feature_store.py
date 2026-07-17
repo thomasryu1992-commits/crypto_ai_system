@@ -39,6 +39,7 @@ def build_feature_frame(
     mark: pd.DataFrame | None = None,
     index: pd.DataFrame | None = None,
     orderbook: dict | None = None,
+    funding: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     df = ohlcv.copy().reset_index(drop=True)
     df['timestamp'] = df['timestamp'].astype(str)
@@ -115,10 +116,38 @@ def build_feature_frame(
         for c in ['funding_rate','open_interest','open_interest_base','oi_change_pct','long_liquidation','short_liquidation']:
             df[c] = np.nan
 
-    df['funding_rate'] = pd.to_numeric(df['funding_rate'], errors='coerce').fillna(0)
+    # An 8h funding-event series (deep history) supersedes the legacy per-cycle
+    # derivatives merge: each bar carries the last funding event at or before its
+    # open (merge_asof backward — an event can never leak into earlier bars), and
+    # bars before the first known event stay NaN = indeterminate, never a
+    # constant. Without the series the legacy 0-fill behavior is unchanged.
+    has_funding_series = funding is not None
+    if has_funding_series:
+        if funding.empty or 'funding_rate' not in funding.columns:
+            df['funding_rate'] = np.nan
+        else:
+            f = funding[['timestamp', 'funding_rate']].copy()
+            f['_ts'] = pd.to_datetime(f['timestamp'], utc=True, errors='coerce')
+            f = f.dropna(subset=['_ts']).sort_values('_ts')
+            f['funding_rate'] = pd.to_numeric(f['funding_rate'], errors='coerce')
+            left = pd.DataFrame({'_ts': pd.to_datetime(df['timestamp'], utc=True, errors='coerce')})
+            left['_order'] = np.arange(len(left))
+            # merge_asof rejects null keys: align only parseable rows, the rest
+            # stay NaN (an unreadable timestamp cannot honestly carry funding).
+            valid = left.dropna(subset=['_ts']).sort_values('_ts')
+            aligned = np.full(len(left), np.nan)
+            if not valid.empty and not f.empty:
+                merged = pd.merge_asof(valid, f[['_ts', 'funding_rate']], on='_ts', direction='backward')
+                aligned[valid['_order'].to_numpy()] = merged['funding_rate'].to_numpy()
+            df['funding_rate'] = aligned
+
+    df['funding_rate'] = pd.to_numeric(df['funding_rate'], errors='coerce')
+    if not has_funding_series:
+        df['funding_rate'] = df['funding_rate'].fillna(0)
     funding_ma = df['funding_rate'].rolling(funding_z_window, min_periods=10).mean()
     funding_std = df['funding_rate'].rolling(funding_z_window, min_periods=10).std().replace(0, np.nan)
-    df['funding_zscore'] = ((df['funding_rate'] - funding_ma) / funding_std).replace([np.inf, -np.inf], np.nan).fillna(0)
+    funding_z = ((df['funding_rate'] - funding_ma) / funding_std).replace([np.inf, -np.inf], np.nan)
+    df['funding_zscore'] = funding_z if has_funding_series else funding_z.fillna(0)
 
     df['open_interest'] = pd.to_numeric(df['open_interest'], errors='coerce').ffill().fillna(0)
     df['open_interest_base'] = pd.to_numeric(df.get('open_interest_base', 0), errors='coerce').ffill().fillna(0)

@@ -11,6 +11,8 @@ from crypto_ai_system.config import AppConfig
 
 # Venue cap on rows per /fapi/v1/klines call; deeper history must be paged.
 PUBLIC_KLINE_PAGE_LIMIT = 1500
+# Venue cap on rows per /fapi/v1/fundingRate call.
+PUBLIC_FUNDING_PAGE_LIMIT = 1000
 
 
 def _utc_now_iso() -> str:
@@ -96,18 +98,66 @@ class BinanceFuturesPublicClient:
             })
         return pd.DataFrame(rows)
 
-    def funding_rate(self, symbol: str, limit: int) -> pd.DataFrame:
-        payload = self._get('/fapi/v1/fundingRate', {'symbol': symbol, 'limit': limit})
+    def _funding_rows(self, payload: Any, symbol: str) -> list[dict[str, Any]]:
         rows = []
         for item in payload or []:
             rows.append({
                 'timestamp': _to_timestamp(item.get('fundingTime')),
+                'funding_time_ms': int(item.get('fundingTime')),
                 'symbol': symbol,
                 'funding_rate': _number(item.get('fundingRate'), 0.0),
                 'mark_price': _number(item.get('markPrice')),
                 'source': 'binance_futures_public',
             })
-        return pd.DataFrame(rows)
+        return rows
+
+    def funding_rate(self, symbol: str, limit: int) -> pd.DataFrame:
+        payload = self._get('/fapi/v1/fundingRate', {'symbol': symbol, 'limit': limit})
+        frame = pd.DataFrame(self._funding_rows(payload, symbol))
+        return frame.drop(columns=['funding_time_ms'], errors='ignore')
+
+    def funding_rate_history(
+        self, symbol: str, records: int, *, page_limit: int = PUBLIC_FUNDING_PAGE_LIMIT
+    ) -> pd.DataFrame:
+        """Fetch up to ``records`` funding events, paging backward past the cap.
+
+        Funding is charged every 8h, so one 1000-row page is ~11 months and a few
+        pages cover the venue's whole history — years of real funding for the
+        backtest. Same backward-paging discipline as ``klines_history``: walk
+        ``endTime`` to just before the oldest event seen, stop when the venue
+        runs out, refuse to spin without backward progress.
+        """
+        collected: list[dict[str, Any]] = []
+        end_time: int | None = None
+        oldest_seen: int | None = None
+
+        while len(collected) < records:
+            params: dict[str, Any] = {
+                'symbol': symbol,
+                'limit': min(page_limit, records - len(collected)),
+            }
+            if end_time is not None:
+                params['endTime'] = end_time
+            payload = self._get('/fapi/v1/fundingRate', params)
+            rows = self._funding_rows(payload, symbol)
+            if not rows:
+                break
+
+            collected.extend(rows)
+            page_oldest = min(int(r['funding_time_ms']) for r in rows)
+            if oldest_seen is not None and page_oldest >= oldest_seen:
+                break
+            oldest_seen = page_oldest
+            end_time = page_oldest - 1
+            # No short-page early exit: this endpoint returns fewer rows than
+            # ``limit`` even mid-history (500 against a 1000 ask), so exhaustion
+            # is detected only by an empty page or no backward progress.
+
+        if not collected:
+            return pd.DataFrame()
+        frame = pd.DataFrame(collected)
+        frame = frame.drop_duplicates(subset='funding_time_ms').sort_values('funding_time_ms')
+        return frame.drop(columns=['funding_time_ms']).reset_index(drop=True)
 
     def premium_index(self, symbol: str) -> pd.DataFrame:
         payload = self._get('/fapi/v1/premiumIndex', {'symbol': symbol})

@@ -9,12 +9,14 @@ feature source for backtest and live.
 
 Multi-timeframe context and optional-data collectors are disabled here: the
 router needs the price/indicator/regime columns, not the heavy auxiliary feeds,
-and disabling them keeps this fast and side-effect-free. With those feeds off,
-feature_store still emits the derivative/liquidation/mtf columns but fills them
-with a constant fallback (0, or "DISABLED"). A spec must therefore not reference
-them — the S3 validator rejects any that do (see
-``allowed_feature_registry.RUNTIME_UNAVAILABLE_FEATURES``), so a strategy can only
-be built from columns that carry real live values here.
+and disabling them keeps this fast and side-effect-free. Funding is the
+exception: the real 8h funding-event series (deep-history cache) is aligned onto
+every frame, so funding_rate / funding_zscore carry real values in backtest and
+live alike — and are NaN (indeterminate), never a constant, when the series
+cannot be loaded. The remaining feed-less columns (open interest, liquidations,
+legacy mtf, aux scores) still come out as constant fallbacks, so a spec must not
+reference them — the S3 validator rejects any that do (see
+``allowed_feature_registry.RUNTIME_UNAVAILABLE_FEATURES``).
 """
 
 from __future__ import annotations
@@ -41,16 +43,40 @@ def _cfg_without_heavy_feeds(cfg: AppConfig) -> AppConfig:
     return AppConfig(root=cfg.root, settings=settings)
 
 
+# Funding events kept for the frame: 8h cadence -> ~3/day; 7000 covers >6 years,
+# longer than any candle series we backtest.
+FUNDING_HISTORY_RECORDS = 7000
+
+
+def _default_funding_loader() -> "pd.DataFrame":
+    import config.settings as settings
+    from collectors.real_market_data import to_binance_symbol
+    from crypto_ai_system.data.candle_history import load_funding_history
+
+    symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
+    rows, _ = load_funding_history(
+        symbol, FUNDING_HISTORY_RECORDS,
+        cache_dir=settings.HISTORY_DIR,
+        base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL,
+    )
+    return pd.DataFrame(rows)
+
+
 def build_backtest_frame(
     candles: Sequence[dict[str, Any]],
     *,
     cfg: AppConfig | None = None,
+    funding_loader: Callable[[], "pd.DataFrame"] | None = None,
 ) -> "pd.DataFrame":
     """Return the full feature frame from OHLCV candles (the backtest input).
 
     Same feature source as the live router — the factory backtests strategies on
-    exactly the columns they are evaluated against at runtime. Returns an empty
-    frame when there are too few candles or required columns are missing.
+    exactly the columns they are evaluated against at runtime. The real 8h
+    funding series is aligned onto the frame (funding_rate / funding_zscore); if
+    it cannot be loaded those columns are NaN = indeterminate, so a
+    funding-referencing spec fails closed to no-entry rather than evaluating a
+    constant. Returns an empty frame when there are too few candles or required
+    columns are missing.
     """
     if not candles or len(candles) < _MIN_CANDLES:
         return pd.DataFrame()
@@ -59,7 +85,11 @@ def build_backtest_frame(
     required = {"open", "high", "low", "close", "volume", "timestamp"}
     if not required.issubset(ohlcv.columns):
         return pd.DataFrame()
-    return build_feature_frame(ohlcv, pd.DataFrame(), cfg)
+    try:
+        funding = (funding_loader or _default_funding_loader)()
+    except Exception:  # noqa: BLE001 - indeterminate funding, never a constant
+        funding = pd.DataFrame()
+    return build_feature_frame(ohlcv, pd.DataFrame(), cfg, funding=funding)
 
 
 def build_runtime_feature_row(

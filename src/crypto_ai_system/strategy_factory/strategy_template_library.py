@@ -160,6 +160,24 @@ def _htf_trend_follow_short_entry(p: dict) -> list[dict]:
     ]
 
 
+def _funding_fade_short_entry(p: dict) -> list[dict]:
+    # Crowded longs: funding far above its rolling norm while momentum is
+    # stretched — fade the crowd short.
+    return [
+        {"feature": "funding_zscore", "comparison": ">=", "value": p["funding_z_min"]},
+        {"feature": "rsi", "comparison": ">=", "value": p["rsi_min"]},
+    ]
+
+
+def _funding_fade_long_entry(p: dict) -> list[dict]:
+    # Crowded shorts: funding far below its rolling norm while momentum is
+    # washed out — fade the crowd long.
+    return [
+        {"feature": "funding_zscore", "comparison": "<=", "value": p["funding_z_max"]},
+        {"feature": "rsi", "comparison": "<=", "value": p["rsi_max"]},
+    ]
+
+
 # target_atr reaches to 8.0: the 1d sweep was monotonically better all the way to
 # the old 4.0 ceiling (+0.395R at 4.0 vs +0.198R at 2.4), i.e. the cap was cutting
 # winners short. The validator's TARGET_ATR_RANGE (10.0) still bounds it.
@@ -287,6 +305,32 @@ HTF_TREND_FOLLOW_SHORT = StrategyTemplate(
     entry_builder=_htf_trend_follow_short_entry,
 )
 
+FUNDING_FADE_SHORT = StrategyTemplate(
+    family="funding_fade_short",
+    direction=Direction.SHORT,
+    timeframe="1h",
+    param_space={
+        "funding_z_min": ParamSpec(1.0, 2.5),
+        "rsi_min": ParamSpec(55.0, 75.0),
+        **_EXIT_PARAMS,
+    },
+    base_params={"funding_z_min": 1.5, "rsi_min": 62.0, **_EXIT_BASE},
+    entry_builder=_funding_fade_short_entry,
+)
+
+FUNDING_FADE_LONG = StrategyTemplate(
+    family="funding_fade_long",
+    direction=Direction.LONG,
+    timeframe="1h",
+    param_space={
+        "funding_z_max": ParamSpec(-2.5, -1.0),
+        "rsi_max": ParamSpec(25.0, 45.0),
+        **_EXIT_PARAMS,
+    },
+    base_params={"funding_z_max": -1.5, "rsi_max": 38.0, **_EXIT_BASE},
+    entry_builder=_funding_fade_long_entry,
+)
+
 TEMPLATES: dict[str, StrategyTemplate] = {
     t.family: t for t in (
         TREND_PULLBACK, TREND_PULLBACK_SHORT, BREAKOUT, BREAKDOWN_SHORT,
@@ -294,6 +338,7 @@ TEMPLATES: dict[str, StrategyTemplate] = {
         MACD_MOMENTUM, MACD_MOMENTUM_SHORT,
         BOLLINGER_BREAKOUT, BOLLINGER_BREAKDOWN_SHORT,
         HTF_TREND_FOLLOW, HTF_TREND_FOLLOW_SHORT,
+        FUNDING_FADE_LONG, FUNDING_FADE_SHORT,
     )
 }
 
@@ -305,6 +350,7 @@ DEFAULT_TEMPLATE_ORDER = (
     MACD_MOMENTUM, MACD_MOMENTUM_SHORT,
     BOLLINGER_BREAKOUT, BOLLINGER_BREAKDOWN_SHORT,
     HTF_TREND_FOLLOW, HTF_TREND_FOLLOW_SHORT,
+    FUNDING_FADE_LONG, FUNDING_FADE_SHORT,
 )
 
 
