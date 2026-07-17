@@ -56,6 +56,7 @@ def run_factory_cycle(
     cap: int = DEFAULT_PAPER_CAP,
     max_per_family: int = DEFAULT_MAX_PER_FAMILY,
     templates: Sequence = DEFAULT_TEMPLATE_ORDER,
+    symbol: str = "BTCUSDT",
     now: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run one generation cycle. Returns ``(new_state, cycle_report)``.
@@ -68,7 +69,7 @@ def run_factory_cycle(
     pool = state.get("pool") or empty_pool()
     generation_id = f"GEN-{generation_seq:03d}"
 
-    batch = generate_batch(generation_id, seed=seed, start_index=strategy_seq, templates=templates)
+    batch = generate_batch(generation_id, seed=seed, start_index=strategy_seq, templates=templates, symbol=symbol)
     next_strategy_seq = strategy_seq + batch["accepted_count"]
 
     records = [
@@ -85,12 +86,15 @@ def run_factory_cycle(
     if selected_id is not None:
         spec = next(s for s in batch["specs"] if s["strategy_id"] == selected_id)
         family = spec["strategy_family"]
-        if family_count(pool, family) >= max_per_family:
+        # Diversity is judged within the champion's market: another symbol's
+        # strategies of the same family are diversification, not duplication.
+        if family_count(pool, family, symbol) >= max_per_family:
             pool_decision = {
                 "action": ACTION_DIVERSITY_REJECTED,
                 "strategy_id": selected_id,
                 "strategy_family": family,
-                "reason": f"pool already holds {max_per_family} '{family}' strategies",
+                "symbol": symbol,
+                "reason": f"pool already holds {max_per_family} '{family}' strategies on {symbol}",
             }
         else:
             new_pool, pool_decision = add_champion(

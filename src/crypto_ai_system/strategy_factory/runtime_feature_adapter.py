@@ -48,14 +48,20 @@ def _cfg_without_heavy_feeds(cfg: AppConfig) -> AppConfig:
 FUNDING_HISTORY_RECORDS = 7000
 
 
-def _default_funding_loader() -> "pd.DataFrame":
+def runtime_symbol() -> str:
+    """The pipeline's own symbol, in venue form (e.g. BTCUSDT)."""
     import config.settings as settings
     from collectors.real_market_data import to_binance_symbol
+
+    return to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
+
+
+def _default_funding_loader(symbol: str | None = None) -> "pd.DataFrame":
+    import config.settings as settings
     from crypto_ai_system.data.candle_history import load_funding_history
 
-    symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
     rows, _ = load_funding_history(
-        symbol, FUNDING_HISTORY_RECORDS,
+        symbol or runtime_symbol(), FUNDING_HISTORY_RECORDS,
         cache_dir=settings.HISTORY_DIR,
         base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL,
     )
@@ -86,7 +92,13 @@ def build_backtest_frame(
     if not required.issubset(ohlcv.columns):
         return pd.DataFrame()
     try:
-        funding = (funding_loader or _default_funding_loader)()
+        if funding_loader is not None:
+            funding = funding_loader()
+        else:
+            # Candle rows are symbol-labelled; funding must come from the SAME
+            # symbol or the zscore would be computed against another market.
+            row_symbol = str(ohlcv.iloc[0].get("symbol") or "") or None
+            funding = _default_funding_loader(row_symbol)
     except Exception:  # noqa: BLE001 - indeterminate funding, never a constant
         funding = pd.DataFrame()
     return build_feature_frame(ohlcv, pd.DataFrame(), cfg, funding=funding)
@@ -140,33 +152,36 @@ def build_runtime_feature_row_for_timeframe(
     base_candles: Sequence[dict[str, Any]],
     *,
     base_timeframe: str,
+    symbol: str | None = None,
     cfg: AppConfig | None = None,
     now: str | None = None,
     history_loader: Callable[[str, int], Sequence[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
-    """Latest feature row on ``timeframe`` — the frame a spec was backtested on.
+    """Latest feature row on ``(symbol, timeframe)`` — the frame a spec was
+    backtested on.
 
-    A spec on the runtime base timeframe uses the pipeline's own candles
-    (unchanged behavior). Any other timeframe loads its own candle series from
-    the deep-history cache and drops the still-forming last bar, so the row is
-    built from exactly the kind of closed bars the backtest scored. Returns {}
-    when the series cannot be built — the router treats that as no-entry.
+    A spec on the runtime base symbol AND base timeframe uses the pipeline's own
+    candles (unchanged behavior). Anything else — another timeframe or another
+    symbol — loads its own candle series from the deep-history cache and drops
+    the still-forming last bar, so the row is built from exactly the kind of
+    closed bars the backtest scored. Returns {} when the series cannot be built —
+    the router treats that as no-entry.
 
     ``history_loader(timeframe, bars) -> candles`` is injectable for tests; the
     default reads the on-disk deep-history cache (network only when stale).
     """
-    if str(timeframe) == str(base_timeframe):
+    base_symbol = runtime_symbol()
+    spec_symbol = str(symbol or base_symbol)
+    if str(timeframe) == str(base_timeframe) and spec_symbol == base_symbol:
         return build_runtime_feature_row(base_candles, cfg=cfg)
 
     if history_loader is None:
         def history_loader(tf: str, bars: int) -> Sequence[dict[str, Any]]:
             import config.settings as settings
-            from collectors.real_market_data import to_binance_symbol
             from crypto_ai_system.data.candle_history import load_candle_history
 
-            symbol = to_binance_symbol(getattr(settings, "SYMBOL", "BTC-PERP"))
             rows, _ = load_candle_history(
-                symbol, tf, bars,
+                spec_symbol, tf, bars,
                 cache_dir=settings.HISTORY_DIR,
                 base_url=settings.BINANCE_FUTURES_PUBLIC_BASE_URL,
             )

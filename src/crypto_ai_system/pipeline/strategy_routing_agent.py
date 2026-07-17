@@ -21,7 +21,10 @@ import config.settings as settings
 from core.json_io import atomic_write_json, read_json
 
 from crypto_ai_system.strategy_factory.active_strategy_pool import occupying_entries
-from crypto_ai_system.strategy_factory.entry_strategy_router_agent import route_entries
+from crypto_ai_system.strategy_factory.entry_strategy_router_agent import (
+    feature_row_key,
+    route_entries,
+)
 from crypto_ai_system.strategy_factory.runtime_feature_adapter import (
     build_runtime_feature_row_for_timeframe,
 )
@@ -41,30 +44,37 @@ def runtime_base_timeframe() -> str:
     return to_binance_interval(str(getattr(settings, "TIMEFRAME", "PT1H")))
 
 
-def _pool_timeframes(pool: dict) -> set[str]:
-    return {
-        str((e.get("strategy_spec") or {}).get("timeframe") or "")
-        for e in occupying_entries(pool)
-    } - {""}
+def _pool_pairs(pool: dict) -> set[tuple[str, str]]:
+    """The distinct (symbol, timeframe) pairs the active pool trades on."""
+    pairs: set[tuple[str, str]] = set()
+    for e in occupying_entries(pool):
+        spec = e.get("strategy_spec") or {}
+        scope = spec.get("symbol_scope") or []
+        symbol = str(scope[0]) if scope else ""
+        timeframe = str(spec.get("timeframe") or "")
+        if symbol and timeframe:
+            pairs.add((symbol, timeframe))
+    return pairs
 
 
 def evaluate_live_routing(pool: dict, candles: list[dict], *, now: str | None = None) -> dict[str, Any]:
-    """Build a feature row per pool timeframe and route the active pool.
+    """Build a feature row per (symbol, timeframe) pair and route the active pool.
 
-    Each spec is evaluated on the timeframe it was backtested on: base-timeframe
-    specs use the pipeline's own candles, others load their series from the
-    deep-history cache. A timeframe whose row cannot be built leaves its specs
-    unevaluable (fail-closed to no-entry) without blocking the rest of the pool.
+    Each spec is evaluated on the symbol AND timeframe it was backtested on: the
+    runtime pair uses the pipeline's own candles, everything else loads its
+    series from the deep-history cache. A pair whose row cannot be built leaves
+    its specs unevaluable (fail-closed to no-entry) without blocking the rest of
+    the pool.
     """
     if not occupying_entries(pool):
         return {"status": STATUS_NO_ACTIVE_STRATEGIES, "order_candidate_count": 0}
 
     base_tf = runtime_base_timeframe()
     feature_rows = {
-        tf: build_runtime_feature_row_for_timeframe(
-            tf, candles, base_timeframe=base_tf, now=now
+        feature_row_key(symbol, tf): build_runtime_feature_row_for_timeframe(
+            tf, candles, base_timeframe=base_tf, symbol=symbol, now=now
         )
-        for tf in _pool_timeframes(pool)
+        for symbol, tf in _pool_pairs(pool)
     }
     if not any(feature_rows.values()):
         return {"status": STATUS_NO_FEATURE_ROW, "order_candidate_count": 0}

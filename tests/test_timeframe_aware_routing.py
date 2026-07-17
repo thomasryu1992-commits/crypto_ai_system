@@ -96,9 +96,14 @@ _MATCH_ROW = {"close": 110.0, "ma20": 100.0, "ma50": 90.0, "adx": 40.0}
 
 
 def test_router_resolves_each_spec_to_its_timeframe_row() -> None:
+    from crypto_ai_system.strategy_factory.entry_strategy_router_agent import feature_row_key
+
     pool = {"active_strategies": [_pool_entry("S1", "1h"), _pool_entry("S2", "1d")]}
     result = route_entries(
-        pool, {}, feature_rows={"1h": _MATCH_ROW, "1d": {"close": 1.0, "ma20": 100.0, "ma50": 90.0, "adx": 40.0}}
+        pool, {}, feature_rows={
+            feature_row_key("BTCUSDT", "1h"): _MATCH_ROW,
+            feature_row_key("BTCUSDT", "1d"): {"close": 1.0, "ma20": 100.0, "ma50": 90.0, "adx": 40.0},
+        }
     )
     by_id = {e["strategy_id"]: e for e in result["evaluations"]}
     assert by_id["S1"]["matched"] is True and by_id["S1"]["timeframe"] == "1h"

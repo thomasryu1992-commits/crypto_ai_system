@@ -82,15 +82,22 @@ def _evaluate_strategy_risk_gate(
     market_snapshot: Mapping[str, Any],
     open_positions: int,
     eval_id: str | None,
+    price: float | None = None,
 ) -> dict[str, Any]:
     """Evaluate the hot-path PreOrderRiskGate for the strategy's direction.
 
     Mirrors the research bridge's gate call but seeds the decision with the
     strategy direction. Paper gets the auto-approved paper profile; live gets the
     operator-approved live profile plus real live risk numbers; any other stage
-    gets no approved profile and the gate blocks."""
+    gets no approved profile and the gate blocks.
+
+    ``price`` must be the STRATEGY SYMBOL's price. The market snapshot only knows
+    the runtime symbol, so for a cross-symbol spec the caller passes the close
+    from the spec's own feature row — gating an ETH order at BTC's price would
+    make every notional and sanity check meaningless."""
     stage = str(execution_stage or "paper").lower()
-    price = market_snapshot.get("last_close")
+    if price is None:
+        price = market_snapshot.get("last_close")
     decision_seed = {"decision_id": eval_id, "side": direction, "direction": direction,
                      "entry": price, "entry_price": price}
     runtime_state = {
@@ -149,14 +156,17 @@ def build_strategy_decision_for_cycle(
     risk = read_json(settings.RISK_STATUS_PATH, {}) or {}
     market_data = read_json(settings.MARKET_DATA_PATH, {}) or {}
     candles = market_data.get("candles", []) if isinstance(market_data, dict) else []
-    # The decision must carry the row on the spec's own timeframe — the one the
-    # router matched on and the backtest scored.
+    # The decision must carry the row on the spec's own symbol AND timeframe —
+    # the pair the router matched on and the backtest scored.
     from crypto_ai_system.pipeline.strategy_routing_agent import runtime_base_timeframe
 
+    spec_scope = primary_spec.get("symbol_scope") or []
+    spec_symbol = str(spec_scope[0]) if spec_scope else None
     feature_row = build_runtime_feature_row_for_timeframe(
         str(primary_spec.get("timeframe") or runtime_base_timeframe()),
         candles,
         base_timeframe=runtime_base_timeframe(),
+        symbol=spec_symbol,
         now=now,
     )
 
@@ -166,10 +176,20 @@ def build_strategy_decision_for_cycle(
 
     attribution = build_strategy_attribution(strategy_routing, primary_spec, cycle_id=cycle_id)
 
+    # Cross-symbol specs are gated and priced at THEIR market, not the runtime
+    # symbol's: the row's close is the last closed bar of the spec's own frame.
+    # Compare in venue form — the snapshot says BTC-PERP where a spec says BTCUSDT.
+    from collectors.real_market_data import to_binance_symbol
+
+    runtime_symbol_venue = to_binance_symbol(str(market_snapshot.get("symbol") or ""))
+    cross_symbol = bool(spec_symbol) and spec_symbol != runtime_symbol_venue
+    spec_price = feature_row.get("close") if cross_symbol else None
+
     gate = _evaluate_strategy_risk_gate(
         direction, execution_stage=execution_stage, research_signal=research_signal,
         risk=risk, market_snapshot=market_snapshot, open_positions=open_positions,
         eval_id=attribution.get("strategy_entry_evaluation_id"),
+        price=spec_price,
     )
 
     stage = str(execution_stage or "paper").lower()
@@ -180,7 +200,13 @@ def build_strategy_decision_for_cycle(
 
         persist_risk_gate_record(gate, ttl_seconds=300)
 
-    symbol = str(market_snapshot.get("symbol") or primary_spec.get("symbol_scope", ["BTCUSDT"])[0])
+    # The order's symbol is the STRATEGY's symbol. Same-market specs keep the
+    # snapshot's canonical name (the paper engine's existing convention); only a
+    # genuinely cross-symbol spec overrides it.
+    if cross_symbol:
+        symbol = spec_symbol
+    else:
+        symbol = str(market_snapshot.get("symbol") or spec_symbol or "BTCUSDT")
     if stage == "live":
         cap = float(getattr(settings, "LIVE_STRATEGY_MAX_ORDER_NOTIONAL_USDT", 0.0) or 0.0)
         ceiling = float(getattr(settings, "LIVE_STRATEGY_ABSOLUTE_MAX_NOTIONAL_USDT", 200.0) or 0.0)

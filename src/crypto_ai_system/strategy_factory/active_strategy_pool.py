@@ -83,12 +83,24 @@ def is_strategy_id_active(pool: dict, strategy_id: str) -> bool:
     )
 
 
-def family_count(pool: dict, family: str) -> int:
-    """How many slot-occupying strategies belong to ``family`` (diversity guard)."""
-    return sum(
-        1 for e in occupying_entries(pool)
-        if (e.get("strategy_spec") or {}).get("strategy_family") == family
-    )
+def family_count(pool: dict, family: str, symbol: str | None = None) -> int:
+    """How many slot-occupying strategies belong to ``family`` (diversity guard).
+
+    With ``symbol`` the count is per market: two BTC breakouts and two ETH
+    breakouts are four distinct bets on the family cap's terms, because the
+    diversity the guard protects is *within* a market — across markets the same
+    family is exactly the diversification a multi-symbol pool exists for.
+    """
+    def _matches(e: dict) -> bool:
+        spec = e.get("strategy_spec") or {}
+        if spec.get("strategy_family") != family:
+            return False
+        if symbol is None:
+            return True
+        scope = spec.get("symbol_scope") or []
+        return bool(scope) and str(scope[0]) == str(symbol)
+
+    return sum(1 for e in occupying_entries(pool) if _matches(e))
 
 
 def paper_active_specs(pool: dict) -> list[dict]:
