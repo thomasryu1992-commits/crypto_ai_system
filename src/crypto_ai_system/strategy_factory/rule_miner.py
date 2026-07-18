@@ -208,6 +208,35 @@ def mutate(
     return out
 
 
+def spec_to_rule_set(spec: Mapping[str, Any]) -> dict[str, Any] | None:
+    """A pool champion's spec as an evolvable rule set, or None if not expressible.
+
+    This is the inverse of ``rule_set_to_spec_dict`` for the parts the search
+    breeds on (direction, entry conditions, exits). It lets adopted champions
+    seed the initial population, so the search starts from proven parents
+    instead of pure noise — crossover then recombines their conditions with
+    each other and with fresh random material. A champion from another symbol
+    or timeframe still converts: its conditions are generic feature rules, and
+    whatever descends from them is re-fitted and re-gated on the target frame.
+    """
+    direction = str(spec.get("direction", "")).lower()
+    entry = spec.get("entry_rules") or {}
+    conditions = [dict(c) for c in (entry.get("conditions") or [])]
+    exits = dict(spec.get("exit_rules") or {})
+    if direction not in ("long", "short"):
+        return None
+    if len(_dedupe_features(conditions)) < MIN_CONDITIONS:
+        return None
+    if not {"stop_atr", "target_atr", "max_holding_bars"}.issubset(exits):
+        return None
+    exits.setdefault("stop_model", "atr")
+    return {
+        "direction": direction,
+        "conditions": _dedupe_features(conditions),
+        "exit_rules": {k: exits[k] for k in ("stop_model", "stop_atr", "target_atr", "max_holding_bars")},
+    }
+
+
 def rule_set_to_spec_dict(
     rule_set: Mapping[str, Any],
     *,
@@ -258,8 +287,15 @@ def mine_rule_sets(
     generations: int = 12,
     elite_fraction: float = 0.25,
     top_n: int = 5,
+    seed_population: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Evolve rule sets against ``fitness`` (which must only see ``train``).
+
+    ``seed_population`` (rule sets, e.g. from ``spec_to_rule_set`` on adopted
+    champions) joins the initial population; random candidates fill the rest.
+    Seeds get no other privilege — they are scored, ranked, recombined, and
+    discarded by exactly the same loop as everything else, so a stale champion
+    dies in one generation while a good one spreads its conditions.
 
     Returns the ``top_n`` distinct-by-family survivors and the total number of
     fitness evaluations performed (the selection-bias denominator).
@@ -267,7 +303,7 @@ def mine_rule_sets(
     rng = random.Random(seed)
     pool = build_condition_pool(train)
     if not pool:
-        return {"survivors": [], "search_evaluations": 0, "condition_pool_size": 0}
+        return {"survivors": [], "search_evaluations": 0, "condition_pool_size": 0, "seeded": 0}
 
     scored: dict[str, tuple[float, dict[str, Any]]] = {}
     evaluations = 0
@@ -289,7 +325,18 @@ def mine_rule_sets(
         scored[key] = (score, rs)
         return score
 
-    current = [random_rule_set(pool, rng) for _ in range(population)]
+    seeds = []
+    for candidate in seed_population or ():
+        rule_set = {
+            "direction": candidate["direction"],
+            "conditions": [dict(c) for c in candidate["conditions"]],
+            "exit_rules": dict(candidate["exit_rules"]),
+        }
+        if _key(rule_set) not in {_key(s) for s in seeds}:
+            seeds.append(rule_set)
+    seeds = seeds[:population]
+
+    current = seeds + [random_rule_set(pool, rng) for _ in range(population - len(seeds))]
     for _ in range(max(1, generations)):
         ranked = sorted(current, key=_evaluate, reverse=True)
         elite = ranked[: max(2, int(population * elite_fraction))]
@@ -323,4 +370,5 @@ def mine_rule_sets(
         "survivors": survivors,
         "search_evaluations": evaluations,
         "condition_pool_size": len(pool),
+        "seeded": len(seeds),
     }
