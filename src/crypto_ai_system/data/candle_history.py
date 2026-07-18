@@ -129,3 +129,69 @@ def load_funding_history(
     if rows:
         _write_cache(path, symbol, "funding", rows)
     return rows, "fetch"
+
+
+# Daily liquidation buckets close at UTC midnight; one period + slack keeps the
+# cache current without refetching on every factory run.
+LIQUIDATION_MAX_AGE_HOURS = 26.0
+
+
+def _drop_unclosed_daily_bucket(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop the last row if its daily bucket has not closed yet.
+
+    Coinalyze returns the in-progress day as the newest row. A partial-day
+    aggregate would make live rows see a value the backtest never scored (the
+    same hazard ``drop_forming_bar`` handles for candles), so it is dropped at
+    the source and every consumer sees only closed days.
+    """
+    if not rows:
+        return rows
+    newest = pd.to_datetime(rows[-1].get("timestamp"), utc=True, errors="coerce")
+    if pd.isna(newest):
+        return rows
+    if newest + pd.Timedelta(days=1) > pd.Timestamp.now(tz="UTC"):
+        return rows[:-1]
+    return rows
+
+
+def load_liquidation_history(
+    symbol: str,
+    days: int,
+    *,
+    cache_dir: Path,
+    refresh: bool = False,
+    max_age_hours: float = LIQUIDATION_MAX_AGE_HOURS,
+    client: Any | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Return ``(liquidation_days, source)``, newest ``days`` closed rows, oldest first.
+
+    Same shape and cache discipline as ``load_funding_history``; the series is
+    Coinalyze's daily long/short liquidation aggregate for the Binance perp
+    (``timestamp`` = day open UTC, ``long_liquidation`` / ``short_liquidation``).
+    The still-forming current day is dropped. Raises on a required fetch failing
+    (including a missing COINALYZE_API_KEY) — the caller decides how to fail
+    closed.
+    """
+    path = _cache_path(cache_dir, symbol, "liquidation")
+
+    if not refresh and path.exists():
+        cached = _drop_unclosed_daily_bucket(_read_cache(path))
+        # Freshness is measured against the last *closed* day, which is always
+        # at least a day old — hence the 26h window, not candle-style hours.
+        if len(cached) >= days and _newest_age_hours(cached) <= max_age_hours + 24.0:
+            return cached[-days:], "cache"
+
+    from crypto_ai_system.data.coinalyze_client import CoinalyzeClient, to_coinalyze_symbol
+
+    client = client or CoinalyzeClient()
+    coinalyze_symbol = to_coinalyze_symbol(symbol)
+    now = int(pd.Timestamp.now(tz="UTC").timestamp())
+    frame = client.get_liquidation_history(
+        coinalyze_symbol, interval="daily", limit=days,
+        from_ts=now - (days + 2) * 86400, to_ts=now,
+    )
+    rows = frame.to_dict("records") if not frame.empty else []
+    rows = _drop_unclosed_daily_bucket(rows)
+    if rows:
+        _write_cache(path, symbol, "liquidation", rows)
+    return rows[-days:], "fetch"

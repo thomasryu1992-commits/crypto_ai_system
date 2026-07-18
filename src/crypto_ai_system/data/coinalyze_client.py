@@ -41,6 +41,11 @@ def _normalize_ts_seconds(value: Any) -> str | None:
     return pd.to_datetime(float(numeric), unit=unit, utc=True).strftime('%Y-%m-%d %H:%M:%S+00:00')
 
 
+def to_coinalyze_symbol(binance_symbol: str) -> str:
+    """Coinalyze's code for a Binance USDT perp (exchange suffix 'A')."""
+    return f"{binance_symbol}_PERP.A"
+
+
 @dataclass
 class CoinalyzeClient:
     """Coinalyze derivatives client.
@@ -112,8 +117,18 @@ class CoinalyzeClient:
                     records.append({'timestamp': ts, 'coinalyze_symbol': item_symbol, 'funding_rate': value, 'source': 'coinalyze'})
         return pd.DataFrame(records)
 
-    def get_liquidation_history(self, symbol: str, interval: str = '1hour', limit: int = 500) -> pd.DataFrame:
-        rows = self._history_endpoint('liquidation-history', symbol, interval, limit)
+    def get_liquidation_history(
+        self,
+        symbol: str,
+        interval: str = '1hour',
+        limit: int = 500,
+        from_ts: int | None = None,
+        to_ts: int | None = None,
+    ) -> pd.DataFrame:
+        # from_ts/to_ts (unix seconds) reach past the hour-based default window:
+        # the fallback derives the range as limit*3600s, which caps a 'daily'
+        # request at ~limit/24 days and silently truncates deep history.
+        rows = self._history_endpoint('liquidation-history', symbol, interval, limit, from_ts=from_ts, to_ts=to_ts)
         records: list[dict[str, Any]] = []
         for item in rows:
             item_symbol = item.get('symbol') or symbol

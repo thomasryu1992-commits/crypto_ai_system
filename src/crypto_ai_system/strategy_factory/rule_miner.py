@@ -60,6 +60,10 @@ THRESHOLD_FEATURES: tuple[str, ...] = (
     "funding_rate", "funding_zscore",
     "htf_4h_ema_gap_pct", "htf_1d_ema_gap_pct", "htf_alignment_score",
     "mark_index_basis_bps", "mark_last_basis_bps",
+    # Liquidations: only the normalized forms. Raw USD totals grow with price
+    # and open interest across years, so train-slice quantile thresholds on
+    # them would encode the era, not the signal.
+    "liquidation_spike_ratio", "liquidation_imbalance",
 )
 
 _THRESHOLD_QUANTILES = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
