@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         add_champion,
         load_pool,
         family_count,
+        occupying_entries,
         save_pool,
     )
     from crypto_ai_system.registry.base_registry import append_registry_record
@@ -64,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     from crypto_ai_system.strategy_factory.rule_miner import (
         mine_rule_sets,
         rule_set_to_spec_dict,
+        spec_to_rule_set,
         split_train_holdout,
     )
     from crypto_ai_system.strategy_factory.runtime_feature_adapter import build_backtest_frame
@@ -90,6 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-drawdown", type=float, default=10.0)
     parser.add_argument("--min-stability", type=float, default=0.3)
     parser.add_argument("--dry-run", action="store_true", help="mine and gate, but do not touch the pool")
+    parser.add_argument("--no-seed-champions", action="store_true",
+                        help="start from a fully random population instead of seeding the "
+                             "adopted pool champions' rule sets into it")
     args = parser.parse_args(argv)
 
     symbol = to_binance_symbol(args.symbol or getattr(settings, "SYMBOL", "BTC-PERP"))
@@ -138,9 +143,21 @@ def main(argv: list[str] | None = None) -> int:
             return -10.0
         return mean / ((var ** 0.5) / (n ** 0.5))
 
+    # Adopted champions seed the initial population (proven parents to breed
+    # from); they earn no other privilege — same fitness, same gates.
+    seed_rule_sets = []
+    if not args.no_seed_champions:
+        for entry in occupying_entries(load_pool(str(settings.ACTIVE_STRATEGY_POOL_PATH))):
+            rule_set = spec_to_rule_set(entry.get("strategy_spec") or {})
+            if rule_set is not None:
+                seed_rule_sets.append(rule_set)
+        if seed_rule_sets:
+            print(f"seeding {len(seed_rule_sets)} pool champions into the initial population")
+
     mined = mine_rule_sets(
         train, fitness=fitness, seed=args.seed,
         population=args.population, generations=args.generations, top_n=args.top,
+        seed_population=seed_rule_sets,
     )
     print(f"searched {mined['search_evaluations']} candidates "
           f"(condition pool {mined['condition_pool_size']}) -> {len(mined['survivors'])} distinct families")
