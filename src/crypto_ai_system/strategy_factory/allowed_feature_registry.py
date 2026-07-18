@@ -127,19 +127,13 @@ RUNTIME_UNAVAILABLE_FEATURES = frozenset(
         # funding_rate / funding_zscore are NOT listed: the feature adapter aligns
         # the real 8h funding-event series (deep-history cache) onto every frame,
         # and a load failure leaves them NaN (indeterminate), never a constant.
-        # open interest / liquidations still have no feed
+        # The liquidation_* family is NOT listed either: the daily Coinalyze
+        # liquidation series is aligned the same way (missing key/outage -> NaN).
+        # open interest still has no feed
         "open_interest",
         "open_interest_base",
         "oi_change_pct",
         "oi_change_4h_pct",
-        # liquidations (same feed)
-        "long_liquidation",
-        "short_liquidation",
-        "liquidation_total",
-        "liquidation_spike_ratio",
-        "liquidation_imbalance",
-        "long_liquidation_spike",
-        "short_liquidation_spike",
         # auxiliary composite scores (require the optional-data collectors)
         "binance_derivatives_score",
         "exchange_flow_score",

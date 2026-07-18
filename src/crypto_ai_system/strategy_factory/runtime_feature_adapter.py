@@ -9,13 +9,14 @@ feature source for backtest and live.
 
 Multi-timeframe context and optional-data collectors are disabled here: the
 router needs the price/indicator/regime columns, not the heavy auxiliary feeds,
-and disabling them keeps this fast and side-effect-free. Funding is the
-exception: the real 8h funding-event series (deep-history cache) is aligned onto
-every frame, so funding_rate / funding_zscore carry real values in backtest and
-live alike — and are NaN (indeterminate), never a constant, when the series
-cannot be loaded. The remaining feed-less columns (open interest, liquidations,
-legacy mtf, aux scores) still come out as constant fallbacks, so a spec must not
-reference them — the S3 validator rejects any that do (see
+and disabling them keeps this fast and side-effect-free. Funding and daily
+liquidations are the exceptions: their real event series (deep-history caches)
+are aligned onto every frame, so funding_rate / funding_zscore and the
+liquidation_* columns carry real values in backtest and live alike — and are
+NaN (indeterminate), never a constant, when a series cannot be loaded. The
+remaining feed-less columns (open interest, legacy mtf, aux scores) still come
+out as constant fallbacks, so a spec must not reference them — the S3 validator
+rejects any that do (see
 ``allowed_feature_registry.RUNTIME_UNAVAILABLE_FEATURES``).
 """
 
@@ -68,21 +69,38 @@ def _default_funding_loader(symbol: str | None = None) -> "pd.DataFrame":
     return pd.DataFrame(rows)
 
 
+# Daily liquidation rows kept for the frame: 2300 covers the deepest candle
+# series the factory backtests (2200 x 1d) with head-room.
+LIQUIDATION_HISTORY_DAYS = 2300
+
+
+def _default_liquidation_loader(symbol: str | None = None) -> "pd.DataFrame":
+    import config.settings as settings
+    from crypto_ai_system.data.candle_history import load_liquidation_history
+
+    rows, _ = load_liquidation_history(
+        symbol or runtime_symbol(), LIQUIDATION_HISTORY_DAYS,
+        cache_dir=settings.HISTORY_DIR,
+    )
+    return pd.DataFrame(rows)
+
+
 def build_backtest_frame(
     candles: Sequence[dict[str, Any]],
     *,
     cfg: AppConfig | None = None,
     funding_loader: Callable[[], "pd.DataFrame"] | None = None,
+    liquidation_loader: Callable[[], "pd.DataFrame"] | None = None,
 ) -> "pd.DataFrame":
     """Return the full feature frame from OHLCV candles (the backtest input).
 
     Same feature source as the live router — the factory backtests strategies on
     exactly the columns they are evaluated against at runtime. The real 8h
-    funding series is aligned onto the frame (funding_rate / funding_zscore); if
-    it cannot be loaded those columns are NaN = indeterminate, so a
-    funding-referencing spec fails closed to no-entry rather than evaluating a
-    constant. Returns an empty frame when there are too few candles or required
-    columns are missing.
+    funding series and daily liquidation series are aligned onto the frame
+    (funding_rate / funding_zscore, liquidation_*); if a series cannot be loaded
+    its columns are NaN = indeterminate, so a spec referencing them fails closed
+    to no-entry rather than evaluating a constant. Returns an empty frame when
+    there are too few candles or required columns are missing.
     """
     if not candles or len(candles) < _MIN_CANDLES:
         return pd.DataFrame()
@@ -91,17 +109,19 @@ def build_backtest_frame(
     required = {"open", "high", "low", "close", "volume", "timestamp"}
     if not required.issubset(ohlcv.columns):
         return pd.DataFrame()
+    # Candle rows are symbol-labelled; the aligned series must come from the
+    # SAME symbol or rolling stats would be computed against another market.
+    row_symbol = str(ohlcv.iloc[0].get("symbol") or "") or None
     try:
-        if funding_loader is not None:
-            funding = funding_loader()
-        else:
-            # Candle rows are symbol-labelled; funding must come from the SAME
-            # symbol or the zscore would be computed against another market.
-            row_symbol = str(ohlcv.iloc[0].get("symbol") or "") or None
-            funding = _default_funding_loader(row_symbol)
+        funding = funding_loader() if funding_loader is not None else _default_funding_loader(row_symbol)
     except Exception:  # noqa: BLE001 - indeterminate funding, never a constant
         funding = pd.DataFrame()
-    return build_feature_frame(ohlcv, pd.DataFrame(), cfg, funding=funding)
+    try:
+        liquidations = (liquidation_loader() if liquidation_loader is not None
+                        else _default_liquidation_loader(row_symbol))
+    except Exception:  # noqa: BLE001 - indeterminate liquidations, never a constant
+        liquidations = pd.DataFrame()
+    return build_feature_frame(ohlcv, pd.DataFrame(), cfg, funding=funding, liquidations=liquidations)
 
 
 def build_runtime_feature_row(

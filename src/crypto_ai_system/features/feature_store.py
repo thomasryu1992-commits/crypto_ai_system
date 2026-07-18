@@ -22,6 +22,29 @@ from crypto_ai_system.data.price_data_loader import build_multi_timeframe_contex
 from crypto_ai_system.features.additional_data_features import build_additional_feature_snapshot
 
 
+def _asof_align_events(df: pd.DataFrame, events: pd.DataFrame, columns: list[str]) -> dict[str, np.ndarray]:
+    """Align event-series ``columns`` onto ``df``'s bars, merge_asof backward.
+
+    Each bar carries the last event at or before its open — an event can never
+    leak into earlier bars — and bars before the first event (or with an
+    unparseable timestamp) stay NaN = indeterminate, never a constant.
+    """
+    ev = events[['timestamp', *columns]].copy()
+    ev['_ts'] = pd.to_datetime(ev['timestamp'], utc=True, errors='coerce')
+    ev = ev.dropna(subset=['_ts']).sort_values('_ts')
+    for col in columns:
+        ev[col] = pd.to_numeric(ev[col], errors='coerce')
+    left = pd.DataFrame({'_ts': pd.to_datetime(df['timestamp'], utc=True, errors='coerce')})
+    left['_order'] = np.arange(len(left))
+    valid = left.dropna(subset=['_ts']).sort_values('_ts')
+    out = {col: np.full(len(left), np.nan) for col in columns}
+    if not valid.empty and not ev.empty:
+        merged = pd.merge_asof(valid, ev[['_ts', *columns]], on='_ts', direction='backward')
+        for col in columns:
+            out[col][valid['_order'].to_numpy()] = merged[col].to_numpy()
+    return out
+
+
 def _merge_close_feature(df: pd.DataFrame, other: pd.DataFrame | None, name: str) -> pd.DataFrame:
     if other is None or other.empty or 'close' not in other.columns:
         df[name] = np.nan
@@ -40,6 +63,7 @@ def build_feature_frame(
     index: pd.DataFrame | None = None,
     orderbook: dict | None = None,
     funding: pd.DataFrame | None = None,
+    liquidations: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     df = ohlcv.copy().reset_index(drop=True)
     df['timestamp'] = df['timestamp'].astype(str)
@@ -153,17 +177,45 @@ def build_feature_frame(
     df['open_interest_base'] = pd.to_numeric(df.get('open_interest_base', 0), errors='coerce').ffill().fillna(0)
     df['oi_change_pct'] = pd.to_numeric(df['oi_change_pct'], errors='coerce').fillna(df['open_interest'].pct_change()).fillna(0)
     df['oi_change_4h_pct'] = df['open_interest'].pct_change(4).replace([np.inf, -np.inf], np.nan).fillna(0)
-    df['long_liquidation'] = pd.to_numeric(df['long_liquidation'], errors='coerce').fillna(0)
-    df['short_liquidation'] = pd.to_numeric(df['short_liquidation'], errors='coerce').fillna(0)
+    # A daily liquidation series (deep history) supersedes the legacy per-cycle
+    # derivatives merge, with the same discipline as the funding series above:
+    # merge_asof backward, NaN where the series is missing or not yet started —
+    # never a constant, so a liquidation spec fails closed to no-entry on outage.
+    # Without the series the legacy 0-fill behavior is unchanged.
+    has_liq_series = liquidations is not None
+    if has_liq_series:
+        liq_cols = ['long_liquidation', 'short_liquidation']
+        if liquidations.empty or not set(liq_cols).issubset(liquidations.columns):
+            for col in liq_cols:
+                df[col] = np.nan
+        else:
+            aligned = _asof_align_events(df, liquidations, liq_cols)
+            for col in liq_cols:
+                df[col] = aligned[col]
+
+    df['long_liquidation'] = pd.to_numeric(df['long_liquidation'], errors='coerce')
+    df['short_liquidation'] = pd.to_numeric(df['short_liquidation'], errors='coerce')
+    if not has_liq_series:
+        df['long_liquidation'] = df['long_liquidation'].fillna(0)
+        df['short_liquidation'] = df['short_liquidation'].fillna(0)
 
     liq_total = df['long_liquidation'] + df['short_liquidation']
     liq_ma = liq_total.rolling(50, min_periods=10).mean().replace(0, np.nan)
     df['liquidation_total'] = liq_total
-    df['liquidation_spike_ratio'] = (liq_total / liq_ma).replace([np.inf, -np.inf], np.nan).fillna(0)
-    df['liquidation_imbalance'] = (df['short_liquidation'] - df['long_liquidation']) / liq_total.replace(0, np.nan)
-    df['liquidation_imbalance'] = df['liquidation_imbalance'].fillna(0)
-    df['long_liquidation_spike'] = ((df['long_liquidation'] > df['long_liquidation'].rolling(50, min_periods=10).mean() * 3) & (df['long_liquidation'] > 0)).astype(int)
-    df['short_liquidation_spike'] = ((df['short_liquidation'] > df['short_liquidation'].rolling(50, min_periods=10).mean() * 3) & (df['short_liquidation'] > 0)).astype(int)
+    spike_ratio = (liq_total / liq_ma).replace([np.inf, -np.inf], np.nan)
+    df['liquidation_spike_ratio'] = spike_ratio if has_liq_series else spike_ratio.fillna(0)
+    imbalance = (df['short_liquidation'] - df['long_liquidation']) / liq_total.replace(0, np.nan)
+    df['liquidation_imbalance'] = imbalance if has_liq_series else imbalance.fillna(0)
+    long_spike = (df['long_liquidation'] > df['long_liquidation'].rolling(50, min_periods=10).mean() * 3) & (df['long_liquidation'] > 0)
+    short_spike = (df['short_liquidation'] > df['short_liquidation'].rolling(50, min_periods=10).mean() * 3) & (df['short_liquidation'] > 0)
+    if has_liq_series:
+        # Spike flags on unknown inputs must stay indeterminate, not read as
+        # "no spike" — a NaN comparison is False, which would be a constant lie.
+        df['long_liquidation_spike'] = np.where(df['long_liquidation'].isna(), np.nan, long_spike.astype(float))
+        df['short_liquidation_spike'] = np.where(df['short_liquidation'].isna(), np.nan, short_spike.astype(float))
+    else:
+        df['long_liquidation_spike'] = long_spike.astype(int)
+        df['short_liquidation_spike'] = short_spike.astype(int)
 
     if bool(cfg.get('price_data.include_multi_timeframe_context', True)):
         mtf_context = build_multi_timeframe_context(cfg)
