@@ -125,6 +125,18 @@ BLOCK_FALLBACK_DATA_FOR_TRADING = env_bool("BLOCK_FALLBACK_DATA_FOR_TRADING", Tr
 # Paper/risk
 PAPER_ENGINE_ENABLED = env_bool("PAPER_ENGINE_ENABLED", True)
 PAPER_TRADING_ENABLED = env_bool("PAPER_TRADING_ENABLED", True)
+
+# Multi-book paper trading (M1: kernel support only — the trading path stays
+# single-book until M2 wires it). One book per strategy, each with its own
+# position; the caps are the operator's 2026-07-19 decision. Off by default so
+# behavior is unchanged until explicitly enabled.
+MULTIBOOK_PAPER_ENABLED = env_bool("MULTIBOOK_PAPER_ENABLED", False)
+# Global concurrent-position cap: diversification stops paying past a handful
+# of books when every underlying is crypto.
+MULTIBOOK_MAX_OPEN_BOOKS = env_int("MULTIBOOK_MAX_OPEN_BOOKS", 5)
+# Correlated-market guard: BTC/ETH/SOL longs are one bet three times, not
+# three bets, so same-direction books are capped harder than total books.
+MULTIBOOK_MAX_SAME_DIRECTION = env_int("MULTIBOOK_MAX_SAME_DIRECTION", 3)
 USE_RESEARCH_SIGNAL_GATE = env_bool("USE_RESEARCH_SIGNAL_GATE", True)
 RISK_LEVEL_REDUCED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_REDUCED_POSITION_MULTIPLIER", 0.5)
 RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER", 0.0)

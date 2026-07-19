@@ -77,16 +77,17 @@ def _result_r(direction: str, entry: float, exit_price: float, risk: float) -> f
     return signed / risk
 
 
-def open_from_execution(
+def build_position(
     execution_record: Mapping[str, Any],
     reconciliation: Mapping[str, Any],
     *,
     cycle_id: str | None = None,
-    cfg: AppConfig | None = None,
 ) -> dict[str, Any] | None:
-    """Open a paper position from a filled entry execution. Returns the position
-    (or None if the fill did not open a position)."""
-    cfg = cfg or load_config(".")
+    """The position dict a filled entry opens — pure, no IO.
+
+    Split out so the multi-book kernel opens positions with byte-identical
+    field logic; ``open_from_execution`` stays the single-book persistence
+    wrapper around it."""
     fill = dict(execution_record.get("simulated_fill") or {})
     if fill.get("fill_status") not in _FILLED:
         return None
@@ -134,6 +135,22 @@ def open_from_execution(
         {"execution_id": position["execution_id"], "entry": entry, "opened_at": position["opened_at_utc"]},
         24,
     )
+    return position
+
+
+def open_from_execution(
+    execution_record: Mapping[str, Any],
+    reconciliation: Mapping[str, Any],
+    *,
+    cycle_id: str | None = None,
+    cfg: AppConfig | None = None,
+) -> dict[str, Any] | None:
+    """Open a paper position from a filled entry execution. Returns the position
+    (or None if the fill did not open a position)."""
+    cfg = cfg or load_config(".")
+    position = build_position(execution_record, reconciliation, cycle_id=cycle_id)
+    if position is None:
+        return None
     _save_position(cfg, position)
     return position
 
