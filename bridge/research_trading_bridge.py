@@ -99,9 +99,17 @@ def _evaluate_pre_order_gate(
         "synthetic_flag": bool(market_snapshot.get("is_synthetic", False)),
         "fallback_flag": bool(market_snapshot.get("is_fallback", False)),
     }
+    # Paper's cap follows the multibook policy (1 single-book, else the global
+    # book cap); any other stage keeps its hard cap of one position.
+    if stage == "paper":
+        from crypto_ai_system.execution.paper_book_kernel import paper_gate_max_open_positions
+
+        max_open = paper_gate_max_open_positions()
+    else:
+        max_open = 1
     gate_config = {
         "stage": stage,
-        "max_open_positions": 1,
+        "max_open_positions": max_open,
         "require_profile_hash": True,
         # Loss limits come from settings so the hot-path gate and the cold-path
         # risk_guard judge against the same thresholds (they previously relied

@@ -63,6 +63,17 @@ def _caps() -> tuple[int, int]:
     )
 
 
+def paper_gate_max_open_positions(enabled: bool | None = None) -> int:
+    """The ``max_open_positions`` the paper PreOrderRiskGate should enforce.
+
+    Single-book paper allows one position; multibook allows one per book up to
+    the global cap. The live stage never routes through this - its cap stays 1.
+    """
+    if not multibook_enabled(enabled):
+        return 1
+    return _caps()[0]
+
+
 def _books_path(cfg: AppConfig) -> Path:
     raw = cfg.get("storage.latest_dir", "storage/latest")
     base = Path(raw)
@@ -216,6 +227,9 @@ def settle_books(
             "execution_id": position.get("execution_id"),
             "outcome_id": outcome.get("outcome_id"),
             "outcome_status": outcome.get("status"),
+            # The closed position itself, for per-book strategy attribution -
+            # the caller no longer has a single slot to read it back from.
+            "position": dict(position),
         })
 
     _save_books(cfg, data)

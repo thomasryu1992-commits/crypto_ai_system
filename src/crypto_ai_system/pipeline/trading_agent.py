@@ -22,6 +22,12 @@ from core.event_log import log_event
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
+from crypto_ai_system.execution.paper_book_kernel import (
+    multibook_enabled,
+    open_books,
+    open_in_book,
+    settle_books,
+)
 from crypto_ai_system.execution.paper_position_kernel import (
     has_open_position,
     load_open_position,
@@ -228,7 +234,25 @@ class TradingAgent(Agent):
         #    Paper settles by simulation; live submits a REAL reduceOnly close
         #    (fail-open-position: a blocked/unconfirmed close stays OPEN).
         settlement = None
-        if is_paper:
+        book_settlements: list[dict] = []
+        multibook = is_paper and multibook_enabled()
+        if multibook:
+            # Every open book settles independently on the same candle; each
+            # closed summary carries its own position for S8/S9 attribution.
+            book_settlements = settle_books(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+            settlement = book_settlements[0] if book_settlements else None
+            if _flag("STRATEGY_FACTORY_ROUTING_ENABLED"):
+                for closed in book_settlements:
+                    position = closed.get("position")
+                    if isinstance(position, dict) and position.get("strategy_id"):
+                        self._record_strategy_outcome(position, closed, ctx)
+        elif is_paper:
             # Capture the position before settling — settle clears it, and a
             # strategy-driven close must be attributed to its strategy (S8/S9).
             open_before = load_open_position(cfg)
@@ -279,11 +303,14 @@ class TradingAgent(Agent):
         #     makes "the gate cost us 3R" a measurement rather than a guess.
         counterfactuals_settled = self._settle_counterfactuals(cfg, snapshot)
 
-        # 2. Open-position count for the gate (max_open_positions enforced there).
+        # 2. Open-position count for the gate (max_open_positions enforced there;
+        #    multibook counts open books against the book cap).
         if is_live:
             from crypto_ai_system.execution.live_position_kernel import has_open_live_position
 
             open_positions = 1 if has_open_live_position(cfg) else 0
+        elif multibook:
+            open_positions = len(open_books(cfg))
         else:
             open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
 
@@ -298,11 +325,20 @@ class TradingAgent(Agent):
         # live stage the L2 final guard additionally requires the persisted
         # stage='live' RiskGate record before anything is signed.
         strategy_drive = None
-        if (
+        drive_eligible = (
             (is_paper or execution_stage == "live")
             and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
             and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
-        ):
+        )
+        if drive_eligible and multibook:
+            # One position per book: a routed candidate whose book is already
+            # open would only burn this cycle's entry on a guaranteed kernel
+            # refusal - let the research decision (default book) stand instead.
+            routing = ctx.get("strategy_routing")
+            routed_primary = routing.get("primary_strategy_id") if isinstance(routing, dict) else None
+            if routed_primary and routed_primary in open_books(cfg):
+                drive_eligible = False
+        if drive_eligible:
             strategy_drive = self._maybe_strategy_decision(ctx, execution_stage, open_positions)
             if strategy_drive is not None and strategy_drive.get("allow_order_intent"):
                 atomic_write_json(TRADE_DECISION_PATH, strategy_drive)
@@ -357,7 +393,23 @@ class TradingAgent(Agent):
         #    Paper opens from the simulated fill; live opens from the REAL fill
         #    via its kernel (which requires a RECONCILED entry).
         opened = None
-        if is_paper and order_filled and not has_open_position(cfg):
+        book_open_refusal = None
+        if multibook and order_filled:
+            # The book kernel is the arbiter: one position per book, global and
+            # same-direction caps. A refusal is logged, never silently dropped.
+            opened, book_open_refusal = open_in_book(
+                order,
+                reconciliation if isinstance(reconciliation, dict) else {},
+                cycle_id=cycle_id,
+                cfg=cfg,
+            )
+            if book_open_refusal:
+                log_event(
+                    "multibook_open_refused",
+                    {"reason": book_open_refusal, "cycle_id": cycle_id},
+                    severity="WARNING",
+                )
+        elif is_paper and order_filled and not has_open_position(cfg):
             opened = open_from_execution(
                 order,
                 reconciliation if isinstance(reconciliation, dict) else {},
@@ -383,6 +435,8 @@ class TradingAgent(Agent):
         position_opened = opened is not None
         if is_live:
             position_closed = isinstance(settlement, dict) and settlement.get("status") == "CLOSED"
+        elif multibook:
+            position_closed = bool(book_settlements)
         else:
             position_closed = settlement is not None
 
@@ -407,6 +461,11 @@ class TradingAgent(Agent):
             # candle resolved.
             "counterfactual_opened": counterfactual_opened,
             "counterfactuals_settled": counterfactuals_settled,
+            # Multibook state (empty/None in single-book mode).
+            "multibook_active": multibook,
+            "book_settlements": book_settlements,
+            "book_open_refusal": book_open_refusal,
+            "open_books_count": open_positions if multibook else None,
         }
 
         if not allow_new_position:

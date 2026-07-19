@@ -109,7 +109,15 @@ def _evaluate_strategy_risk_gate(
         "manual_kill_switch": bool(risk.get("manual_kill_switch", False)),
         "reconciliation_mismatch": bool(risk.get("reconciliation_mismatch", False)),
     }
-    gate_config: dict[str, Any] = {"stage": stage, "max_open_positions": 1, "require_profile_hash": True}
+    # Paper's cap follows the multibook policy (1 single-book, else the global
+    # book cap); the live stage keeps its hard cap of one position.
+    if stage == "paper":
+        from crypto_ai_system.execution.paper_book_kernel import paper_gate_max_open_positions
+
+        max_open = paper_gate_max_open_positions()
+    else:
+        max_open = 1
+    gate_config: dict[str, Any] = {"stage": stage, "max_open_positions": max_open, "require_profile_hash": True}
     if stage == "paper":
         profile: Mapping[str, Any] = get_paper_profile()
     elif stage == "live":

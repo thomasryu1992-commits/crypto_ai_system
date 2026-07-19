@@ -176,3 +176,21 @@ def test_settled_book_frees_its_slot(tmp_path):
     books.settle_books({"high": 99.0, "low": 97.0}, last_close=97.5, cfg=cfg, enabled=True)
     pos, refusal = _open(cfg, "LONG", "S271", "e3")
     assert refusal is None and pos["book_id"] == "S271"
+
+
+def test_close_summary_carries_the_position_for_attribution(tmp_path):
+    """The caller has no single slot to read the closed position back from."""
+    cfg = _cfg(tmp_path)
+    _open(cfg, "LONG", "S271", "e1")
+    closed = books.settle_books({"high": 99.0, "low": 97.0}, last_close=97.5, cfg=cfg, enabled=True)
+    position = closed[0]["position"]
+    assert position["strategy_id"] == "S271"
+    assert position["entry_price"] == 100.0
+
+
+def test_paper_gate_max_open_positions_follows_the_flag(monkeypatch):
+    import config.settings as settings
+
+    assert books.paper_gate_max_open_positions(enabled=False) == 1
+    monkeypatch.setattr(settings, "MULTIBOOK_MAX_OPEN_BOOKS", 5, raising=False)
+    assert books.paper_gate_max_open_positions(enabled=True) == 5
