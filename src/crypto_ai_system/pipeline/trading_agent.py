@@ -171,6 +171,117 @@ class TradingAgent(Agent):
         except Exception:  # noqa: BLE001 - never let the drive path break research
             return None
 
+    def _strategy_decision_for_candidate(self, ctx: PipelineContext, execution_stage: str,
+                                         open_positions: int, candidate: dict):
+        """A strategy decision for ONE ranked candidate (multibook entry walk).
+
+        The decision builder reads the routing's primary_* fields, so the
+        candidate is presented as the primary of a shallow routing copy.
+        Isolated like _maybe_strategy_decision: any failure returns None."""
+        routing = ctx.get("strategy_routing")
+        if not isinstance(routing, dict):
+            return None
+        try:
+            from crypto_ai_system.strategy_factory.strategy_execution_bridge import (
+                build_strategy_decision_for_cycle,
+            )
+
+            candidate_routing = {
+                **routing,
+                "primary_strategy_id": candidate.get("strategy_id"),
+                "primary_strategy_rule_hash": candidate.get("strategy_rule_hash"),
+                "direction": candidate.get("direction"),
+                "symbol": candidate.get("symbol"),
+            }
+            cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
+            now = ctx.cycle.started_at_utc if ctx.cycle else None
+            return build_strategy_decision_for_cycle(
+                candidate_routing, execution_stage=execution_stage, open_positions=open_positions,
+                cycle_id=cycle_id, now=now,
+            )
+        except Exception:  # noqa: BLE001 - never let the drive path break research
+            return None
+
+    def _run_multibook_entries(self, ctx: PipelineContext, cfg, cycle_id, execution_stage: str,
+                               research_decision: dict, open_count: int):
+        """Multibook entry phase: ranked candidates first, then the research
+        decision into the default book, bounded by the per-cycle entry budget.
+
+        Every attempt runs the full unchanged chain — persist decision, order
+        executor, paper reconciler, book kernel — so each entry is gated and
+        audited exactly like a single-book entry, and the kernel remains the
+        arbiter of the book/global/direction caps. Returns
+        ``(entries, first_strategy_decision)``."""
+        from crypto_ai_system.execution.paper_book_kernel import DEFAULT_BOOK_ID
+
+        entries: list[dict] = []
+        opened_count = 0
+        budget = max(0, int(getattr(settings, "MULTIBOOK_MAX_ENTRIES_PER_CYCLE", 2)))
+        taken_books = set(open_books(cfg))
+
+        def _attempt(decision: dict, kind: str, book_hint: str) -> None:
+            nonlocal opened_count
+            atomic_write_json(TRADE_DECISION_PATH, decision)
+            order = run_order_executor(execution_stage)
+            order = order if isinstance(order, dict) else {}
+            reconciliation = run_reconciler()
+            opened, refusal = None, None
+            if order.get("filled"):
+                # enabled is passed explicitly: the caller decided the mode for
+                # this cycle, and a mid-cycle settings flip must not split it.
+                opened, refusal = open_in_book(
+                    order, reconciliation if isinstance(reconciliation, dict) else {},
+                    cycle_id=cycle_id, cfg=cfg, enabled=True,
+                )
+                if refusal:
+                    log_event(
+                        "multibook_open_refused",
+                        {"reason": refusal, "book": book_hint, "cycle_id": cycle_id},
+                        severity="WARNING",
+                    )
+                elif opened is not None:
+                    opened_count += 1
+                    taken_books.add(str(opened.get("book_id")))
+            entries.append({
+                "decision_kind": kind,
+                "book": book_hint,
+                "order": order,
+                "reconciliation": reconciliation,
+                "opened": opened,
+                "book_refusal": refusal,
+                "filled": bool(order.get("filled")),
+            })
+
+        strategy_drive = None
+        routing = ctx.get("strategy_routing")
+        drive_on = _flag("STRATEGY_FACTORY_ROUTING_ENABLED") and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
+        candidates = []
+        if drive_on and isinstance(routing, dict):
+            candidates = [
+                c for c in (routing.get("ranked_candidates") or [])
+                if c.get("strategy_id") and c["strategy_id"] not in taken_books
+            ]
+
+        for candidate in candidates:
+            if len(entries) >= budget:
+                break
+            decision = self._strategy_decision_for_candidate(
+                ctx, execution_stage, open_count + opened_count, candidate,
+            )
+            # No executor churn on a candidate the bridge already refused.
+            if decision is None or not decision.get("allow_order_intent"):
+                continue
+            if strategy_drive is None:
+                strategy_drive = decision
+            _attempt(decision, "strategy", str(candidate["strategy_id"]))
+
+        # The research decision drives the shared default book, last: the pool's
+        # strategies are the point of multibook, research keeps its one slot.
+        if len(entries) < budget and DEFAULT_BOOK_ID not in taken_books and isinstance(research_decision, dict):
+            _attempt(research_decision, "research", DEFAULT_BOOK_ID)
+
+        return entries, strategy_drive
+
     def _settle_counterfactuals(self, cfg, snapshot: dict) -> list[dict]:
         """Advance the shadow book of trades the gates blocked.
 
@@ -245,6 +356,7 @@ class TradingAgent(Agent):
                 timeframe=str(snapshot.get("timeframe", "1h")),
                 regime=str(snapshot.get("trend_bias", "unknown")),
                 cfg=cfg,
+                enabled=True,
             )
             settlement = book_settlements[0] if book_settlements else None
             if _flag("STRATEGY_FACTORY_ROUTING_ENABLED"):
@@ -325,58 +437,74 @@ class TradingAgent(Agent):
         # live stage the L2 final guard additionally requires the persisted
         # stage='live' RiskGate record before anything is signed.
         strategy_drive = None
-        drive_eligible = (
-            (is_paper or execution_stage == "live")
-            and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-            and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
-        )
-        if drive_eligible and multibook:
-            # One position per book: a routed candidate whose book is already
-            # open would only burn this cycle's entry on a guaranteed kernel
-            # refusal - let the research decision (default book) stand instead.
-            routing = ctx.get("strategy_routing")
-            routed_primary = routing.get("primary_strategy_id") if isinstance(routing, dict) else None
-            if routed_primary and routed_primary in open_books(cfg):
-                drive_eligible = False
-        if drive_eligible:
-            strategy_drive = self._maybe_strategy_decision(ctx, execution_stage, open_positions)
-            if strategy_drive is not None and strategy_drive.get("allow_order_intent"):
-                atomic_write_json(TRADE_DECISION_PATH, strategy_drive)
-                trade_decision = strategy_drive
-
-        order = run_order_executor(execution_stage)
-
-        # Reconcile against the venue only when a real external order was
-        # submitted; otherwise use the paper reconciler.
-        externally_submitted = isinstance(order, dict) and order.get(
-            "external_order_submission_performed"
-        )
-        if execution_stage == "signed_testnet" and externally_submitted:
-            reconciliation = run_signed_testnet_reconciliation()
-        elif execution_stage == "live" and externally_submitted:
-            from crypto_ai_system.execution.live_strategy_execution import (
-                run_live_strategy_reconciliation,
+        multibook_entries: list[dict] = []
+        if multibook:
+            # M3: walk the ranked candidates (one book each), then the research
+            # decision into the default book, bounded by the per-cycle entry
+            # budget. The kernel's caps stay the arbiter inside the loop.
+            multibook_entries, strategy_drive = self._run_multibook_entries(
+                ctx, cfg, cycle_id, execution_stage, trade_decision, open_positions,
             )
-
-            reconciliation = run_live_strategy_reconciliation()
+            last = multibook_entries[-1] if multibook_entries else {}
+            order = last.get("order") or {}
+            reconciliation = last.get("reconciliation") or {}
+            externally_submitted = False
         else:
-            reconciliation = run_reconciler()
+            drive_eligible = (
+                (is_paper or execution_stage == "live")
+                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
+                and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
+            )
+            if drive_eligible:
+                strategy_drive = self._maybe_strategy_decision(ctx, execution_stage, open_positions)
+                if strategy_drive is not None and strategy_drive.get("allow_order_intent"):
+                    atomic_write_json(TRADE_DECISION_PATH, strategy_drive)
+                    trade_decision = strategy_drive
+
+            order = run_order_executor(execution_stage)
+
+            # Reconcile against the venue only when a real external order was
+            # submitted; otherwise use the paper reconciler.
+            externally_submitted = isinstance(order, dict) and order.get(
+                "external_order_submission_performed"
+            )
+            if execution_stage == "signed_testnet" and externally_submitted:
+                reconciliation = run_signed_testnet_reconciliation()
+            elif execution_stage == "live" and externally_submitted:
+                from crypto_ai_system.execution.live_strategy_execution import (
+                    run_live_strategy_reconciliation,
+                )
+
+                reconciliation = run_live_strategy_reconciliation()
+            else:
+                reconciliation = run_reconciler()
 
         # Derive real order lifecycle state — a non-empty result dict is NOT a
         # trade (a REJECTED/NO_ORDER result is also a dict). A trade counts only
         # when the executor actually filled (paper) or submitted (testnet).
+        # Multibook aggregates across this cycle's entry attempts.
         order = order if isinstance(order, dict) else {}
         order_status = order.get("status")
-        order_filled = bool(order.get("filled"))
-        order_intent_created = bool(order.get("intent", {}).get("order_intent_created")) or bool(
-            order.get("order_intent_id")
-        )
-        order_submitted = bool(order.get("external_order_submission_performed")) or (
-            order_status in {"SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED"}
-        )
-        trade_executed = order_filled or order_status in {
-            "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
-        }
+        if multibook:
+            orders = [e.get("order") or {} for e in multibook_entries]
+            order_filled = any(bool(o.get("filled")) for o in orders)
+            order_intent_created = any(
+                bool(o.get("intent", {}).get("order_intent_created")) or bool(o.get("order_intent_id"))
+                for o in orders
+            )
+            order_submitted = False  # multibook is paper-only; nothing external
+            trade_executed = order_filled
+        else:
+            order_filled = bool(order.get("filled"))
+            order_intent_created = bool(order.get("intent", {}).get("order_intent_created")) or bool(
+                order.get("order_intent_id")
+            )
+            order_submitted = bool(order.get("external_order_submission_performed")) or (
+                order_status in {"SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED"}
+            )
+            trade_executed = order_filled or order_status in {
+                "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
+            }
 
         # 2b. The signal wanted a trade and did not get one — shadow it, whatever
         #     stopped it. Recording keys off what actually happened (no trade),
@@ -394,21 +522,13 @@ class TradingAgent(Agent):
         #    via its kernel (which requires a RECONCILED entry).
         opened = None
         book_open_refusal = None
-        if multibook and order_filled:
-            # The book kernel is the arbiter: one position per book, global and
-            # same-direction caps. A refusal is logged, never silently dropped.
-            opened, book_open_refusal = open_in_book(
-                order,
-                reconciliation if isinstance(reconciliation, dict) else {},
-                cycle_id=cycle_id,
-                cfg=cfg,
+        if multibook:
+            # Opens already happened inside the entry walk (the kernel stayed
+            # the arbiter there); surface the first for the legacy output shape.
+            opened = next((e.get("opened") for e in multibook_entries if e.get("opened")), None)
+            book_open_refusal = next(
+                (e.get("book_refusal") for e in multibook_entries if e.get("book_refusal")), None
             )
-            if book_open_refusal:
-                log_event(
-                    "multibook_open_refused",
-                    {"reason": book_open_refusal, "cycle_id": cycle_id},
-                    severity="WARNING",
-                )
         elif is_paper and order_filled and not has_open_position(cfg):
             opened = open_from_execution(
                 order,
@@ -466,6 +586,9 @@ class TradingAgent(Agent):
             "book_settlements": book_settlements,
             "book_open_refusal": book_open_refusal,
             "open_books_count": open_positions if multibook else None,
+            # This cycle's entry walk: which decisions ran, what filled, which
+            # books opened or refused (order/reconciliation dicts included).
+            "multibook_entries": multibook_entries,
         }
 
         if not allow_new_position:

@@ -121,6 +121,30 @@ def has_open_book(cfg: AppConfig | None = None, *, enabled: bool | None = None) 
     return bool(open_books(cfg))
 
 
+def multibook_report(cfg: AppConfig | None = None, *, enabled: bool | None = None) -> dict[str, Any] | None:
+    """Observability snapshot of the book state against the caps, or None when
+    multibook is disabled. Read-only - the validation agent surfaces this so
+    the operator sees capacity pressure before the kernel starts refusing."""
+    if not multibook_enabled(enabled):
+        return None
+    books = open_books(cfg)
+    directions: dict[str, int] = {}
+    for pos in books.values():
+        d = str(pos.get("direction") or "?")
+        directions[d] = directions.get(d, 0) + 1
+    max_books, max_same_direction = _caps()
+    return {
+        "enabled": True,
+        "open_books": sorted(books),
+        "open_count": len(books),
+        "max_open_books": max_books,
+        "same_direction_counts": directions,
+        "max_same_direction": max_same_direction,
+        "remaining_capacity": max(0, max_books - len(books)),
+        "at_capacity": len(books) >= max_books,
+    }
+
+
 def open_in_book(
     execution_record: Mapping[str, Any],
     reconciliation: Mapping[str, Any],

@@ -147,18 +147,37 @@ def route_entries(
             "conflicted_symbols": sorted(conflicted),
         }
 
-    # Primary strategy: strongest champion score, then id for determinism.
-    primary = max(
+    # Ranked candidates: strongest champion score first, id for determinism.
+    # The primary is the head; multibook entry (M3) walks the rest, one book
+    # each. The router still only proposes — nothing here grants execution.
+    # reverse sort on (score, id) so the head is exactly what max() picked
+    # before - highest score, then highest id on a tie.
+    ranked = sorted(
         survivors,
-        key=lambda m: (m["champion_score"] if m["champion_score"] is not None else -math.inf, m["strategy_id"] or ""),
+        key=lambda m: (
+            m["champion_score"] if m["champion_score"] is not None else -math.inf,
+            m["strategy_id"] or "",
+        ),
+        reverse=True,
     )
+    primary = ranked[0]
     return {
         **base,
         "status": STATUS_ENTRY_CANDIDATE,
         "direction": primary["direction"],
         "symbol": primary["symbol"],
-        "order_candidate_count": 1,  # one order regardless of how many agreed
+        "order_candidate_count": 1,  # one order per single-book cycle regardless of how many agreed
         "primary_strategy_id": primary["strategy_id"],
         "primary_strategy_rule_hash": primary["strategy_rule_hash"],
+        "ranked_candidates": [
+            {
+                "strategy_id": m["strategy_id"],
+                "strategy_rule_hash": m["strategy_rule_hash"],
+                "direction": m["direction"],
+                "symbol": m["symbol"],
+                "champion_score": m["champion_score"],
+            }
+            for m in ranked
+        ],
         "conflicted_symbols": sorted(conflicted) if conflicted else [],
     }
