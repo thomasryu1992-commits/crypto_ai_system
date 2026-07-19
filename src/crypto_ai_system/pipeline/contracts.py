@@ -30,7 +30,8 @@ class StageStatus(str, Enum):
     """Stage refused to proceed; fatal blocks halt the pipeline (fail-closed)."""
 
     ERROR = "ERROR"
-    """Stage raised an unexpected exception; always halts the trade path."""
+    """Stage raised an unexpected exception; halts the trade path only when
+    fatal (advisory stages run with ``fatal_on_error = False``)."""
 
 
 @dataclass
@@ -48,11 +49,7 @@ class StageResult:
 
     @property
     def halts(self) -> bool:
-        if self.status is StageStatus.ERROR:
-            return True
-        if self.status is StageStatus.BLOCKED and self.fatal:
-            return True
-        return False
+        return self.fatal and self.status in {StageStatus.ERROR, StageStatus.BLOCKED}
 
     def summary(self) -> str:
         reason = f" — {'; '.join(self.reasons)}" if self.reasons else ""

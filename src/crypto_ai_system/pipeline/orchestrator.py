@@ -3,8 +3,9 @@
 Order: data -> research -> validation -> trading -> feedback.
 
 Fail-closed semantics:
-  * If any pre-trade stage (data/research/validation) halts (ERROR, or a
-    fatal BLOCK), the trading stage is SKIPPED — no orders on bad inputs.
+  * If any pre-trade stage (data/research/validation) halts (a fatal ERROR
+    or BLOCK), the trading stage is SKIPPED — no orders on bad inputs.
+    Advisory stages (``fatal_on_error = False``) never halt the trade path.
   * A DEGRADED pre-trade stage (e.g. validation's no-trade gate) does not
     halt; trading runs in no-new-position mode.
   * Feedback always runs so the system learns from every cycle.

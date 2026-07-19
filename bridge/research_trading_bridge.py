@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from config.settings import (
+    DAILY_MAX_LOSS_R,
     DATA_HEALTH_PATH,
     MARKET_SNAPSHOT_PATH,
+    MAX_CONSECUTIVE_LOSSES,
     RESEARCH_DECISION_PATH,
     RESEARCH_SIGNAL_PATH,
     RISK_STATUS_PATH,
@@ -97,7 +99,17 @@ def _evaluate_pre_order_gate(
         "synthetic_flag": bool(market_snapshot.get("is_synthetic", False)),
         "fallback_flag": bool(market_snapshot.get("is_fallback", False)),
     }
-    gate_config = {"stage": stage, "max_open_positions": 1, "require_profile_hash": True}
+    gate_config = {
+        "stage": stage,
+        "max_open_positions": 1,
+        "require_profile_hash": True,
+        # Loss limits come from settings so the hot-path gate and the cold-path
+        # risk_guard judge against the same thresholds (they previously relied
+        # on the gate's hardcoded defaults, which drift if the env overrides
+        # DAILY_MAX_LOSS_R / MAX_CONSECUTIVE_LOSSES).
+        "daily_loss_limit_r": DAILY_MAX_LOSS_R,
+        "max_consecutive_losses": MAX_CONSECUTIVE_LOSSES,
+    }
     result = evaluate_pre_order_risk_gate(
         decision=decision_seed,
         research_signal=research_signal,

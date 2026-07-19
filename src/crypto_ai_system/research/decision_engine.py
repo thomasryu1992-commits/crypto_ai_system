@@ -8,6 +8,7 @@ from crypto_ai_system.registry.decision_pipeline_registry import persist_decisio
 from crypto_ai_system.trading.order_id_chain import ORDER_ID_CHAIN_VERSION, decision_id_from_signal
 from core.event_log import log_event
 from crypto_ai_system.quality.legacy_signal_fallback_blocker import build_legacy_signal_fallback_block_report
+from crypto_ai_system.research.trade_permission import directional_permission
 
 
 RESEARCH_DECISION_MODE = "DECISION_GENERATION_ONLY"
@@ -36,11 +37,17 @@ def run_research_decision() -> dict:
     timing = research.get("signal_timing") or research_signal.get("signal_timing")
     score = float(research.get("scores", {}).get("final_score", research_signal.get("score_total_score", 0)))
 
-    bias = "NEUTRAL"
-    if scenario in {"Bullish", "Constructive"} and timing not in {"Data-Blocked", "Late"}:
+    # Directional view comes from the shared mapping (same source as the
+    # ResearchSignal's trade_permission), so bias/side can never disagree with
+    # the permission the gate enforces. "Cautious" keeps its risk-off label
+    # even though it never permits a short.
+    allow_long_dir, allow_short_dir = directional_permission(str(scenario or ""), str(timing or ""))
+    if allow_long_dir:
         bias = "ALLOW_LONG_BIAS"
     elif scenario in {"Bearish", "Cautious"}:
         bias = "ALLOW_SHORT_OR_RISK_OFF"
+    else:
+        bias = "NEUTRAL"
 
     # Step280 runtime hygiene: avoid global latest ResearchSignal state leaking into
     # isolated legacy research-result tests/runs. A ResearchSignal permission override
@@ -78,7 +85,7 @@ def run_research_decision() -> dict:
         if signal_permission_authoritative and isinstance(research_signal.get("trade_permission"), dict)
         else {}
     )
-    side = "LONG" if bias == "ALLOW_LONG_BIAS" else "SHORT" if bias == "ALLOW_SHORT_OR_RISK_OFF" and scenario == "Bearish" else "NONE"
+    side = "LONG" if allow_long_dir else "SHORT" if allow_short_dir else "NONE"
     decision_seed = {"side": side, "scenario": scenario, "final_score": score, "created_from": "step271_research_decision"}
     decision_id = decision_id_from_signal(research_signal, decision_seed)
 

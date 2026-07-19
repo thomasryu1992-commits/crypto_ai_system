@@ -60,13 +60,14 @@ def _resolve_signal_profile() -> tuple[str, str]:
 
 SIGNAL_QA_REPORT_PATH = LATEST_DIR / "signal_qa_report.json"
 
-# Scenario/timing that permit a long (mirrors the decision engine bias). The
-# scenario sets are public because they are the only record of the research's
-# *directional view* before timing/data blocks collapse entry_side to FLAT — the
-# counterfactual tracker reads them to know what a block suppressed.
-LONG_SCENARIOS = {"Bullish", "Constructive"}
-SHORT_SCENARIOS = {"Bearish"}
-_BLOCKING_TIMING = {"Data-Blocked", "Late", "Risk-Off", "Bearish"}
+# Re-exported for existing importers (e.g. the counterfactual tracker); the
+# canonical mapping lives in research.trade_permission, shared with the
+# decision engine so the directional sets cannot drift apart.
+from crypto_ai_system.research.trade_permission import (  # noqa: F401
+    LONG_SCENARIOS,
+    SHORT_SCENARIOS,
+    directional_permission,
+)
 
 
 def _f(value: Any, default: float = 0.0) -> float:
@@ -94,8 +95,9 @@ def _trade_permission(snapshot: Mapping[str, Any], research: Mapping[str, Any]) 
     if snapshot.get("is_fallback") is True:
         block_reasons.append("FALLBACK_DATA")
 
-    allow_long = scenario in LONG_SCENARIOS and timing not in _BLOCKING_TIMING and not block_reasons
-    allow_short = scenario in SHORT_SCENARIOS and timing != "Data-Blocked" and not block_reasons
+    dir_long, dir_short = directional_permission(scenario, timing)
+    allow_long = dir_long and not block_reasons
+    allow_short = dir_short and not block_reasons
     allow_new = allow_long or allow_short
     risk_level = "blocked" if (block_reasons or not allow_new) else "normal"
     return {
