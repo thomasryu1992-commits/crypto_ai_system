@@ -13,3 +13,14 @@ for %%S in (BTCUSDT ETHUSDT BNBUSDT DOGEUSDT SOLUSDT) do (
     --min-trades 100 --min-expectancy 0.1 --min-profit-factor 1.15 ^
     --min-wf-pass 0.7 --max-drawdown 10.0 --min-stability 0.3 >> "storage\logs\strategy_factory.log" 2>&1
 )
+REM Rule mining after the template pass: evolve entry rules per symbol, seeded
+REM by the adopted champions. The CLI defaults ARE the directive gates
+REM (100 trades / 0.1R / PF 1.15 / WF 0.7 / dd 10 / holdout), so no flag soup.
+REM One fresh seed per run - a fixed seed would repeat the same search forever;
+REM logged so any mined champion's search is reproducible.
+set MINER_SEED=%RANDOM%
+echo [miner] seed %MINER_SEED% >> "storage\logs\strategy_factory.log"
+for %%S in (BTCUSDT ETHUSDT BNBUSDT DOGEUSDT SOLUSDT) do (
+  py run_rule_miner.py --symbol %%S --history 2200 --interval 1d ^
+    --seed %MINER_SEED% >> "storage\logs\strategy_factory.log" 2>&1
+)
