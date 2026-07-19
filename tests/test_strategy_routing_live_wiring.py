@@ -113,9 +113,17 @@ def test_agent_disabled_is_noop(monkeypatch):
 
 def test_agent_never_halts_even_on_error(monkeypatch):
     monkeypatch.setattr(settings, "STRATEGY_FACTORY_ROUTING_ENABLED", True, raising=False)
-    # Point the pool path at something that makes read fail internally; the agent
-    # must still not halt the pipeline (fatal_on_error is False).
+    # Force a real crash inside the agent; advisory stages must surface it as a
+    # non-fatal ERROR that does not halt the pipeline (fatal_on_error is False).
+    import crypto_ai_system.pipeline.strategy_routing_agent as sra
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("routing kaboom")
+
+    monkeypatch.setattr(sra, "evaluate_live_routing", _boom)
     result = StrategyRoutingAgent().run(_ctx())
+    assert result.status is StageStatus.ERROR
+    assert result.fatal is False
     assert result.halts is False
 
 

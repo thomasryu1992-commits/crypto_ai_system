@@ -30,7 +30,6 @@ def run_research_cycle() -> dict:
         "signal_timing": timing,
         "scores": scores,
         "context_summary": context.get("summary"),
-        "allow_research_bias": timing not in {"Data-Blocked", "Risk-Off", "Bearish"},
         "research_engine_mode": RESEARCH_ENGINE_MODE,
         "trading_execution_enabled_by_this_module": TRADING_EXECUTION_ENABLED_BY_THIS_MODULE,
         "order_routing_enabled_by_this_module": ORDER_ROUTING_ENABLED_BY_THIS_MODULE,

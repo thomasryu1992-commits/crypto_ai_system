@@ -120,6 +120,48 @@ def test_degraded_validation_does_not_halt():
     assert not run.halted
 
 
+def test_nonfatal_error_does_not_skip_trading():
+    """An advisory pre-trade stage (fatal_on_error=False) crashing must not
+    halt the trade path — only fatal ERROR/BLOCK results do."""
+    pre = [
+        _FakeAgent("data", StageResult("data", StageStatus.OK)),
+        _FakeAgent(
+            "strategy_routing",
+            StageResult("strategy_routing", StageStatus.ERROR, reasons=["boom"], fatal=False),
+        ),
+        _FakeAgent(
+            "validation",
+            StageResult("validation", StageStatus.OK, outputs={"allow_new_position": True}),
+        ),
+    ]
+    trading = _FakeAgent("trading", StageResult("trading", StageStatus.OK))
+    feedback = _FakeAgent("feedback", StageResult("feedback", StageStatus.OK))
+
+    run = _pipeline_with(pre, trading, feedback).run_once()
+
+    assert pre[2].ran is True
+    assert trading.ran is True
+    assert not run.halted
+
+
+def test_feedback_error_does_not_mark_run_halted():
+    pre = [
+        _FakeAgent("data", StageResult("data", StageStatus.OK)),
+        _FakeAgent("research", StageResult("research", StageStatus.OK)),
+        _FakeAgent("validation", StageResult("validation", StageStatus.OK)),
+    ]
+    trading = _FakeAgent("trading", StageResult("trading", StageStatus.OK))
+    feedback = _FakeAgent(
+        "feedback",
+        StageResult("feedback", StageStatus.ERROR, reasons=["registry boom"], fatal=False),
+    )
+
+    run = _pipeline_with(pre, trading, feedback).run_once()
+
+    assert trading.ran is True
+    assert not run.halted
+
+
 def test_agent_exception_becomes_error_result():
     class _Boom(Agent):
         name = "data"
