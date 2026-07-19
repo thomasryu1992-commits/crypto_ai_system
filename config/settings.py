@@ -137,6 +137,10 @@ MULTIBOOK_MAX_OPEN_BOOKS = env_int("MULTIBOOK_MAX_OPEN_BOOKS", 5)
 # Correlated-market guard: BTC/ETH/SOL longs are one bet three times, not
 # three bets, so same-direction books are capped harder than total books.
 MULTIBOOK_MAX_SAME_DIRECTION = env_int("MULTIBOOK_MAX_SAME_DIRECTION", 3)
+# Burst bound: books opened in the same cycle share one candle's entry timing,
+# so even under the caps a full fan-out in one cycle would correlate every
+# entry. Two per cycle lets the portfolio build across cycles instead.
+MULTIBOOK_MAX_ENTRIES_PER_CYCLE = env_int("MULTIBOOK_MAX_ENTRIES_PER_CYCLE", 2)
 USE_RESEARCH_SIGNAL_GATE = env_bool("USE_RESEARCH_SIGNAL_GATE", True)
 RISK_LEVEL_REDUCED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_REDUCED_POSITION_MULTIPLIER", 0.5)
 RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER = env_float("RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER", 0.0)

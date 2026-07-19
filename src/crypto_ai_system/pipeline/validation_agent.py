@@ -34,6 +34,18 @@ class ValidationAgent(Agent):
             "allow_new_position": allow_new_position,
         }
 
+        # Multibook observability (None when disabled): capacity pressure is
+        # visible here before the book kernel starts refusing opens. Best-effort
+        # — a report failure must never gate trading.
+        try:
+            from crypto_ai_system.execution.paper_book_kernel import multibook_report
+
+            report = multibook_report()
+            if report is not None:
+                outputs["multibook"] = report
+        except Exception:  # noqa: BLE001 - observational only
+            pass
+
         if allow_new_position:
             return self.ok(**outputs)
 
