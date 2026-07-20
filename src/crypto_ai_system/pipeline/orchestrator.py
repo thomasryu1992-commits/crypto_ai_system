@@ -67,17 +67,15 @@ class Pipeline:
                 break
 
         if halted:
-            skipped = StageResult(
+            trade_result = StageResult(
                 stage=self.trading.name,
                 status=StageStatus.SKIPPED,
                 reasons=["upstream stage halted the pipeline (fail-closed)"],
             )
-            ctx.record(skipped)
-            results.append(skipped)
         else:
             trade_result = self.trading.run(ctx)
-            ctx.record(trade_result)
-            results.append(trade_result)
+        ctx.record(trade_result)
+        results.append(trade_result)
 
         feedback_result = self.feedback.run(ctx)
         ctx.record(feedback_result)
@@ -85,6 +83,7 @@ class Pipeline:
 
         return PipelineRun(
             results=results,
-            trade_executed=bool(ctx.get("trade_executed", False)),
+            # Read from the trading stage's own result, not a shared namespace.
+            trade_executed=bool(trade_result.outputs.get("trade_executed", False)),
             cycle_id=ctx.cycle.cycle_id if ctx.cycle else None,
         )

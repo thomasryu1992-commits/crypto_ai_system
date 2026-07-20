@@ -116,28 +116,21 @@ class ValidationVerdict:
 class PipelineContext:
     """Mutable state threaded through the agents within one cycle.
 
-    Typed slots are the load-bearing intra-cycle contract: ``verdict`` is set
-    by the validation agent, ``strategy_routing`` by the routing agent. The
-    legacy ``data`` dict (outputs merged into a shared namespace) remains only
-    until the P3 migration removes it.
+    The typed slots ARE the intra-cycle contract: ``verdict`` is set by the
+    validation agent, ``strategy_routing`` by the routing agent, and consumers
+    read those fields — there is no shared outputs namespace to remember keys
+    in (the legacy merged dict was how the gate-bypass class slipped through).
+    Everything else flows through each stage's own :class:`StageResult` or the
+    ``storage/latest`` files.
     """
 
     cycle: CycleEnvelope | None = None
     results: dict[str, StageResult] = field(default_factory=dict)
-    data: dict[str, Any] = field(default_factory=dict)
     verdict: ValidationVerdict | None = None
     strategy_routing: dict[str, Any] | None = None
 
     def record(self, result: StageResult) -> None:
         self.results[result.stage] = result
-        self.data.update(result.outputs)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self.data.get(key, default)
-
-    def stage_ok(self, stage: str) -> bool:
-        result = self.results.get(stage)
-        return result is not None and result.status is StageStatus.OK
 
 
 @dataclass

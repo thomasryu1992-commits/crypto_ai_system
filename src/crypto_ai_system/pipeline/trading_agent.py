@@ -159,7 +159,7 @@ class TradingAgent(Agent):
 
         Isolated so a failure here can never break the research path: any error
         returns None and the research decision stands."""
-        routing = ctx.get("strategy_routing")
+        routing = ctx.strategy_routing
         if not isinstance(routing, dict):
             return None
         try:
@@ -185,7 +185,7 @@ class TradingAgent(Agent):
         The decision builder reads the routing's primary_* fields, so the
         candidate is presented as the primary of a shallow routing copy.
         Isolated like _maybe_strategy_decision: any failure returns None."""
-        routing = ctx.get("strategy_routing")
+        routing = ctx.strategy_routing
         if not isinstance(routing, dict):
             return None
         try:
@@ -266,7 +266,7 @@ class TradingAgent(Agent):
             })
 
         strategy_drive = None
-        routing = ctx.get("strategy_routing")
+        routing = ctx.strategy_routing
         drive_on = _flag("STRATEGY_FACTORY_ROUTING_ENABLED") and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
         candidates = []
         if drive_on and isinstance(routing, dict):

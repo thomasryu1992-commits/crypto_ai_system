@@ -110,12 +110,9 @@ class _Ctx:
     """Just enough PipelineContext for the entry walk."""
 
     def __init__(self, routing):
-        self._d = {"strategy_routing": routing}
+        self.strategy_routing = routing
         self.cycle = None
         self.verdict = None  # -> ValidationVerdict.fail_closed() in the agent
-
-    def get(self, key, default=None):
-        return self._d.get(key, default)
 
 
 def _wire_fake_execution(monkeypatch, cfg):

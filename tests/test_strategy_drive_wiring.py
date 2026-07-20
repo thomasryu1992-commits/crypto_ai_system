@@ -116,8 +116,7 @@ def test_bridge_enforces_risk_gate(tmp_path, monkeypatch):
 
 def _ctx(routing=None):
     ctx = PipelineContext(cycle=CycleEnvelope(cycle_id="cycle_x", started_at_utc=NOW, stage="paper"))
-    if routing is not None:
-        ctx.data["strategy_routing"] = routing
+    ctx.strategy_routing = routing
     return ctx
 
 
