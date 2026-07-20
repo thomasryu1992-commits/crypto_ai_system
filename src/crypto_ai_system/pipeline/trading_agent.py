@@ -63,66 +63,19 @@ def _f(value) -> float | None:
     except (TypeError, ValueError):
         return None
 
-_CONFIRMATION_PHRASE = "I_UNDERSTAND_THIS_PLACES_REAL_ORDERS"
 
-
-def _flag(name: str, default: bool = False) -> bool:
-    return bool(getattr(settings, name, default))
-
-
-def _live_requested() -> bool:
-    return _flag("LIVE_TRADING_ENABLED") or _flag("ALLOW_LIVE_TRADING")
-
-
-def _testnet_requested() -> bool:
-    return _flag("ENABLE_TESTNET_ORDERS") or _flag("TESTNET_SIGNED_ORDER_ENABLED")
-
-
-def _confirmation_present() -> bool:
-    phrase = getattr(settings, "LIVE_TRADING_CONFIRMATION_PHRASE", "")
-    given = getattr(settings, "LIVE_TRADING_CONFIRMATION", "")
-    expected = phrase or _CONFIRMATION_PHRASE
-    return bool(given) and given == expected
-
-
-def _live_strategy_requested() -> bool:
-    return _flag("LIVE_STRATEGY_ORDER_ENABLED")
-
-
-def _live_strategy_block_reason() -> str | None:
-    """Every condition for routing the pipeline to the live stage, or why not.
-
-    A partially-configured live request refuses loudly rather than silently
-    downgrading to paper — an operator who flipped the live flag must know it is
-    not live. Delegates to the single source (live_profile) shared with the
-    signal builder; the final guard re-checks all of this before signing.
-    """
-    from crypto_ai_system.research.live_profile import live_stage_block_reason
-
-    return live_stage_block_reason()
-
-
-def resolve_execution_stage() -> tuple[str | None, str | None]:
-    """Decide the execution stage from config, fail-closed.
-
-    Returns ``(stage, block_reason)``. When ``block_reason`` is set the caller
-    must refuse execution. ``stage`` is ``"paper"``, ``"signed_testnet"``, or
-    ``"live"`` (all enable flags + confirmation + promotion evidence required).
-    """
-    if _live_requested():
-        # The legacy live flags never route anywhere; the only live path is the
-        # explicit LIVE_STRATEGY_* set below.
-        return None, "legacy live trading flags are not a live path - refusing (fail-closed)"
-    if _live_strategy_requested():
-        reason = _live_strategy_block_reason()
-        if reason:
-            return None, reason
-        return "live", None
-    if _testnet_requested() and not _confirmation_present():
-        return None, "testnet order flag enabled without confirmation phrase - refusing"
-    if _testnet_requested() and _confirmation_present():
-        return "signed_testnet", None
-    return "paper", None
+# Stage routing lives in trading_steps.stage_router (M1); these names stay
+# importable/patchable here until the M5 call-site migration.
+from crypto_ai_system.pipeline.trading_steps.stage_router import (  # noqa: E402
+    _confirmation_present,
+    _flag,
+    _live_requested,
+    _live_strategy_block_reason,
+    _live_strategy_requested,
+    _testnet_requested,
+    resolve_execution_stage,
+)
+from crypto_ai_system.pipeline.trading_steps.context import CycleInputs  # noqa: E402
 
 
 class TradingAgent(Agent):
@@ -295,7 +248,7 @@ class TradingAgent(Agent):
 
         return entries, strategy_drive
 
-    def _settle_counterfactuals(self, cfg, snapshot: dict) -> list[dict]:
+    def _settle_counterfactuals(self, inputs: CycleInputs) -> list[dict]:
         """Advance the shadow book of trades the gates blocked.
 
         Best-effort: counterfactual bookkeeping is observational, so a failure
@@ -304,11 +257,11 @@ class TradingAgent(Agent):
             return []
         try:
             return settle_counterfactuals(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
-                cfg=cfg,
+                inputs.latest_candle,
+                last_close=inputs.last_close,
+                timeframe=inputs.timeframe,
+                regime=inputs.regime,
+                cfg=inputs.cfg,
             )
         except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
             log_event(
@@ -393,6 +346,18 @@ class TradingAgent(Agent):
         cfg = load_config(".")
         cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
         snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+        # One market view per cycle: every step below shares THIS snapshot and
+        # candle, so two reads of a mid-cycle-rewritten file cannot disagree.
+        inputs = CycleInputs(
+            cfg=cfg,
+            stage=execution_stage,
+            cycle_id=cycle_id,
+            now=ctx.cycle.started_at_utc if ctx.cycle else None,
+            snapshot=snapshot,
+            latest_candle=_latest_candle(),
+            verdict=verdict,
+            routing=ctx.strategy_routing,
+        )
         is_paper = execution_stage == "paper"
         is_live = execution_stage == "live"
 
@@ -407,10 +372,10 @@ class TradingAgent(Agent):
             # Every open book settles independently on the same candle; each
             # closed summary carries its own position for S8/S9 attribution.
             book_settlements = settle_books(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
+                inputs.latest_candle,
+                last_close=inputs.last_close,
+                timeframe=inputs.timeframe,
+                regime=inputs.regime,
                 cfg=cfg,
                 enabled=True,
             )
@@ -425,10 +390,10 @@ class TradingAgent(Agent):
             # strategy-driven close must be attributed to its strategy (S8/S9).
             open_before = load_open_position(cfg)
             settlement = settle_open_position(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
+                inputs.latest_candle,
+                last_close=inputs.last_close,
+                timeframe=inputs.timeframe,
+                regime=inputs.regime,
                 cfg=cfg,
             )
             if (
@@ -451,10 +416,10 @@ class TradingAgent(Agent):
             live_risk_snapshot()
             open_before = load_open_live_position(cfg)
             settlement = settle_open_live_position(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
+                inputs.latest_candle,
+                last_close=inputs.last_close,
+                timeframe=inputs.timeframe,
+                regime=inputs.regime,
                 cfg=cfg,
             )
             if (
@@ -469,7 +434,7 @@ class TradingAgent(Agent):
         # 1b. Settle the shadow book on the same candle. These are the trades the
         #     gates blocked; settling them with the kernel's exit math is what
         #     makes "the gate cost us 3R" a measurement rather than a guess.
-        counterfactuals_settled = self._settle_counterfactuals(cfg, snapshot)
+        counterfactuals_settled = self._settle_counterfactuals(inputs)
 
         # 2. Open-position count for the gate (max_open_positions enforced there;
         #    multibook counts open books against the book cap).

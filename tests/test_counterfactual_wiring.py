@@ -83,14 +83,28 @@ def test_agent_shadows_a_blocked_signal(tmp_path, monkeypatch):
     assert plan["block_reason"] == "BLOCK_DAILY_LOSS_LIMIT"
 
 
+def _inputs(cfg, snapshot, candle=None):
+    """M1: the settle hook takes the per-cycle CycleInputs, not (cfg, snapshot)."""
+    from crypto_ai_system.pipeline.contracts import ValidationVerdict
+    from crypto_ai_system.pipeline.trading_steps.context import CycleInputs
+
+    return CycleInputs(
+        cfg=cfg, stage="paper", cycle_id="cyc1", now=None,
+        snapshot=snapshot, latest_candle=candle,
+        verdict=ValidationVerdict.fail_closed(), routing=None,
+    )
+
+
 def test_agent_settle_hook_resolves_the_shadow(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     _bullish_signal(tmp_path, monkeypatch)
     agent = ta.TradingAgent()
     agent._record_counterfactual(cfg, _suppressed_decision(), _snapshot(), "cyc1")
 
-    monkeypatch.setattr(ta, "_latest_candle", lambda: {"high": 105.0, "low": 100.0})
-    settled = agent._settle_counterfactuals(cfg, _snapshot() | {"last_close": 104.0})
+    settled = agent._settle_counterfactuals(
+        _inputs(cfg, _snapshot() | {"last_close": 104.0},
+                candle={"high": 105.0, "low": 100.0})
+    )
     assert len(settled) == 1
     assert settled[0]["classification"] == tracker.MISSED_OPPORTUNITY
     assert settled[0]["result_R"] == 2.0
@@ -104,7 +118,7 @@ def test_tracking_can_be_switched_off(tmp_path, monkeypatch):
     agent = ta.TradingAgent()
 
     assert agent._record_counterfactual(cfg, _suppressed_decision(), _snapshot(), "c1") is None
-    assert agent._settle_counterfactuals(cfg, _snapshot()) == []
+    assert agent._settle_counterfactuals(_inputs(cfg, _snapshot())) == []
 
 
 def test_tracker_failure_never_disturbs_execution(tmp_path, monkeypatch):
@@ -121,4 +135,4 @@ def test_tracker_failure_never_disturbs_execution(tmp_path, monkeypatch):
     agent = ta.TradingAgent()
 
     assert agent._record_counterfactual(cfg, _suppressed_decision(), _snapshot(), "c1") is None
-    assert agent._settle_counterfactuals(cfg, _snapshot()) == []
+    assert agent._settle_counterfactuals(_inputs(cfg, _snapshot())) == []
