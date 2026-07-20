@@ -68,11 +68,35 @@ class BinanceFuturesPublicClient:
         timeout = float(cfg.get('additional_data.binance_futures.timeout_seconds', cfg.get('additional_data.timeout_seconds', 5)))
         return cls(base_url=base, timeout_seconds=timeout)
 
+    #: Read-only public GETs are idempotent, so a bounded retry is safe. One
+    #: transient blip used to cost a whole cycle (synthetic fallback -> the
+    #: validation stage blocks trading).
+    RETRY_ATTEMPTS = 3
+    RETRY_BACKOFF_SECONDS = 1.0
+
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         url = f'{self.base_url}{path}'
-        response = self.session.get(url, params=params or {}, timeout=self.timeout_seconds)
-        response.raise_for_status()
-        return response.json()
+        last_error: Exception | None = None
+        for attempt in range(self.RETRY_ATTEMPTS):
+            if attempt:
+                time.sleep(self.RETRY_BACKOFF_SECONDS * attempt)
+            try:
+                response = self.session.get(url, params=params or {}, timeout=self.timeout_seconds)
+            except requests.RequestException as exc:
+                last_error = exc
+                continue
+            # Client errors (except rate-limit) are definitive: retrying the
+            # same bad request is pointless.
+            if 400 <= response.status_code < 500 and response.status_code != 429:
+                response.raise_for_status()
+            if response.status_code >= 500 or response.status_code == 429:
+                last_error = requests.HTTPError(
+                    f'{response.status_code} from {path}', response=response
+                )
+                continue
+            response.raise_for_status()
+            return response.json()
+        raise last_error if last_error is not None else RuntimeError(f'GET {path} failed')
 
     def open_interest_now(self, symbol: str) -> pd.DataFrame:
         payload = self._get('/fapi/v1/openInterest', {'symbol': symbol})

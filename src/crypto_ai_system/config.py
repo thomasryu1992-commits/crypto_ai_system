@@ -28,7 +28,26 @@ def _to_bool(value: Any) -> bool:
         return value
     if value is None:
         return False
-    return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    # Same vocabulary as config.settings.env_bool — the same env string must
+    # never parse True in one config half and False in the other.
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on', 'enabled'}
+
+
+def _to_int(value: Any, default: int) -> int:
+    """Same forgiving semantics as config.settings.env_int: accepts "500.0",
+    silently falls back on garbage — a malformed operator env var must not
+    crash every load_config caller while the flat half quietly defaults."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 
@@ -62,8 +81,18 @@ def _load_fallback_profiles(root: Path) -> Dict[str, Any]:
     }
 
 
+# src/crypto_ai_system/config.py -> repo root, mirroring the flat config's
+# __file__ anchor. load_config(".") used to resolve against the process cwd,
+# so a Task Scheduler entry without "Start in" (cwd=System32) crashed or —
+# worse — was swallowed by best-effort callers.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def load_config(project_root: str | Path | None = None) -> AppConfig:
-    root = Path(project_root or Path.cwd()).resolve()
+    if project_root in (None, '.'):
+        root = _REPO_ROOT
+    else:
+        root = Path(project_root).resolve()
     env_path = root / '.env'
     if env_path.exists():
         load_dotenv(env_path, override=True)
@@ -82,7 +111,7 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     data['canonical_symbol'] = os.getenv('DEFAULT_CANONICAL_SYMBOL', data.get('canonical_symbol', 'BTC-PERP'))
     data['exchange_market'] = os.getenv('DEFAULT_EXCHANGE_MARKET', data.get('exchange_market', 'BTC-USD'))
     data['timeframe'] = os.getenv('DEFAULT_TIMEFRAME', data.get('timeframe', 'PT1H'))
-    data['limit'] = int(os.getenv('DEFAULT_LIMIT', data.get('limit', 500)))
+    data['limit'] = _to_int(os.getenv('DEFAULT_LIMIT', data.get('limit', 500)), 500)
     data['allow_sample_fallback'] = _to_bool(os.getenv('ALLOW_SAMPLE_FALLBACK', data.get('allow_sample_fallback', True)))
 
     extended = settings.setdefault('extended', {})
@@ -99,7 +128,7 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
 
     additional = settings.setdefault('additional_data', {})
     additional['enabled'] = _to_bool(os.getenv('ADDITIONAL_DATA_ENABLED', additional.get('enabled', True)))
-    additional['timeout_seconds'] = float(os.getenv('ADDITIONAL_DATA_TIMEOUT_SECONDS', additional.get('timeout_seconds', 5)))
+    additional['timeout_seconds'] = _to_float(os.getenv('ADDITIONAL_DATA_TIMEOUT_SECONDS', additional.get('timeout_seconds', 5)), 5.0)
     additional['network_enabled'] = _to_bool(os.getenv('ADDITIONAL_DATA_NETWORK_ENABLED', additional.get('network_enabled', False)))
 
     binance_futures = additional.setdefault('binance_futures', {})
@@ -108,14 +137,14 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     binance_futures['symbol'] = os.getenv('BINANCE_FUTURES_SYMBOL', binance_futures.get('symbol', 'BTCUSDT'))
     binance_futures['pair'] = os.getenv('BINANCE_FUTURES_PAIR', binance_futures.get('pair', binance_futures.get('symbol', 'BTCUSDT')))
     binance_futures['period'] = os.getenv('BINANCE_FUTURES_PERIOD', binance_futures.get('period', '1h'))
-    binance_futures['limit'] = int(os.getenv('BINANCE_FUTURES_LIMIT', binance_futures.get('limit', 100)))
+    binance_futures['limit'] = _to_int(os.getenv('BINANCE_FUTURES_LIMIT', binance_futures.get('limit', 100)), 100)
 
     coinmetrics_extra = additional.setdefault('coinmetrics', {})
     coinmetrics_extra['enabled'] = _to_bool(os.getenv('COINMETRICS_ENABLED', coinmetrics_extra.get('enabled', True)))
     coinmetrics_extra['base_url'] = os.getenv('COINMETRICS_BASE_URL', coinmetrics_extra.get('base_url', 'https://community-api.coinmetrics.io/v4'))
     coinmetrics_extra['asset'] = os.getenv('COINMETRICS_ASSET', coinmetrics_extra.get('asset', 'btc'))
     coinmetrics_extra['frequency'] = os.getenv('COINMETRICS_FREQUENCY', coinmetrics_extra.get('frequency', '1d'))
-    coinmetrics_extra['page_size'] = int(os.getenv('COINMETRICS_PAGE_SIZE', coinmetrics_extra.get('page_size', 200)))
+    coinmetrics_extra['page_size'] = _to_int(os.getenv('COINMETRICS_PAGE_SIZE', coinmetrics_extra.get('page_size', 200)), 200)
 
     farside = additional.setdefault('farside', {})
     farside['enabled'] = _to_bool(os.getenv('FARSIDE_ETF_FLOW_ENABLED', farside.get('enabled', True)))
@@ -142,9 +171,9 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     trading_cfg['risk_level_blocked_position_multiplier'] = float(_flat_settings.RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER)
 
     backtest = settings.setdefault('backtest', {})
-    backtest['maker_fee_bps'] = float(os.getenv('MAKER_FEE_BPS', backtest.get('maker_fee_bps', 0)))
-    backtest['taker_fee_bps'] = float(os.getenv('TAKER_FEE_BPS', backtest.get('taker_fee_bps', 2.5)))
-    backtest['slippage_bps'] = float(os.getenv('SLIPPAGE_BPS', backtest.get('slippage_bps', 3)))
+    backtest['maker_fee_bps'] = _to_float(os.getenv('MAKER_FEE_BPS', backtest.get('maker_fee_bps', 0)), 0.0)
+    backtest['taker_fee_bps'] = _to_float(os.getenv('TAKER_FEE_BPS', backtest.get('taker_fee_bps', 2.5)), 2.5)
+    backtest['slippage_bps'] = _to_float(os.getenv('SLIPPAGE_BPS', backtest.get('slippage_bps', 3)), 3.0)
 
     # Same single-source rule as the trading gate above: the flat config.settings
     # flags are the ones scripts/check_safety_defaults.py guards in CI, so mirror

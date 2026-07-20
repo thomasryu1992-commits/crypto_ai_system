@@ -14,11 +14,10 @@ from crypto_ai_system.pipeline.contracts import (
     StageResult,
     StageStatus,
 )
-from crypto_ai_system.pipeline.orchestrator import Pipeline, run_pipeline_once
+from crypto_ai_system.pipeline.orchestrator import Pipeline
 
 __all__ = [
     "Pipeline",
-    "run_pipeline_once",
     "CycleEnvelope",
     "PipelineContext",
     "PipelineRun",

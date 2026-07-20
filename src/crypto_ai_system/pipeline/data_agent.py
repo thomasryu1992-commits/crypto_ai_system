@@ -47,7 +47,7 @@ class DataAgent(Agent):
 
         if _looks_synthetic(market_data):
             return self.degraded(
-                ["market data used synthetic/fallback source — not live-eligible"],
+                ["market data used synthetic/fallback source - not live-eligible"],
                 data_is_synthetic=True,
                 **outputs,
             )

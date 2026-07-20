@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -56,6 +57,59 @@ def load_registry_records(path: str | Path) -> list[dict[str, Any]]:
     return _read_existing_records(Path(path))
 
 
+_TAIL_PROBE_BYTES = 65536  # registry rows are ~1-2KB; 64KB always covers the last line
+
+
+def _validate_tail(path: Path) -> None:
+    """O(1) integrity check at the append site.
+
+    Appends can only tear the LAST line (a crash mid-write), so the append path
+    checks exactly that — the trailing newline and the last line's JSON — and
+    stays O(1) instead of re-parsing the whole file per append (the
+    performance-report registry alone is tens of MB). Full-file validation
+    still happens on every ``load_registry_records`` read. Same fail-closed
+    contract: damage raises, nothing is silently regenerated.
+    """
+    if not path.exists():
+        return
+    size = path.stat().st_size
+    if size == 0:
+        return
+    with path.open("rb") as handle:
+        handle.seek(max(0, size - _TAIL_PROBE_BYTES))
+        chunk = handle.read()
+    if not chunk.endswith(b"\n"):
+        raise RegistryIntegrityError(
+            f"Torn tail in {path}: last append did not complete (no trailing newline)"
+        )
+    lines = [ln for ln in chunk.split(b"\n") if ln.strip()]
+    if not lines:
+        return
+    try:
+        payload = json.loads(lines[-1].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RegistryIntegrityError(f"Damaged registry tail in {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RegistryIntegrityError(f"Damaged registry tail in {path}: expected object")
+
+
+def rotate_registry_if_large(path: str | Path, *, max_bytes: int) -> Path | None:
+    """Archive an oversized registry so appends start a fresh file.
+
+    ONLY for write-only audit registries whose consumers read the separately
+    persisted latest record — NEVER for a registry whose full history is a
+    runtime input (outcome_feedback_registry feeds the risk limits). The
+    archive keeps the full history on disk under a timestamped sibling name.
+    """
+    target = Path(path)
+    if not target.exists() or target.stat().st_size < max_bytes:
+        return None
+    stamp = utc_now_canonical().replace(":", "").replace("-", "")
+    archive = target.with_name(f"{target.stem}.{stamp}.rotated.jsonl")
+    target.rename(archive)
+    return archive
+
+
 def _with_registry_metadata(
     record: Mapping[str, Any],
     *,
@@ -96,7 +150,7 @@ def append_registry_record(
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    _read_existing_records(target)
+    _validate_tail(target)
     payload = _with_registry_metadata(
         record,
         registry_name=registry_name,
@@ -104,8 +158,12 @@ def append_registry_record(
         hash_field=hash_field,
         id_prefix=id_prefix,
     )
+    line = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str) + "\n"
     with target.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+        # One write call + fsync narrows the torn-line window to the OS level.
+        handle.write(line)
+        handle.flush()
+        os.fsync(handle.fileno())
     return payload
 
 
@@ -126,7 +184,7 @@ def append_registry_records(
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    _read_existing_records(target)
+    _validate_tail(target)
     payloads = [
         _with_registry_metadata(
             record,
@@ -140,4 +198,6 @@ def append_registry_records(
     with target.open("a", encoding="utf-8") as handle:
         for payload in payloads:
             handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     return payloads

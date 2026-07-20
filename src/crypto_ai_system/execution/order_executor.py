@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from config.settings import MAX_ORDER_NOTIONAL_USDT, ORDER_INTENT_PATH, ORDER_RESULT_PATH, TRADE_DECISION_PATH
+from config.settings import ORDER_INTENT_PATH, ORDER_RESULT_PATH, TRADE_DECISION_PATH
 from core.json_io import atomic_write_json, read_json
 from core.time_utils import utc_now_iso
 from core.event_log import log_event
@@ -45,14 +45,44 @@ def build_order_intent(trade_decision: dict) -> dict:
             "order_intent_created": False,
         }
 
-    direction = trade_decision.get("direction")
+    direction = str(trade_decision.get("direction") or "").upper()
+    if direction not in {"LONG", "SHORT"}:
+        # A corrupted/missing direction must never default to a side (it used
+        # to map anything non-LONG to SELL — the wrong fail direction).
+        return {
+            "created_at": utc_now_iso(),
+            "state": "REJECTED",
+            "status": "NO_ORDER_INTENT",
+            "reason": "MALFORMED_DIRECTION",
+            "direction": trade_decision.get("direction"),
+            "order_intent_block_reason": "MALFORMED_DIRECTION",
+            "order_intent_created": False,
+        }
     side = "BUY" if direction == "LONG" else "SELL"
     entry_price = trade_decision.get("entry") or trade_decision.get("entry_price") or trade_decision.get("price")
     try:
         entry_float = float(entry_price or 0)
     except Exception:
         entry_float = 0.0
-    notional = float(trade_decision.get("order_notional_usdt") or trade_decision.get("notional_usdt") or MAX_ORDER_NOTIONAL_USDT)
+    raw_notional = trade_decision.get("order_notional_usdt") or trade_decision.get("notional_usdt")
+    try:
+        notional = float(raw_notional) if raw_notional not in {None, ""} else 0.0
+    except (TypeError, ValueError):
+        notional = 0.0
+    if notional <= 0:
+        # A missing notional used to default to MAX_ORDER_NOTIONAL_USDT — the
+        # cap is a ceiling, never a fallback size. Block instead.
+        return {
+            "created_at": utc_now_iso(),
+            "state": "REJECTED",
+            "status": "NO_ORDER_INTENT",
+            "reason": "MISSING_ORDER_NOTIONAL",
+            "order_intent_block_reason": "MISSING_ORDER_NOTIONAL",
+            "order_intent_created": False,
+        }
+    # No clamp here: MAX_ORDER_NOTIONAL_USDT is the paper cap, and each stage's
+    # final guard enforces its own ceiling — a silent resize would desync the
+    # intent from the decision the gate approved.
     quantity = trade_decision.get("quantity")
     try:
         quantity_float = float(quantity) if quantity not in {None, ""} else (notional / entry_float if entry_float > 0 else 0.0)
@@ -229,10 +259,30 @@ def execute_order_with_risk_check(
 
 def run_order_executor(execution_stage: str | None = None) -> dict:
     decision = read_json(TRADE_DECISION_PATH, {})
+    if decision.get("order_intent_consumed_at"):
+        # One persisted decision authorizes AT MOST one intent. Re-running the
+        # executor against the same file (e.g. a manual `py -m ...order_executor`
+        # inside the RiskGate record's TTL) must not re-submit.
+        intent = {
+            "created_at": utc_now_iso(),
+            "state": "REJECTED",
+            "status": "NO_ORDER_INTENT",
+            "reason": "TRADE_DECISION_ALREADY_CONSUMED",
+            "order_intent_block_reason": "TRADE_DECISION_ALREADY_CONSUMED",
+            "consumed_at": decision.get("order_intent_consumed_at"),
+            "consumed_by_order_intent_id": decision.get("consumed_by_order_intent_id"),
+            "order_intent_created": False,
+        }
+        atomic_write_json(ORDER_INTENT_PATH, intent)
+        return execute_order_intent(intent)
     intent = build_order_intent(decision)
     if execution_stage and intent.get("status") == "ORDER_INTENT_CREATED":
         intent["execution_stage"] = execution_stage
         intent["decision_stage"] = execution_stage
+    if intent.get("status") == "ORDER_INTENT_CREATED":
+        decision["order_intent_consumed_at"] = utc_now_iso()
+        decision["consumed_by_order_intent_id"] = intent.get("order_intent_id")
+        atomic_write_json(TRADE_DECISION_PATH, decision)
     atomic_write_json(ORDER_INTENT_PATH, intent)
     return execute_order_intent(intent)
 

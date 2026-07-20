@@ -84,6 +84,10 @@ def evaluate_signed_testnet_final_guard(intent: dict[str, Any]) -> dict[str, Any
         blocks.append("manual approval confirmation phrase not present")
 
     # -- key scope (testnet only) ----------------------------------------
+    # The scope rail itself is not optional: turning the flag off BLOCKS
+    # rather than relaxing the section (it existed but was never consulted).
+    if not getattr(settings, "SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE", True):
+        blocks.append("SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE is false (guard rail must stay on)")
     if not getattr(settings, "BINANCE_TESTNET", True):
         blocks.append("BINANCE_TESTNET is false (mainnet key scope not allowed)")
     if getattr(settings, "SIGNED_TESTNET_LIVE_KEY_ALLOWED", False):

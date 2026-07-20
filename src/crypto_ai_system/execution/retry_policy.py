@@ -1,10 +1,25 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Callable, Mapping
 
 # Binance: "Order does not exist" — the only venue answer that PROVES an
 # ambiguous submit never reached the book.
 ORDER_NOT_FOUND_CODES = {-2013}
+
+_SIGNATURE_PARAM = re.compile(r"(signature=)[0-9a-fA-F]+")
+
+
+def scrub_secret_params(text: str) -> str:
+    """Remove credential-derived query params from free text.
+
+    A requests ConnectionError/MaxRetryError message embeds the full request
+    URL including the HMAC ``signature`` query param. Any exception text that
+    gets persisted (order results, logs) must pass through here first — the
+    structured ``request`` field is already redacted, but exception strings
+    bypassed that layer.
+    """
+    return _SIGNATURE_PARAM.sub(r"\1***redacted***", text)
 
 
 def classify_exchange_error(status_code: int | None = None, error_name: str | None = None) -> dict:

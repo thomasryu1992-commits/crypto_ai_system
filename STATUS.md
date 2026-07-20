@@ -460,6 +460,41 @@ all fixed, no safety default changed, verified with the full suite (847),
   indicator repaint, no SL/TP on partial-bar extremes.
 - Advisory-stage ERRORs (fatal_on_error=False) no longer exit as an error halt.
 
+**2026-07-20 — QA audit follow-up (lower-priority items).** The remaining audit
+findings, fixed and verified (876 tests, 0 warnings, safety guard, live cycle):
+
+- **Decision replay closed.** One persisted trade decision authorizes at most
+  one order intent: the executor stamps `order_intent_consumed_at` and refuses
+  a re-run against the same file (closes the RiskGate-TTL replay window).
+- **Intent input guards.** A malformed direction is rejected (used to map to
+  SELL); a missing notional blocks (used to default to the cap).
+- **Signature scrubbed from exception text** (`retry_policy.scrub_secret_params`)
+  before any error string reaches persisted storage — closes the requests-URL
+  leak that bypassed the structured redaction.
+- **Registry appends are O(1) + fsync'd.** Tail-line validation replaces the
+  full-file re-parse per append (same torn-line fail-closed contract; full
+  validation still on read). `performance_report_registry` (write-only audit)
+  auto-rotates at 10MB to a timestamped archive.
+- **Multibook persists the EXECUTED decision.** The entry walk re-persists the
+  filled entry's decision (not last-attempted), and order/reconciliation
+  outputs describe that same trade.
+- **holding_candles counts distinct candles** (timestamp-deduped), so manual
+  re-runs within one interval no longer accelerate time_exit.
+- **Dual-config unified**: same bool vocabulary in both halves, forgiving
+  numeric env parsing, and `load_config(".")` anchors at the repo root (Task
+  Scheduler without "Start in" no longer breaks).
+- **Data-health thresholds follow TIMEFRAME** (gap interval + staleness derive
+  from the runtime timeframe; 1h defaults unchanged).
+- **Bounded retry on public kline GETs** (3 attempts, backoff; 4xx never
+  retried) — a transient blip no longer costs a full cycle.
+- **`SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE` is load-bearing**: disabling the
+  rail now BLOCKS the guard instead of being ignored.
+- NumPy timedelta deprecation warnings eliminated (3181 → 0) via explicit-unit
+  `pd.Timedelta` construction; ASCII console strings; small dead code removed.
+
+Deliberately deferred (structural, separate effort): splitting the ~600-line
+TradingAgent and making PipelineContext load-bearing (or removing it).
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a

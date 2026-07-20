@@ -149,7 +149,7 @@ def _drop_unclosed_daily_bucket(rows: list[dict[str, Any]]) -> list[dict[str, An
     newest = pd.to_datetime(rows[-1].get("timestamp"), utc=True, errors="coerce")
     if pd.isna(newest):
         return rows
-    if newest + pd.Timedelta(days=1) > pd.Timestamp.now(tz="UTC"):
+    if newest + pd.Timedelta(1, unit="D") > pd.Timestamp.now(tz="UTC"):
         return rows[:-1]
     return rows
 

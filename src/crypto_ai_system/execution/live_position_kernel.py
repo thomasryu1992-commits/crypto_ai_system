@@ -174,6 +174,20 @@ def open_from_live_execution(
     return position
 
 
+def _advance_holding(position: dict[str, Any], candle: Mapping[str, Any] | None) -> None:
+    """Advance holding_candles once per DISTINCT candle.
+
+    Settle used to count invocations, so extra manual pipeline runs within one
+    interval accelerated time_exit. A candle without a timestamp keeps the old
+    per-invocation behavior (nothing to dedupe on)."""
+    ts = candle.get("timestamp") if isinstance(candle, Mapping) else None
+    if ts is not None and str(ts) == str(position.get("last_counted_candle_ts") or ""):
+        return
+    position["holding_candles"] = int(position.get("holding_candles", 0)) + 1
+    if ts is not None:
+        position["last_counted_candle_ts"] = str(ts)
+
+
 def _exit_signal(
     position: dict[str, Any],
     candle: Mapping[str, Any] | None,
@@ -195,7 +209,7 @@ def _exit_signal(
     if manual_exit and last_close is not None:
         return "manual_exit"
 
-    position["holding_candles"] = int(position.get("holding_candles", 0)) + 1
+    _advance_holding(position, candle)
     if candle is not None and risk > 0:
         high = _f(candle.get("high"))
         low = _f(candle.get("low"))

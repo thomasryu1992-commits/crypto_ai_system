@@ -16,6 +16,7 @@ from crypto_ai_system.execution.retry_policy import (
     classify_exchange_error,
     is_ambiguous_submit,
     resolve_ambiguous_submit,
+    scrub_secret_params,
 )
 
 
@@ -77,3 +78,42 @@ def test_query_exception_stays_unresolved_and_never_raises() -> None:
         raise ConnectionError("network down")
 
     assert resolve_ambiguous_submit(query, "BTCUSDT", "cid1")["order_exists"] is None
+
+
+# -- scrub_secret_params -------------------------------------------------------
+
+def test_signature_is_scrubbed_from_exception_text() -> None:
+    # The shape a requests MaxRetryError message takes: full URL with query.
+    text = ("HTTPSConnectionPool(host='fapi.binance.com', port=443): Max retries "
+            "exceeded with url: /fapi/v1/order?symbol=BTCUSDT&quantity=0.001"
+            "&timestamp=1700000000000&signature=0a1b2c3d4e5f67890a1b2c3d4e5f6789")
+    scrubbed = scrub_secret_params(text)
+    assert "0a1b2c3d4e5f" not in scrubbed
+    assert "signature=***redacted***" in scrubbed
+    assert "symbol=BTCUSDT" in scrubbed  # non-secret params untouched
+
+
+def test_scrub_is_a_noop_without_a_signature() -> None:
+    assert scrub_secret_params("ReadTimeout: timed out") == "ReadTimeout: timed out"
+
+
+def test_adapter_transport_error_is_scrubbed_end_to_end() -> None:
+    from crypto_ai_system.execution.live_canary_adapter import LiveCanaryAdapter
+
+    def leaking_transport(method, url, params, headers, timeout):
+        raise ConnectionError(
+            f"Max retries exceeded with url: {url}?symbol=BTCUSDT&signature={params['signature']}"
+        )
+
+    adapter = LiveCanaryAdapter("k", "s", base_url="https://fapi.binance.com",
+                                transport=leaking_transport)
+    result = adapter.submit_order({"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.001,
+                                   "client_order_id": "c1"})
+    assert "signature=***redacted***" in result["error"]
+    assert params_signature_absent(result["error"])
+
+
+def params_signature_absent(text: str) -> bool:
+    import re
+
+    return re.search(r"signature=[0-9a-fA-F]{10,}", text) is None

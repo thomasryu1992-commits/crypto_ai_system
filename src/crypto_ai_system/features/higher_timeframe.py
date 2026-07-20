@@ -30,8 +30,10 @@ from crypto_ai_system.features.indicators import ema
 
 # label -> (resample rule, bar period). Order fixes the alignment-score weighting.
 HTF_SPECS: tuple[tuple[str, str, pd.Timedelta], ...] = (
-    ("4h", "4h", pd.Timedelta(hours=4)),
-    ("1d", "1D", pd.Timedelta(days=1)),
+    # Explicit-unit construction: kwarg/string forms hit NumPy's deprecated
+    # 'generic' timedelta unit and will raise on a future NumPy.
+    ("4h", "4h", pd.Timedelta(4, unit="h")),
+    ("1d", "1D", pd.Timedelta(1, unit="D")),
 )
 
 HTF_TREND_COLUMNS: tuple[str, ...] = tuple(f"htf_{label}_trend" for label, _, _ in HTF_SPECS)

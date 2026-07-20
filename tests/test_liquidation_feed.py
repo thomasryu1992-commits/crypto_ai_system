@@ -46,7 +46,7 @@ class _StubCoinalyze:
 
 
 def test_liquidation_cache_roundtrip(tmp_path) -> None:
-    client = _StubCoinalyze(120, newest=pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta(days=1))
+    client = _StubCoinalyze(120, newest=pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta(1, unit="D"))
     rows, source = load_liquidation_history("BTCUSDT", 100, cache_dir=tmp_path, client=client)
     assert source == "fetch" and len(rows) == 100
     rows, source = load_liquidation_history("BTCUSDT", 100, cache_dir=tmp_path, client=client)

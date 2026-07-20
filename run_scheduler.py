@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             "halted": r.get("halted"),
             "exit_code": r.get("exit_code"),
             "halt_reason": r.get("halt_reason"),
-            "healthy": r.get("healthy", not record["ok"] is False),
+            "healthy": r.get("healthy", record["ok"] is not False),
             "data_is_synthetic": r.get("data_is_synthetic"),
             **(r.get("metrics") or {}),
         }

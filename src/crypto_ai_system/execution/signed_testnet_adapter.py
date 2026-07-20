@@ -21,7 +21,7 @@ import time
 from typing import Any, Callable
 from urllib.parse import urlencode, urlparse
 
-from crypto_ai_system.execution.retry_policy import classify_exchange_error
+from crypto_ai_system.execution.retry_policy import classify_exchange_error, scrub_secret_params
 
 # Only these hosts may ever be signed against. Mainnet is not here by design.
 ALLOWED_TESTNET_HOSTS = frozenset({"testnet.binancefuture.com"})
@@ -112,7 +112,9 @@ class SignedTestnetAdapter:
             return {
                 "ok": False,
                 "http_status": None,
-                "error": f"{type(exc).__name__}: {exc}",
+                # Exception text can embed the request URL (incl. the signature
+                # query param) — scrub before it reaches persisted storage.
+                "error": scrub_secret_params(f"{type(exc).__name__}: {exc}"),
                 "classification": classification,
                 "request": _redact(signed),
             }

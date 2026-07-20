@@ -52,7 +52,8 @@ class StageResult:
         return self.fatal and self.status in {StageStatus.ERROR, StageStatus.BLOCKED}
 
     def summary(self) -> str:
-        reason = f" — {'; '.join(self.reasons)}" if self.reasons else ""
+        # ASCII separator: this line goes to consoles that may be cp949.
+        reason = f" - {'; '.join(self.reasons)}" if self.reasons else ""
         return f"[{self.status.value}] {self.stage}{reason}"
 
 
