@@ -26,13 +26,10 @@ from crypto_ai_system.execution.paper_book_kernel import (
     multibook_enabled,
     open_books,
     open_in_book,
-    settle_books,
 )
 from crypto_ai_system.execution.paper_position_kernel import (
     has_open_position,
-    load_open_position,
     open_from_execution,
-    settle_open_position,
 )
 from crypto_ai_system.feedback.counterfactual_tracker import (
     record_blocked_signal,
@@ -77,31 +74,12 @@ from crypto_ai_system.pipeline.trading_steps.stage_router import (  # noqa: E402
 )
 from crypto_ai_system.pipeline.trading_steps.context import CycleInputs  # noqa: E402
 from crypto_ai_system.pipeline.trading_steps.lifecycle import derive_lifecycle  # noqa: E402
+from crypto_ai_system.pipeline.trading_steps.settlement import settle_positions  # noqa: E402
 
 
 class TradingAgent(Agent):
     name = "trading"
     fatal_on_error = True
-
-    def _record_strategy_outcome(self, position, settlement, ctx: PipelineContext) -> None:
-        """Attribute a closed strategy-driven paper position to its strategy (S8).
-
-        Isolated and best-effort: an attribution failure must not affect the
-        trade result that already happened."""
-        try:
-            from crypto_ai_system.feedback.strategy_feedback_step import record_strategy_outcome
-
-            now = ctx.cycle.started_at_utc if ctx.cycle else None
-            record_strategy_outcome(
-                position, settlement,
-                registry_file=str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH), now=now,
-            )
-        except Exception as exc:  # noqa: BLE001 - attribution is best-effort, but never silent
-            log_event(
-                "strategy_outcome_attribution_failed",
-                {"error": repr(exc)},
-                severity="WARNING",
-            )
 
     @staticmethod
     def _verdict(ctx: PipelineContext) -> ValidationVerdict:
@@ -363,74 +341,12 @@ class TradingAgent(Agent):
         is_live = execution_stage == "live"
 
         # 1. Settle any open position FIRST — SL/TP/time exit may close it and
-        #    produce a CLOSED outcome before this cycle considers a new entry.
-        #    Paper settles by simulation; live submits a REAL reduceOnly close
-        #    (fail-open-position: a blocked/unconfirmed close stays OPEN).
-        settlement = None
-        book_settlements: list[dict] = []
+        #    produce a CLOSED outcome before this cycle considers a new entry
+        #    (see trading_steps.settlement for the three variants + S8).
         multibook = is_paper and multibook_enabled()
-        if multibook:
-            # Every open book settles independently on the same candle; each
-            # closed summary carries its own position for S8/S9 attribution.
-            book_settlements = settle_books(
-                inputs.latest_candle,
-                last_close=inputs.last_close,
-                timeframe=inputs.timeframe,
-                regime=inputs.regime,
-                cfg=cfg,
-                enabled=True,
-            )
-            settlement = book_settlements[0] if book_settlements else None
-            if _flag("STRATEGY_FACTORY_ROUTING_ENABLED"):
-                for closed in book_settlements:
-                    position = closed.get("position")
-                    if isinstance(position, dict) and position.get("strategy_id"):
-                        self._record_strategy_outcome(position, closed, ctx)
-        elif is_paper:
-            # Capture the position before settling — settle clears it, and a
-            # strategy-driven close must be attributed to its strategy (S8/S9).
-            open_before = load_open_position(cfg)
-            settlement = settle_open_position(
-                inputs.latest_candle,
-                last_close=inputs.last_close,
-                timeframe=inputs.timeframe,
-                regime=inputs.regime,
-                cfg=cfg,
-            )
-            if (
-                settlement is not None
-                and isinstance(open_before, dict)
-                and open_before.get("strategy_id")
-                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-            ):
-                self._record_strategy_outcome(open_before, settlement, ctx)
-        elif is_live:
-            from crypto_ai_system.execution.live_pnl_ledger import live_risk_snapshot
-            from crypto_ai_system.execution.live_position_kernel import (
-                load_open_live_position,
-                settle_open_live_position,
-            )
-
-            # Persist today's realized live P&L + breaker state each cycle so the
-            # operator (and dashboard) can watch it and the daily-loss circuit
-            # breaker's input is fresh.
-            live_risk_snapshot()
-            open_before = load_open_live_position(cfg)
-            settlement = settle_open_live_position(
-                inputs.latest_candle,
-                last_close=inputs.last_close,
-                timeframe=inputs.timeframe,
-                regime=inputs.regime,
-                cfg=cfg,
-            )
-            if (
-                isinstance(settlement, dict)
-                and settlement.get("status") == "CLOSED"
-                and isinstance(open_before, dict)
-                and open_before.get("strategy_id")
-                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-            ):
-                self._record_strategy_outcome(open_before, settlement, ctx)
+        settle_outcome = settle_positions(inputs, multibook=multibook)
+        settlement = settle_outcome.settlement
+        book_settlements = settle_outcome.book_settlements
 
         # 1b. Settle the shadow book on the same candle. These are the trades the
         #     gates blocked; settling them with the kernel's exit math is what
