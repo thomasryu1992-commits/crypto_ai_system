@@ -215,7 +215,13 @@ def _exit_signal(
     return None
 
 
-def _close_intent(position: Mapping[str, Any], close_reason: str, last_close: float | None) -> dict[str, Any]:
+def _close_intent(
+    position: Mapping[str, Any],
+    close_reason: str,
+    last_close: float | None,
+    *,
+    client_order_id: str | None = None,
+) -> dict[str, Any]:
     direction = str(position.get("direction") or "LONG").upper()
     side = "SELL" if direction == "LONG" else "BUY"
     qty = _f(position.get("quantity"))
@@ -240,7 +246,128 @@ def _close_intent(position: Mapping[str, Any], close_reason: str, last_close: fl
         "risk_gate_id": position.get("risk_gate_id"),
         "order_intent_created": True,
     }
-    return enrich_order_identity(intent)
+    intent = enrich_order_identity(intent)
+    if client_order_id:
+        # Retrying an earlier unconfirmed close MUST reuse its client order id —
+        # a fresh id would race a second reduceOnly close against a fill the
+        # first one may already have produced.
+        intent["client_order_id"] = client_order_id
+    return intent
+
+
+# Venue order states that prove a close order will never fill (safe to retire
+# its client order id and submit a fresh close).
+_CLOSE_DEAD = {"CANCELED", "REJECTED", "EXPIRED"}
+
+
+def _settle_from_fill(
+    cfg: AppConfig,
+    position: dict[str, Any],
+    reason: str,
+    exit_price: float,
+    filled_qty: float,
+    close_exchange_order_id: Any,
+    regime: str | None,
+) -> dict[str, Any]:
+    """Record the realized outcome from a REAL close fill and clear the position."""
+    direction = str(position.get("direction") or "LONG").upper()
+    entry = _f(position.get("entry_price"))
+    qty = filled_qty or _f(position.get("quantity"))
+    risk = _f(position.get("risk"))
+    realized = _realized_pnl_usdt(direction, entry, exit_price, qty)
+    result_r = _result_r(direction, entry, exit_price, risk)
+
+    # Feed the L1 ledger — this is what the daily-loss circuit breaker reads.
+    ledger_record = record_live_outcome(
+        realized_pnl_usdt=realized,
+        symbol=str(position.get("symbol")),
+        side="BUY" if direction == "LONG" else "SELL",
+        quantity=qty,
+        open_price=entry,
+        close_price=exit_price,
+        open_order_id=position.get("entry_exchange_order_id"),
+        close_order_id=close_exchange_order_id,
+        strategy_id=position.get("strategy_id"),
+        opened_at_utc=position.get("opened_at_utc"),
+    )
+    _clear_position(cfg)
+    log_event(
+        "live_position_closed",
+        {"position_id": position.get("position_id"), "close_reason": reason,
+         "realized_pnl_usdt": round(realized, 8), "result_R": round(result_r, 8)},
+    )
+    return {
+        "status": "CLOSED",
+        "position_id": position.get("position_id"),
+        "close_reason": reason,
+        "exit_price": exit_price,
+        "quantity": qty,
+        "realized_pnl_usdt": round(realized, 8),
+        "result_R": round(result_r, 8),
+        "regime": regime or "unknown",
+        "live_outcome_record_id": ledger_record.get("live_outcome_record_id"),
+        "close_exchange_order_id": close_exchange_order_id,
+    }
+
+
+def _resolve_pending_close(
+    cfg: AppConfig,
+    position: dict[str, Any],
+    query_order: Callable[[str, str], dict],
+    regime: str | None,
+) -> dict[str, Any] | None:
+    """Settle/track an earlier close attempt whose fill was never confirmed.
+
+    Returns a settlement/hold dict when the pending close decides this cycle, or
+    None when the pending id is proven dead (the caller may submit a fresh
+    close). The pending id was persisted BEFORE the original submit, so even a
+    crash mid-submit is re-queried here rather than double-closed.
+    """
+    pending_id = position.get("close_client_order_id")
+    if not pending_id:
+        return None
+    reason = str(position.get("close_reason_pending") or "manual_exit")
+    query = query_order(str(position.get("symbol")), str(pending_id))
+    query = query if isinstance(query, dict) else {}
+    if query.get("ok"):
+        response = query.get("response") if isinstance(query.get("response"), dict) else {}
+        order_status = response.get("status")
+        exit_price = _f(response.get("avgPrice"))
+        filled_qty = _f(response.get("executedQty"))
+        if order_status in _FILLED and exit_price > 0:
+            # The earlier close DID fill — realize it now, so the loss reaches
+            # the L1 ledger the daily-loss breaker reads.
+            return _settle_from_fill(
+                cfg, position, reason, exit_price, filled_qty, response.get("orderId"), regime
+            )
+        if order_status in _CLOSE_DEAD:
+            position.pop("close_client_order_id", None)
+            position.pop("close_reason_pending", None)
+            position["close_attempt_status"] = f"PENDING_CLOSE_DEAD:{order_status}"
+            _save_position(cfg, position)
+            return None  # safe to submit a fresh close this cycle
+        # Still working at the venue (NEW / partially filled without price yet).
+        position["close_attempt_status"] = f"CLOSE_PENDING:{order_status}"
+        _save_position(cfg, position)
+        return {"status": "CLOSE_PENDING", "close_reason": reason,
+                "order_status": order_status, "position_id": position.get("position_id")}
+    error = query.get("error") if isinstance(query.get("error"), dict) else {}
+    if error.get("code") in {-2013}:
+        # Venue says the order never existed — the original submit truly failed.
+        position.pop("close_client_order_id", None)
+        position.pop("close_reason_pending", None)
+        _save_position(cfg, position)
+        return None
+    # Query failed: the pending close may be live — do NOT race a second one.
+    position["close_attempt_status"] = "CLOSE_PENDING_QUERY_FAILED"
+    _save_position(cfg, position)
+    log_event(
+        "live_position_pending_close_query_failed",
+        {"position_id": position.get("position_id")},
+        severity="WARNING",
+    )
+    return {"status": "CLOSE_UNCONFIRMED", "close_reason": reason,
+            "order_status": None, "position_id": position.get("position_id")}
 
 
 def settle_open_live_position(
@@ -266,13 +393,6 @@ def settle_open_live_position(
     if not position:
         return None
 
-    max_hold = MAX_HOLD_BARS.get(timeframe, DEFAULT_MAX_HOLD_BARS)
-    reason = _exit_signal(position, candle, last_close, max_hold, manual_exit)
-    if reason is None:
-        position["last_seen_price"] = last_close
-        _save_position(cfg, position)
-        return None
-
     if submit_close is None or query_order is None:
         from crypto_ai_system.execution.live_strategy_execution import (
             query_live_order,
@@ -282,10 +402,32 @@ def settle_open_live_position(
         submit_close = submit_close or submit_live_close_order
         query_order = query_order or query_live_order
 
+    # An unconfirmed earlier close is resolved BEFORE any new exit decision —
+    # its fill (if any) is the position's real outcome.
+    pending = _resolve_pending_close(cfg, position, query_order, regime)
+    if pending is not None:
+        return pending
+
+    max_hold = MAX_HOLD_BARS.get(timeframe, DEFAULT_MAX_HOLD_BARS)
+    reason = _exit_signal(position, candle, last_close, max_hold, manual_exit)
+    if reason is None:
+        position["last_seen_price"] = last_close
+        _save_position(cfg, position)
+        return None
+
     intent = _close_intent(position, reason, last_close)
+    # Write-ahead: persist the close id BEFORE submitting, so a crash between
+    # POST and response still re-queries THIS id instead of double-closing.
+    position["close_client_order_id"] = intent.get("client_order_id")
+    position["close_reason_pending"] = reason
+    _save_position(cfg, position)
+
     close_result = submit_close(intent)
     if not close_result.get("external_order_submission_performed"):
-        # Close blocked/failed: the position STAYS OPEN. Loud, retried next cycle.
+        # Close blocked/rejected before reaching the venue: the position STAYS
+        # OPEN and the never-submitted id is retired. Loud, retried next cycle.
+        position.pop("close_client_order_id", None)
+        position.pop("close_reason_pending", None)
         position["close_attempt_failed_at_utc"] = utc_now_iso()
         position["close_attempt_status"] = close_result.get("status")
         _save_position(cfg, position)
@@ -307,8 +449,9 @@ def settle_open_live_position(
     filled_qty = _f(response.get("executedQty"))
     order_status = response.get("status")
     if order_status not in _FILLED or exit_price <= 0:
-        # Submitted but not (yet) filled/readable: keep the position OPEN and let
-        # the next cycle re-evaluate; never fabricate an exit price.
+        # Submitted but not (yet) filled/readable: keep the position OPEN with
+        # the SAME pending close id — the next cycle re-queries it; never
+        # fabricate an exit price, never race a second close.
         position["close_attempt_failed_at_utc"] = utc_now_iso()
         position["close_attempt_status"] = f"CLOSE_FILL_UNCONFIRMED:{order_status}"
         _save_position(cfg, position)
@@ -320,41 +463,7 @@ def settle_open_live_position(
         return {"status": "CLOSE_UNCONFIRMED", "close_reason": reason,
                 "order_status": order_status, "position_id": position.get("position_id")}
 
-    direction = str(position.get("direction") or "LONG").upper()
-    entry = _f(position.get("entry_price"))
-    qty = filled_qty or _f(position.get("quantity"))
-    risk = _f(position.get("risk"))
-    realized = _realized_pnl_usdt(direction, entry, exit_price, qty)
-    result_r = _result_r(direction, entry, exit_price, risk)
-
-    # Feed the L1 ledger — this is what the daily-loss circuit breaker reads.
-    ledger_record = record_live_outcome(
-        realized_pnl_usdt=realized,
-        symbol=str(position.get("symbol")),
-        side="BUY" if direction == "LONG" else "SELL",
-        quantity=qty,
-        open_price=entry,
-        close_price=exit_price,
-        open_order_id=position.get("entry_exchange_order_id"),
-        close_order_id=close_result.get("exchange_order_id"),
-        strategy_id=position.get("strategy_id"),
-        opened_at_utc=position.get("opened_at_utc"),
+    return _settle_from_fill(
+        cfg, position, reason, exit_price, filled_qty,
+        close_result.get("exchange_order_id"), regime,
     )
-    _clear_position(cfg)
-    log_event(
-        "live_position_closed",
-        {"position_id": position.get("position_id"), "close_reason": reason,
-         "realized_pnl_usdt": round(realized, 8), "result_R": round(result_r, 8)},
-    )
-    return {
-        "status": "CLOSED",
-        "position_id": position.get("position_id"),
-        "close_reason": reason,
-        "exit_price": exit_price,
-        "quantity": qty,
-        "realized_pnl_usdt": round(realized, 8),
-        "result_R": round(result_r, 8),
-        "regime": regime or "unknown",
-        "live_outcome_record_id": ledger_record.get("live_outcome_record_id"),
-        "close_exchange_order_id": close_result.get("exchange_order_id"),
-    }

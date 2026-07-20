@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from core.time_utils import utc_now_iso
+from core.time_utils import parse_time, utc_now, utc_now_iso
 from crypto_ai_system.data.binance_futures_collector import BinanceFuturesPublicClient
 
 # Optional-data status vocabulary (directive §7.2). A missing/failed optional
@@ -107,6 +107,35 @@ def to_binance_interval(timeframe: str) -> str:
     return _TIMEFRAME_MAP.get(timeframe.upper().strip(), "1h")
 
 
+_INTERVAL_MINUTES = {
+    "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30,
+    "1h": 60, "2h": 120, "4h": 240, "6h": 360, "8h": 480, "12h": 720,
+    "1d": 1440,
+}
+
+
+def drop_forming_candle(candles: list[dict], interval: str) -> list[dict]:
+    """Drop the still-forming last candle (open time + interval in the future).
+
+    Binance's klines endpoint always includes the current, unclosed bar as the
+    last row. Feeding it downstream repaints indicators every cycle and lets
+    paper settlement trigger SL/TP on the partial bar's extremes — every
+    consumer (snapshot, health check, settlement, research) must only ever see
+    CLOSED bars. An unparseable last timestamp drops the bar (fail-closed).
+    """
+    if len(candles) <= 1:
+        return candles
+    minutes = _INTERVAL_MINUTES.get(interval)
+    if minutes is None:
+        return candles
+    from datetime import timedelta
+
+    last_open = parse_time(candles[-1].get("timestamp"))
+    if last_open is None or last_open + timedelta(minutes=minutes) > utc_now():
+        return candles[:-1]
+    return candles
+
+
 def collect_real_market_data(
     symbol: str,
     timeframe: str,
@@ -135,6 +164,9 @@ def collect_real_market_data(
         }
         for _, row in klines.iterrows()
     ]
+    candles = drop_forming_candle(candles, interval)
+    if not candles:
+        raise RuntimeError(f"no closed klines for {binance_symbol} {interval}")
 
     # Derivatives are best-effort; a failure here should not void real candles.
     # Each optional metric carries a status so a missing/failed value is never

@@ -38,14 +38,25 @@ def main(argv: list[str] | None = None) -> int:
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
+    from core.run_lock import PipelineAlreadyRunning, pipeline_run_lock
     from crypto_ai_system.pipeline import Pipeline
-    from crypto_ai_system.pipeline.exit_codes import exit_code_for
+    from crypto_ai_system.pipeline.exit_codes import EXIT_ALREADY_RUNNING, exit_code_for
 
     parser = argparse.ArgumentParser(description="Run one lean trading cycle.")
     parser.add_argument("--json", action="store_true", help="emit JSON output")
     args = parser.parse_args(argv)
 
-    run = Pipeline().run_once()
+    try:
+        with pipeline_run_lock():
+            run = Pipeline().run_once()
+    except PipelineAlreadyRunning as exc:
+        # Two runs interleaving on storage/latest would execute each other's
+        # artifacts — refuse loudly instead.
+        if args.json:
+            print(json.dumps({"exit_code": EXIT_ALREADY_RUNNING, "halt_reason": str(exc)}))
+        else:
+            print(f"SKIPPED: {exc}")
+        return EXIT_ALREADY_RUNNING
     code, halt_reason = exit_code_for(run)
 
     if args.json:

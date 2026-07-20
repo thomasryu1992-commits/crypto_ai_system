@@ -65,14 +65,28 @@ def test_non_fatal_block_does_not_halt():
 
 
 def test_upstream_error_is_twenty():
-    results = [_ok("data"), StageResult(stage="research", status=StageStatus.ERROR, reasons=["boom"])]
+    # Agent.run stamps fatal=fatal_on_error (True for the core stages) on ERROR.
+    results = [_ok("data"),
+               StageResult(stage="research", status=StageStatus.ERROR, fatal=True, reasons=["boom"])]
     assert exit_code_for(_run(results))[0] == EXIT_UPSTREAM_ERROR
 
 
 def test_trading_error_is_thirty():
     results = [_ok("data"), _ok("research"), _ok("validation"),
-               StageResult(stage="trading", status=StageStatus.ERROR, reasons=["exec fail"])]
+               StageResult(stage="trading", status=StageStatus.ERROR, fatal=True, reasons=["exec fail"])]
     assert exit_code_for(_run(results))[0] == EXIT_TRADING_ERROR
+
+
+def test_advisory_error_does_not_report_a_halt():
+    # A fatal_on_error=False stage (e.g. shadow strategy routing) that ERRORs
+    # must not make a normally-traded cycle exit as an error halt.
+    results = [_ok("data"), _ok("research"), _ok("validation"),
+               StageResult(stage="strategy_routing", status=StageStatus.ERROR, fatal=False, reasons=["shadow blew up"]),
+               _ok("trading"), _ok("feedback")]
+    code, reason = exit_code_for(_run(results, trade_executed=True))
+    assert code == EXIT_OK
+    assert reason is None
+    assert is_healthy(code) is True
 
 
 def test_feedback_error_is_fifty():

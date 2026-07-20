@@ -325,11 +325,53 @@ class TradingAgent(Agent):
             )
             return None
 
+    def _settle_live_before_refusal(self) -> dict | None:
+        """Settle the open live position even when the live stage is refused.
+
+        A kill switch / cleared config blocks NEW entries, but must never
+        abandon an already-open live position: SL/TP/time exits keep being
+        evaluated and the reduceOnly close goes through the narrow close guard
+        (which exempts closes from the kill switch — risk reduction). Any
+        failure leaves the position OPEN (fail-open-position) and logs loudly.
+        """
+        if not _live_strategy_requested():
+            return None
+        try:
+            from crypto_ai_system.execution.live_position_kernel import (
+                has_open_live_position,
+                settle_open_live_position,
+            )
+
+            cfg = load_config(".")
+            if not has_open_live_position(cfg):
+                return None
+            snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+            return settle_open_live_position(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+        except Exception as exc:  # noqa: BLE001 - never turn a refusal into a crash
+            log_event(
+                "live_settle_on_refused_stage_failed",
+                {"error": repr(exc)},
+                severity="ERROR",
+            )
+            return None
+
     def execute(self, ctx: PipelineContext) -> StageResult:
         # Fail-closed stage routing. The executor's final guard is the last
         # gate before anything is signed.
         execution_stage, block_reason = resolve_execution_stage()
         if block_reason:
+            # Settle-first: the refusal must not strand an open live position.
+            settlement = self._settle_live_before_refusal()
+            if settlement is not None:
+                return self.blocked(
+                    [block_reason], fatal=True, live_settlement_on_refusal=settlement
+                )
             return self.blocked([block_reason], fatal=True)
 
         allow_new_position = bool(ctx.get("allow_new_position", False))

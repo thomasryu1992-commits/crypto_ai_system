@@ -117,7 +117,16 @@ def _evaluate_strategy_risk_gate(
         max_open = paper_gate_max_open_positions()
     else:
         max_open = 1
-    gate_config: dict[str, Any] = {"stage": stage, "max_open_positions": max_open, "require_profile_hash": True}
+    gate_config: dict[str, Any] = {
+        "stage": stage,
+        "max_open_positions": max_open,
+        "require_profile_hash": True,
+        # Same settings-derived loss limits the research bridge passes — without
+        # them the gate's hardcoded defaults drift from an env-tightened
+        # DAILY_MAX_LOSS_R / MAX_CONSECUTIVE_LOSSES.
+        "daily_loss_limit_r": settings.DAILY_MAX_LOSS_R,
+        "max_consecutive_losses": settings.MAX_CONSECUTIVE_LOSSES,
+    }
     if stage == "paper":
         profile: Mapping[str, Any] = get_paper_profile()
     elif stage == "live":
@@ -162,6 +171,7 @@ def build_strategy_decision_for_cycle(
     market_snapshot = read_json(settings.MARKET_SNAPSHOT_PATH, {}) or {}
     research_signal = read_json(settings.RESEARCH_SIGNAL_PATH, {}) or {}
     risk = read_json(settings.RISK_STATUS_PATH, {}) or {}
+    data_health = read_json(settings.DATA_HEALTH_PATH, {}) or {}
     market_data = read_json(settings.MARKET_DATA_PATH, {}) or {}
     candles = market_data.get("candles", []) if isinstance(market_data, dict) else []
     # The decision must carry the row on the spec's own symbol AND timeframe —
@@ -224,7 +234,8 @@ def build_strategy_decision_for_cycle(
     return build_strategy_trade_decision(
         router_result=strategy_routing, primary_spec=primary_spec, feature_row=feature_row,
         market_snapshot=market_snapshot, research_permission=permission, pre_order_risk_gate=gate,
-        attribution=attribution, symbol=symbol, notional_usdt=notional,
+        attribution=attribution, data_health=data_health, risk=risk,
+        symbol=symbol, notional_usdt=notional,
         execution_stage=execution_stage,
         # The cycle's data lineage the paper engine requires on the intent.
         research_signal_id=research_signal.get("research_signal_id") or research_signal.get("signal_id"),
