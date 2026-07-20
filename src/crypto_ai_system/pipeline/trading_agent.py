@@ -21,14 +21,7 @@ from core.event_log import log_event
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
-from crypto_ai_system.execution.paper_book_kernel import (
-    multibook_enabled,
-    open_books,
-)
-from crypto_ai_system.execution.paper_position_kernel import (
-    has_open_position,
-    open_from_execution,
-)
+from crypto_ai_system.execution.paper_book_kernel import multibook_enabled
 from crypto_ai_system.feedback.counterfactual_tracker import (
     record_blocked_signal,
     settle_counterfactuals,
@@ -56,19 +49,20 @@ def _f(value) -> float | None:
         return None
 
 
-# Stage routing lives in trading_steps.stage_router (M1); these names stay
-# importable/patchable here until the M5 call-site migration.
+# resolve_execution_stage's canonical home is trading_steps.stage_router; the
+# re-export here is this module's stable public surface (tests and operator
+# tooling call trading_agent.resolve_execution_stage).
 from crypto_ai_system.pipeline.trading_steps.stage_router import (  # noqa: E402
-    _confirmation_present,
     _flag,
-    _live_requested,
-    _live_strategy_block_reason,
     _live_strategy_requested,
-    _testnet_requested,
     resolve_execution_stage,
 )
 from crypto_ai_system.pipeline.trading_steps.context import CycleInputs  # noqa: E402
 from crypto_ai_system.pipeline.trading_steps.lifecycle import derive_lifecycle  # noqa: E402
+from crypto_ai_system.pipeline.trading_steps.positions import (  # noqa: E402
+    count_open_positions,
+    open_position_if_filled,
+)
 from crypto_ai_system.pipeline.trading_steps.settlement import settle_positions  # noqa: E402
 
 
@@ -243,14 +237,7 @@ class TradingAgent(Agent):
 
         # 2. Open-position count for the gate (max_open_positions enforced there;
         #    multibook counts open books against the book cap).
-        if is_live:
-            from crypto_ai_system.execution.live_position_kernel import has_open_live_position
-
-            open_positions = 1 if has_open_live_position(cfg) else 0
-        elif multibook:
-            open_positions = len(open_books(cfg))
-        else:
-            open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
+        open_positions = count_open_positions(inputs, multibook=multibook)
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
 
@@ -311,39 +298,16 @@ class TradingAgent(Agent):
                 cfg, trade_decision, snapshot, cycle_id
             )
 
-        # 3. Open a canonical position from a freshly filled entry (only if none
-        #    is open — the gate's max_open_positions already enforces this).
-        #    Paper opens from the simulated fill; live opens from the REAL fill
-        #    via its kernel (which requires a RECONCILED entry).
-        opened = None
-        book_open_refusal = None
-        if multibook:
-            # Opens already happened inside the entry walk (the kernel stayed
-            # the arbiter there); surface the first for the legacy output shape.
-            opened = next((e.get("opened") for e in multibook_entries if e.get("opened")), None)
-            book_open_refusal = next(
-                (e.get("book_refusal") for e in multibook_entries if e.get("book_refusal")), None
-            )
-        elif is_paper and order_filled and not has_open_position(cfg):
-            opened = open_from_execution(
-                order,
-                reconciliation if isinstance(reconciliation, dict) else {},
-                cycle_id=cycle_id,
-                cfg=cfg,
-            )
-        elif is_live and externally_submitted:
-            from crypto_ai_system.execution.live_position_kernel import (
-                has_open_live_position,
-                open_from_live_execution,
-            )
-
-            if not has_open_live_position(cfg):
-                opened = open_from_live_execution(
-                    order,
-                    reconciliation if isinstance(reconciliation, dict) else {},
-                    cycle_id=cycle_id,
-                    cfg=cfg,
-                )
+        # 3. Open a canonical position from a freshly filled entry (see
+        #    trading_steps.positions — paper opens from the simulated fill;
+        #    live opens from the REAL fill via its kernel).
+        open_outcome = open_position_if_filled(
+            inputs, multibook=multibook, multibook_entries=multibook_entries,
+            order=order, reconciliation=reconciliation,
+            order_filled=order_filled, externally_submitted=bool(externally_submitted),
+        )
+        opened = open_outcome.opened
+        book_open_refusal = open_outcome.book_open_refusal
 
         # Position lifecycle flows through the kernels, not Path A. A live close
         # counts only when it actually CLOSED (a failed close stays open).

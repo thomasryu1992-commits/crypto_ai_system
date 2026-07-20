@@ -1,7 +1,19 @@
 # Design: TradingAgent decomposition + PipelineContext as a load-bearing contract
 
-_Status: PROPOSAL (2026-07-20). The two structural items deferred from the QA
-audit (see STATUS.md "2026-07-19/20" maintenance entries). No code change yet._
+_Status: IMPLEMENTED (2026-07-20, branch `refactor/trading-agent-split-context`,
+commits P1..P3 + M1..M5). Deviations from the proposal are noted inline as
+**[as-built]** paragraphs._
+
+**[as-built] summary.** All P and M steps landed as designed, with three
+deliberate deviations: (1) `settle_live_before_refusal` stayed in the agent —
+it runs before `CycleInputs` exists and its tests patch the agent's module
+surface; (2) the counterfactual wrappers stayed in the agent for the same
+monkeypatch-surface reason (`record_blocked_signal`/`settle_counterfactuals`
+are patched on the agent module); (3) the `resolve_execution_stage` re-export
+is kept permanently as the module's stable public surface rather than removed —
+tests and operator tooling call `trading_agent.resolve_execution_stage`.
+`positions.py` additionally absorbed the open-position count. The agent went
+from ~660 to ~320 lines; `execute()` is the sequencer.
 
 ## Why
 

@@ -492,8 +492,23 @@ findings, fixed and verified (876 tests, 0 warnings, safety guard, live cycle):
 - NumPy timedelta deprecation warnings eliminated (3181 → 0) via explicit-unit
   `pd.Timedelta` construction; ASCII console strings; small dead code removed.
 
-Deliberately deferred (structural, separate effort): splitting the ~600-line
-TradingAgent and making PipelineContext load-bearing (or removing it).
+**2026-07-20 — structural refactor (P1–P3 + M1–M5).** The two deferred items,
+done per `docs/architecture/design_trading_agent_split_and_context.md`:
+
+- **PipelineContext is load-bearing.** `ValidationVerdict` (frozen dataclass)
+  is set once per cycle by the validation agent; BOTH decision builders
+  (`run_research_trading_bridge`, `build_strategy_decision_for_cycle`) take
+  `data_health`/`risk` as REQUIRED kwargs and no longer re-read the verdict
+  files — an entry path without a verdict is a TypeError, and an unwired
+  context resolves to `fail_closed()`. The legacy shared outputs dict
+  (`ctx.data`/`get`/`stage_ok`) is gone; standalone entry points use the
+  explicit `ValidationVerdict.from_latest_files()`.
+- **TradingAgent decomposed** (~660 → ~320 lines): `pipeline/trading_steps/`
+  owns stage routing, `CycleInputs` (one snapshot+candle read per cycle),
+  settlement (3 variants + S8), the entry chain, the multibook walk, pure
+  lifecycle derivation (first direct unit tests), and position open/count.
+  `execute()` is a sequencer; behavior byte-identical (same outputs keys,
+  file-write order, log events, fail-closed semantics).
 
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
