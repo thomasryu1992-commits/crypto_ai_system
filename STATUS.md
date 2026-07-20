@@ -534,6 +534,22 @@ decision-consumption guard (one decision -> at most one intent); the pre-lean
 files under gitignored `storage/` are operator data on this machine and are
 not touched by code changes.
 
+**2026-07-20 — live performance as breeding pressure (L-A).** Per
+`docs/architecture/design_live_performance_selection_pressure.md`: real paper
+results (S8 attributed outcomes) now exert graded selection pressure via the
+shrunk live-blended score `SLS = w*live + (1-w)*backtest, w = n/(n+K)` (K =
+`STRATEGY_LIVE_PRESSURE_PSEUDO_TRADES`, default 20). L-A1: `add_champion`'s
+full-pool comparison ranks occupants by comparison-time SLS (admission
+`champion_score` stays frozen as the audit anchor; decisions record the SLS
+inputs) — a live-refuted incumbent becomes progressively displaceable, a
+live-confirmed one hardens. L-A2: the miner's champion seeds are SLS-ordered
+(budget truncation keeps the live-best) and carry weight `1+w` in the first
+breeding round's parent choice. **No-op until live samples accumulate by
+construction** (n=0 reproduces the old behavior exactly — tested). Admission
+gates, S10 retirement, and the train-slice honesty contract untouched. L-B
+(family-level fitness prior) deferred until live data exists to validate
+against.
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a

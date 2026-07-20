@@ -288,6 +288,7 @@ def mine_rule_sets(
     elite_fraction: float = 0.25,
     top_n: int = 5,
     seed_population: Sequence[Mapping[str, Any]] | None = None,
+    seed_weights: Sequence[float] | None = None,
 ) -> dict[str, Any]:
     """Evolve rule sets against ``fitness`` (which must only see ``train``).
 
@@ -296,6 +297,13 @@ def mine_rule_sets(
     Seeds get no other privilege — they are scored, ranked, recombined, and
     discarded by exactly the same loop as everything else, so a stale champion
     dies in one generation while a good one spreads its conditions.
+
+    ``seed_weights`` (L-A2, aligned with ``seed_population``; value ``1 + w``
+    from live evidence) biases crossover-parent choice in the FIRST breeding
+    round only: a live-validated seed that makes the elite draws
+    proportionally more lottery tickets. Later rounds are uniform (children
+    have no live history), and ``None`` keeps the exact original code path —
+    same rng consumption, byte-identical searches.
 
     Returns the ``top_n`` distinct-by-family survivors and the total number of
     fitness evaluations performed (the selection-bias denominator).
@@ -326,24 +334,37 @@ def mine_rule_sets(
         return score
 
     seeds = []
-    for candidate in seed_population or ():
+    weight_by_key: dict[str, float] = {}
+    for index, candidate in enumerate(seed_population or ()):
         rule_set = {
             "direction": candidate["direction"],
             "conditions": [dict(c) for c in candidate["conditions"]],
             "exit_rules": dict(candidate["exit_rules"]),
         }
-        if _key(rule_set) not in {_key(s) for s in seeds}:
+        key = _key(rule_set)
+        if key not in {_key(s) for s in seeds}:
             seeds.append(rule_set)
+            if seed_weights is not None and index < len(seed_weights):
+                weight_by_key[key] = max(float(seed_weights[index]), 0.0) or 1.0
+    # Caller orders seeds best-first (SLS desc), so truncation at the
+    # population budget keeps the live-best rather than positional luck.
     seeds = seeds[:population]
 
+    def _pick_parent(elite: list[dict[str, Any]], first_round: bool):
+        if first_round and weight_by_key:
+            weights = [weight_by_key.get(_key(e), 1.0) for e in elite]
+            return rng.choices(elite, weights=weights, k=1)[0]
+        return rng.choice(elite)
+
     current = seeds + [random_rule_set(pool, rng) for _ in range(population - len(seeds))]
-    for _ in range(max(1, generations)):
+    for round_index in range(max(1, generations)):
+        first_round = round_index == 0
         ranked = sorted(current, key=_evaluate, reverse=True)
         elite = ranked[: max(2, int(population * elite_fraction))]
         next_gen = list(elite)
         while len(next_gen) < population:
             if rng.random() < 0.7:
-                child = crossover(rng.choice(elite), rng.choice(elite), rng)
+                child = crossover(_pick_parent(elite, first_round), _pick_parent(elite, first_round), rng)
             else:
                 child = random_rule_set(pool, rng)
             if rng.random() < 0.5:

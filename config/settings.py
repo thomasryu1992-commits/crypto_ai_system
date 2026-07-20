@@ -215,6 +215,10 @@ STRATEGY_FACTORY_ROUTING_ENABLED = env_bool("STRATEGY_FACTORY_ROUTING_ENABLED", 
 # Drive mode (paper only): a routed candidate becomes an actual paper entry,
 # still gated by research permission + PreOrderRiskGate. Requires routing enabled.
 STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED = env_bool("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED", False)
+# Live selection pressure (design_live_performance_selection_pressure.md): K
+# pseudo-trades in the shrunk live-blended score. At n=K live trades, real
+# results carry half the weight; n=0 reproduces pure backtest scoring.
+STRATEGY_LIVE_PRESSURE_PSEUDO_TRADES = env_int("STRATEGY_LIVE_PRESSURE_PSEUDO_TRADES", 20)
 
 # Live canary preparation (read-only probe; grants no order authority)
 LIVE_READONLY_PROBE_ENABLED = env_bool("LIVE_READONLY_PROBE_ENABLED", False)
