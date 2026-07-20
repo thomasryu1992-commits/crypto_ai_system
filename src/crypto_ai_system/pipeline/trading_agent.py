@@ -14,7 +14,6 @@ from config.settings import (
     MARKET_DATA_PATH,
     MARKET_SNAPSHOT_PATH,
     RESEARCH_SIGNAL_PATH,
-    TRADE_DECISION_PATH,
 )
 
 from bridge.research_trading_bridge import run_research_trading_bridge
@@ -22,30 +21,16 @@ from core.event_log import log_event
 from core.json_io import atomic_write_json, read_json
 from crypto_ai_system.config import load_config
 from crypto_ai_system.execution.order_executor import run_order_executor
-from crypto_ai_system.execution.paper_book_kernel import (
-    multibook_enabled,
-    open_books,
-    open_in_book,
-    settle_books,
-)
-from crypto_ai_system.execution.paper_position_kernel import (
-    has_open_position,
-    load_open_position,
-    open_from_execution,
-    settle_open_position,
-)
+from crypto_ai_system.execution.paper_book_kernel import multibook_enabled
 from crypto_ai_system.feedback.counterfactual_tracker import (
     record_blocked_signal,
     settle_counterfactuals,
 )
 from crypto_ai_system.execution.reconciler import run_reconciler
-from crypto_ai_system.execution.signed_testnet_reconciliation import (
-    run_signed_testnet_reconciliation,
-)
 from crypto_ai_system.trading.trading_cycle import run_trading_cycle
 
 from crypto_ai_system.pipeline.base import Agent
-from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
+from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult, ValidationVerdict
 
 
 def _latest_candle() -> dict | None:
@@ -63,230 +48,68 @@ def _f(value) -> float | None:
     except (TypeError, ValueError):
         return None
 
-_CONFIRMATION_PHRASE = "I_UNDERSTAND_THIS_PLACES_REAL_ORDERS"
 
-
-def _flag(name: str, default: bool = False) -> bool:
-    return bool(getattr(settings, name, default))
-
-
-def _live_requested() -> bool:
-    return _flag("LIVE_TRADING_ENABLED") or _flag("ALLOW_LIVE_TRADING")
-
-
-def _testnet_requested() -> bool:
-    return _flag("ENABLE_TESTNET_ORDERS") or _flag("TESTNET_SIGNED_ORDER_ENABLED")
-
-
-def _confirmation_present() -> bool:
-    phrase = getattr(settings, "LIVE_TRADING_CONFIRMATION_PHRASE", "")
-    given = getattr(settings, "LIVE_TRADING_CONFIRMATION", "")
-    expected = phrase or _CONFIRMATION_PHRASE
-    return bool(given) and given == expected
-
-
-def _live_strategy_requested() -> bool:
-    return _flag("LIVE_STRATEGY_ORDER_ENABLED")
-
-
-def _live_strategy_block_reason() -> str | None:
-    """Every condition for routing the pipeline to the live stage, or why not.
-
-    A partially-configured live request refuses loudly rather than silently
-    downgrading to paper — an operator who flipped the live flag must know it is
-    not live. Delegates to the single source (live_profile) shared with the
-    signal builder; the final guard re-checks all of this before signing.
-    """
-    from crypto_ai_system.research.live_profile import live_stage_block_reason
-
-    return live_stage_block_reason()
-
-
-def resolve_execution_stage() -> tuple[str | None, str | None]:
-    """Decide the execution stage from config, fail-closed.
-
-    Returns ``(stage, block_reason)``. When ``block_reason`` is set the caller
-    must refuse execution. ``stage`` is ``"paper"``, ``"signed_testnet"``, or
-    ``"live"`` (all enable flags + confirmation + promotion evidence required).
-    """
-    if _live_requested():
-        # The legacy live flags never route anywhere; the only live path is the
-        # explicit LIVE_STRATEGY_* set below.
-        return None, "legacy live trading flags are not a live path - refusing (fail-closed)"
-    if _live_strategy_requested():
-        reason = _live_strategy_block_reason()
-        if reason:
-            return None, reason
-        return "live", None
-    if _testnet_requested() and not _confirmation_present():
-        return None, "testnet order flag enabled without confirmation phrase - refusing"
-    if _testnet_requested() and _confirmation_present():
-        return "signed_testnet", None
-    return "paper", None
+# resolve_execution_stage's canonical home is trading_steps.stage_router; the
+# re-export here is this module's stable public surface (tests and operator
+# tooling call trading_agent.resolve_execution_stage).
+from crypto_ai_system.pipeline.trading_steps.stage_router import (  # noqa: E402
+    _flag,
+    _live_strategy_requested,
+    resolve_execution_stage,
+)
+from crypto_ai_system.pipeline.trading_steps.context import CycleInputs  # noqa: E402
+from crypto_ai_system.pipeline.trading_steps.lifecycle import derive_lifecycle  # noqa: E402
+from crypto_ai_system.pipeline.trading_steps.positions import (  # noqa: E402
+    count_open_positions,
+    open_position_if_filled,
+)
+from crypto_ai_system.pipeline.trading_steps.settlement import settle_positions  # noqa: E402
 
 
 class TradingAgent(Agent):
     name = "trading"
     fatal_on_error = True
 
-    def _record_strategy_outcome(self, position, settlement, ctx: PipelineContext) -> None:
-        """Attribute a closed strategy-driven paper position to its strategy (S8).
-
-        Isolated and best-effort: an attribution failure must not affect the
-        trade result that already happened."""
-        try:
-            from crypto_ai_system.feedback.strategy_feedback_step import record_strategy_outcome
-
-            now = ctx.cycle.started_at_utc if ctx.cycle else None
-            record_strategy_outcome(
-                position, settlement,
-                registry_file=str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH), now=now,
-            )
-        except Exception as exc:  # noqa: BLE001 - attribution is best-effort, but never silent
-            log_event(
-                "strategy_outcome_attribution_failed",
-                {"error": repr(exc)},
-                severity="WARNING",
-            )
+    @staticmethod
+    def _verdict(ctx: PipelineContext) -> ValidationVerdict:
+        """This cycle's validation verdict; an unwired context fails closed."""
+        return ctx.verdict or ValidationVerdict.fail_closed()
 
     def _maybe_strategy_decision(self, ctx: PipelineContext, execution_stage: str, open_positions: int):
-        """Build a strategy-driven trade decision from this cycle's router result.
+        """Compat wrapper over trading_steps.entry.build_drive_decision (M4)."""
+        from crypto_ai_system.pipeline.trading_steps.entry import build_drive_decision
 
-        Isolated so a failure here can never break the research path: any error
-        returns None and the research decision stands."""
-        routing = ctx.get("strategy_routing")
-        if not isinstance(routing, dict):
-            return None
-        try:
-            from crypto_ai_system.strategy_factory.strategy_execution_bridge import (
-                build_strategy_decision_for_cycle,
-            )
+        return build_drive_decision(
+            ctx.strategy_routing, self._verdict(ctx),
+            execution_stage=execution_stage, open_positions=open_positions,
+            cycle_id=ctx.cycle.cycle_id if ctx.cycle else None,
+            now=ctx.cycle.started_at_utc if ctx.cycle else None,
+        )
 
-            cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
-            now = ctx.cycle.started_at_utc if ctx.cycle else None
-            return build_strategy_decision_for_cycle(
-                routing, execution_stage=execution_stage, open_positions=open_positions,
-                cycle_id=cycle_id, now=now,
-            )
-        except Exception:  # noqa: BLE001 - never let the drive path break research
-            return None
-
-    def _strategy_decision_for_candidate(self, ctx: PipelineContext, execution_stage: str,
-                                         open_positions: int, candidate: dict):
-        """A strategy decision for ONE ranked candidate (multibook entry walk).
-
-        The decision builder reads the routing's primary_* fields, so the
-        candidate is presented as the primary of a shallow routing copy.
-        Isolated like _maybe_strategy_decision: any failure returns None."""
-        routing = ctx.get("strategy_routing")
-        if not isinstance(routing, dict):
-            return None
-        try:
-            from crypto_ai_system.strategy_factory.strategy_execution_bridge import (
-                build_strategy_decision_for_cycle,
-            )
-
-            candidate_routing = {
-                **routing,
-                "primary_strategy_id": candidate.get("strategy_id"),
-                "primary_strategy_rule_hash": candidate.get("strategy_rule_hash"),
-                "direction": candidate.get("direction"),
-                "symbol": candidate.get("symbol"),
-            }
-            cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
-            now = ctx.cycle.started_at_utc if ctx.cycle else None
-            return build_strategy_decision_for_cycle(
-                candidate_routing, execution_stage=execution_stage, open_positions=open_positions,
-                cycle_id=cycle_id, now=now,
-            )
-        except Exception:  # noqa: BLE001 - never let the drive path break research
-            return None
-
-    def _run_multibook_entries(self, ctx: PipelineContext, cfg, cycle_id, execution_stage: str,
+    def _run_multibook_entries(self, ctx, cfg, cycle_id, execution_stage: str,
                                research_decision: dict, open_count: int):
-        """Multibook entry phase: ranked candidates first, then the research
-        decision into the default book, bounded by the per-cycle entry budget.
+        """Compat wrapper over trading_steps.multibook (M4): builds a minimal
+        CycleInputs from the given context and returns the legacy
+        ``(entries, first_strategy_decision)`` shape. The executor/reconciler/
+        persist/read callables come from THIS module's surface so existing
+        monkeypatches keep working."""
+        from crypto_ai_system.pipeline.trading_steps.multibook import run_multibook_entries
 
-        Every attempt runs the full unchanged chain — persist decision, order
-        executor, paper reconciler, book kernel — so each entry is gated and
-        audited exactly like a single-book entry, and the kernel remains the
-        arbiter of the book/global/direction caps. Returns
-        ``(entries, first_strategy_decision)``."""
-        from crypto_ai_system.execution.paper_book_kernel import DEFAULT_BOOK_ID
+        inputs = CycleInputs(
+            cfg=cfg, stage=execution_stage, cycle_id=cycle_id,
+            now=ctx.cycle.started_at_utc if getattr(ctx, "cycle", None) else None,
+            snapshot={}, latest_candle=None,
+            verdict=getattr(ctx, "verdict", None) or ValidationVerdict.fail_closed(),
+            routing=getattr(ctx, "strategy_routing", None),
+        )
+        outcome = run_multibook_entries(
+            inputs, research_decision=research_decision, open_count=open_count,
+            executor=run_order_executor, reconciler=run_reconciler,
+            persist=atomic_write_json, read=read_json,
+        )
+        return outcome.entries, outcome.strategy_drive
 
-        entries: list[dict] = []
-        opened_count = 0
-        budget = max(0, int(getattr(settings, "MULTIBOOK_MAX_ENTRIES_PER_CYCLE", 2)))
-        taken_books = set(open_books(cfg))
-
-        def _attempt(decision: dict, kind: str, book_hint: str) -> None:
-            nonlocal opened_count
-            atomic_write_json(TRADE_DECISION_PATH, decision)
-            order = run_order_executor(execution_stage)
-            order = order if isinstance(order, dict) else {}
-            reconciliation = run_reconciler()
-            opened, refusal = None, None
-            if order.get("filled"):
-                # enabled is passed explicitly: the caller decided the mode for
-                # this cycle, and a mid-cycle settings flip must not split it.
-                opened, refusal = open_in_book(
-                    order, reconciliation if isinstance(reconciliation, dict) else {},
-                    cycle_id=cycle_id, cfg=cfg, enabled=True,
-                )
-                if refusal:
-                    log_event(
-                        "multibook_open_refused",
-                        {"reason": refusal, "book": book_hint, "cycle_id": cycle_id},
-                        severity="WARNING",
-                    )
-                elif opened is not None:
-                    opened_count += 1
-                    taken_books.add(str(opened.get("book_id")))
-            entries.append({
-                "decision_kind": kind,
-                "book": book_hint,
-                "order": order,
-                "reconciliation": reconciliation,
-                "opened": opened,
-                "book_refusal": refusal,
-                "filled": bool(order.get("filled")),
-                # The post-executor on-disk decision (carries the consumption
-                # marker) so the walk can re-persist the EXECUTED entry's
-                # decision at the end instead of last-writer-wins.
-                "decision": read_json(TRADE_DECISION_PATH, {}),
-            })
-
-        strategy_drive = None
-        routing = ctx.get("strategy_routing")
-        drive_on = _flag("STRATEGY_FACTORY_ROUTING_ENABLED") and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
-        candidates = []
-        if drive_on and isinstance(routing, dict):
-            candidates = [
-                c for c in (routing.get("ranked_candidates") or [])
-                if c.get("strategy_id") and c["strategy_id"] not in taken_books
-            ]
-
-        for candidate in candidates:
-            if len(entries) >= budget:
-                break
-            decision = self._strategy_decision_for_candidate(
-                ctx, execution_stage, open_count + opened_count, candidate,
-            )
-            # No executor churn on a candidate the bridge already refused.
-            if decision is None or not decision.get("allow_order_intent"):
-                continue
-            if strategy_drive is None:
-                strategy_drive = decision
-            _attempt(decision, "strategy", str(candidate["strategy_id"]))
-
-        # The research decision drives the shared default book, last: the pool's
-        # strategies are the point of multibook, research keeps its one slot.
-        if len(entries) < budget and DEFAULT_BOOK_ID not in taken_books and isinstance(research_decision, dict):
-            _attempt(research_decision, "research", DEFAULT_BOOK_ID)
-
-        return entries, strategy_drive
-
-    def _settle_counterfactuals(self, cfg, snapshot: dict) -> list[dict]:
+    def _settle_counterfactuals(self, inputs: CycleInputs) -> list[dict]:
         """Advance the shadow book of trades the gates blocked.
 
         Best-effort: counterfactual bookkeeping is observational, so a failure
@@ -295,11 +118,11 @@ class TradingAgent(Agent):
             return []
         try:
             return settle_counterfactuals(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
-                cfg=cfg,
+                inputs.latest_candle,
+                last_close=inputs.last_close,
+                timeframe=inputs.timeframe,
+                regime=inputs.regime,
+                cfg=inputs.cfg,
             )
         except Exception as exc:  # noqa: BLE001 - best-effort, but never silent
             log_event(
@@ -378,191 +201,92 @@ class TradingAgent(Agent):
                 )
             return self.blocked([block_reason], fatal=True)
 
-        allow_new_position = bool(ctx.get("allow_new_position", False))
+        verdict = self._verdict(ctx)
+        allow_new_position = verdict.allow_new_position
 
         cfg = load_config(".")
         cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
         snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+        # One market view per cycle: every step below shares THIS snapshot and
+        # candle, so two reads of a mid-cycle-rewritten file cannot disagree.
+        inputs = CycleInputs(
+            cfg=cfg,
+            stage=execution_stage,
+            cycle_id=cycle_id,
+            now=ctx.cycle.started_at_utc if ctx.cycle else None,
+            snapshot=snapshot,
+            latest_candle=_latest_candle(),
+            verdict=verdict,
+            routing=ctx.strategy_routing,
+        )
         is_paper = execution_stage == "paper"
         is_live = execution_stage == "live"
 
         # 1. Settle any open position FIRST — SL/TP/time exit may close it and
-        #    produce a CLOSED outcome before this cycle considers a new entry.
-        #    Paper settles by simulation; live submits a REAL reduceOnly close
-        #    (fail-open-position: a blocked/unconfirmed close stays OPEN).
-        settlement = None
-        book_settlements: list[dict] = []
+        #    produce a CLOSED outcome before this cycle considers a new entry
+        #    (see trading_steps.settlement for the three variants + S8).
         multibook = is_paper and multibook_enabled()
-        if multibook:
-            # Every open book settles independently on the same candle; each
-            # closed summary carries its own position for S8/S9 attribution.
-            book_settlements = settle_books(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
-                cfg=cfg,
-                enabled=True,
-            )
-            settlement = book_settlements[0] if book_settlements else None
-            if _flag("STRATEGY_FACTORY_ROUTING_ENABLED"):
-                for closed in book_settlements:
-                    position = closed.get("position")
-                    if isinstance(position, dict) and position.get("strategy_id"):
-                        self._record_strategy_outcome(position, closed, ctx)
-        elif is_paper:
-            # Capture the position before settling — settle clears it, and a
-            # strategy-driven close must be attributed to its strategy (S8/S9).
-            open_before = load_open_position(cfg)
-            settlement = settle_open_position(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
-                cfg=cfg,
-            )
-            if (
-                settlement is not None
-                and isinstance(open_before, dict)
-                and open_before.get("strategy_id")
-                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-            ):
-                self._record_strategy_outcome(open_before, settlement, ctx)
-        elif is_live:
-            from crypto_ai_system.execution.live_pnl_ledger import live_risk_snapshot
-            from crypto_ai_system.execution.live_position_kernel import (
-                load_open_live_position,
-                settle_open_live_position,
-            )
-
-            # Persist today's realized live P&L + breaker state each cycle so the
-            # operator (and dashboard) can watch it and the daily-loss circuit
-            # breaker's input is fresh.
-            live_risk_snapshot()
-            open_before = load_open_live_position(cfg)
-            settlement = settle_open_live_position(
-                _latest_candle(),
-                last_close=_f(snapshot.get("last_close")),
-                timeframe=str(snapshot.get("timeframe", "1h")),
-                regime=str(snapshot.get("trend_bias", "unknown")),
-                cfg=cfg,
-            )
-            if (
-                isinstance(settlement, dict)
-                and settlement.get("status") == "CLOSED"
-                and isinstance(open_before, dict)
-                and open_before.get("strategy_id")
-                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-            ):
-                self._record_strategy_outcome(open_before, settlement, ctx)
+        settle_outcome = settle_positions(inputs, multibook=multibook)
+        settlement = settle_outcome.settlement
+        book_settlements = settle_outcome.book_settlements
 
         # 1b. Settle the shadow book on the same candle. These are the trades the
         #     gates blocked; settling them with the kernel's exit math is what
         #     makes "the gate cost us 3R" a measurement rather than a guess.
-        counterfactuals_settled = self._settle_counterfactuals(cfg, snapshot)
+        counterfactuals_settled = self._settle_counterfactuals(inputs)
 
         # 2. Open-position count for the gate (max_open_positions enforced there;
         #    multibook counts open books against the book cap).
-        if is_live:
-            from crypto_ai_system.execution.live_position_kernel import has_open_live_position
-
-            open_positions = 1 if has_open_live_position(cfg) else 0
-        elif multibook:
-            open_positions = len(open_books(cfg))
-        else:
-            open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
+        open_positions = count_open_positions(inputs, multibook=multibook)
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
-        trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
 
-        # Strategy-factory drive (paper or live, opt-in): when a routed candidate
-        # exists this cycle, replace the research decision with a strategy-driven
-        # one. It is still gated by research permission + PreOrderRiskGate inside
-        # the builder, and only overrides when it produces an order-intent-eligible
-        # decision — otherwise the research decision stands (fail-closed). On the
-        # live stage the L2 final guard additionally requires the persisted
-        # stage='live' RiskGate record before anything is signed.
+        # Entry phase (see trading_steps.entry / trading_steps.multibook): the
+        # strategy drive is still gated by research permission + PreOrderRiskGate
+        # inside the builder and only overrides when order-intent-eligible;
+        # otherwise the research decision stands (fail-closed).
         strategy_drive = None
         multibook_entries: list[dict] = []
         if multibook:
-            # M3: walk the ranked candidates (one book each), then the research
-            # decision into the default book, bounded by the per-cycle entry
-            # budget. The kernel's caps stay the arbiter inside the loop.
-            multibook_entries, strategy_drive = self._run_multibook_entries(
-                ctx, cfg, cycle_id, execution_stage, trade_decision, open_positions,
+            from crypto_ai_system.pipeline.trading_steps.multibook import run_multibook_entries
+
+            research_decision = run_research_trading_bridge(
+                execution_stage=execution_stage, open_positions=open_positions,
+                data_health=verdict.data_health, risk=verdict.risk_status,
             )
-            # The representative outcome of the walk is the entry that actually
-            # FILLED (first fill wins), not whatever was attempted last — the
-            # persisted decision, order, and reconciliation must all describe
-            # the same executed trade. Falls back to the last attempt when
-            # nothing filled.
-            representative = next(
-                (e for e in multibook_entries if e.get("filled")),
-                multibook_entries[-1] if multibook_entries else {},
+            mb = run_multibook_entries(
+                inputs, research_decision=research_decision, open_count=open_positions,
+                executor=run_order_executor, reconciler=run_reconciler,
+                persist=atomic_write_json, read=read_json,
             )
-            order = representative.get("order") or {}
-            reconciliation = representative.get("reconciliation") or {}
-            executed_decision = representative.get("decision")
-            if isinstance(executed_decision, dict) and executed_decision:
-                atomic_write_json(TRADE_DECISION_PATH, executed_decision)
-                trade_decision = executed_decision
+            multibook_entries = mb.entries
+            strategy_drive = mb.strategy_drive
+            order = mb.order
+            reconciliation = mb.reconciliation
+            trade_decision = mb.executed_decision or research_decision
             externally_submitted = False
         else:
-            drive_eligible = (
-                (is_paper or execution_stage == "live")
-                and _flag("STRATEGY_FACTORY_ROUTING_ENABLED")
-                and _flag("STRATEGY_FACTORY_ROUTING_DRIVE_ENABLED")
+            from crypto_ai_system.pipeline.trading_steps.entry import run_single_entry
+
+            entry = run_single_entry(
+                inputs, open_positions=open_positions,
+                executor=run_order_executor, reconciler=run_reconciler,
+                persist=atomic_write_json,
             )
-            if drive_eligible:
-                strategy_drive = self._maybe_strategy_decision(ctx, execution_stage, open_positions)
-                if strategy_drive is not None and strategy_drive.get("allow_order_intent"):
-                    atomic_write_json(TRADE_DECISION_PATH, strategy_drive)
-                    trade_decision = strategy_drive
+            trade_decision = entry.trade_decision
+            strategy_drive = entry.strategy_drive
+            order = entry.order
+            reconciliation = entry.reconciliation
+            externally_submitted = entry.externally_submitted
 
-            order = run_order_executor(execution_stage)
-
-            # Reconcile against the venue only when a real external order was
-            # submitted; otherwise use the paper reconciler.
-            externally_submitted = isinstance(order, dict) and order.get(
-                "external_order_submission_performed"
-            )
-            if execution_stage == "signed_testnet" and externally_submitted:
-                reconciliation = run_signed_testnet_reconciliation()
-            elif execution_stage == "live" and externally_submitted:
-                from crypto_ai_system.execution.live_strategy_execution import (
-                    run_live_strategy_reconciliation,
-                )
-
-                reconciliation = run_live_strategy_reconciliation()
-            else:
-                reconciliation = run_reconciler()
-
-        # Derive real order lifecycle state — a non-empty result dict is NOT a
-        # trade (a REJECTED/NO_ORDER result is also a dict). A trade counts only
-        # when the executor actually filled (paper) or submitted (testnet).
-        # Multibook aggregates across this cycle's entry attempts.
+        # Derive real order lifecycle state (pure, see trading_steps.lifecycle).
         order = order if isinstance(order, dict) else {}
-        order_status = order.get("status")
-        if multibook:
-            orders = [e.get("order") or {} for e in multibook_entries]
-            order_filled = any(bool(o.get("filled")) for o in orders)
-            order_intent_created = any(
-                bool(o.get("intent", {}).get("order_intent_created")) or bool(o.get("order_intent_id"))
-                for o in orders
-            )
-            order_submitted = False  # multibook is paper-only; nothing external
-            trade_executed = order_filled
-        else:
-            order_filled = bool(order.get("filled"))
-            order_intent_created = bool(order.get("intent", {}).get("order_intent_created")) or bool(
-                order.get("order_intent_id")
-            )
-            order_submitted = bool(order.get("external_order_submission_performed")) or (
-                order_status in {"SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED"}
-            )
-            trade_executed = order_filled or order_status in {
-                "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
-            }
+        lifecycle = derive_lifecycle(order, multibook_entries, multibook=multibook)
+        order_status = lifecycle.order_status
+        order_intent_created = lifecycle.order_intent_created
+        order_submitted = lifecycle.order_submitted
+        order_filled = lifecycle.order_filled
+        trade_executed = lifecycle.trade_executed
 
         # 2b. The signal wanted a trade and did not get one — shadow it, whatever
         #     stopped it. Recording keys off what actually happened (no trade),
@@ -574,39 +298,16 @@ class TradingAgent(Agent):
                 cfg, trade_decision, snapshot, cycle_id
             )
 
-        # 3. Open a canonical position from a freshly filled entry (only if none
-        #    is open — the gate's max_open_positions already enforces this).
-        #    Paper opens from the simulated fill; live opens from the REAL fill
-        #    via its kernel (which requires a RECONCILED entry).
-        opened = None
-        book_open_refusal = None
-        if multibook:
-            # Opens already happened inside the entry walk (the kernel stayed
-            # the arbiter there); surface the first for the legacy output shape.
-            opened = next((e.get("opened") for e in multibook_entries if e.get("opened")), None)
-            book_open_refusal = next(
-                (e.get("book_refusal") for e in multibook_entries if e.get("book_refusal")), None
-            )
-        elif is_paper and order_filled and not has_open_position(cfg):
-            opened = open_from_execution(
-                order,
-                reconciliation if isinstance(reconciliation, dict) else {},
-                cycle_id=cycle_id,
-                cfg=cfg,
-            )
-        elif is_live and externally_submitted:
-            from crypto_ai_system.execution.live_position_kernel import (
-                has_open_live_position,
-                open_from_live_execution,
-            )
-
-            if not has_open_live_position(cfg):
-                opened = open_from_live_execution(
-                    order,
-                    reconciliation if isinstance(reconciliation, dict) else {},
-                    cycle_id=cycle_id,
-                    cfg=cfg,
-                )
+        # 3. Open a canonical position from a freshly filled entry (see
+        #    trading_steps.positions — paper opens from the simulated fill;
+        #    live opens from the REAL fill via its kernel).
+        open_outcome = open_position_if_filled(
+            inputs, multibook=multibook, multibook_entries=multibook_entries,
+            order=order, reconciliation=reconciliation,
+            order_filled=order_filled, externally_submitted=bool(externally_submitted),
+        )
+        opened = open_outcome.opened
+        book_open_refusal = open_outcome.book_open_refusal
 
         # Position lifecycle flows through the kernels, not Path A. A live close
         # counts only when it actually CLOSED (a failed close stays open).

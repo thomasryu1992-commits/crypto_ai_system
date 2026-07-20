@@ -153,10 +153,17 @@ def build_strategy_decision_for_cycle(
     *,
     execution_stage: str = "paper",
     open_positions: int = 0,
+    data_health: Mapping[str, Any],
+    risk: Mapping[str, Any],
     cycle_id: str | None = None,
     now: str | None = None,
 ) -> dict[str, Any] | None:
-    """Build the strategy trade decision for this cycle, or None if not applicable."""
+    """Build the strategy trade decision for this cycle, or None if not applicable.
+
+    ``data_health`` and ``risk`` are the validation stage's verdicts and are
+    REQUIRED (P2) — the bridge no longer re-reads them from disk, so a strategy
+    entry cannot be assembled without the same gates the research path consumes.
+    """
     if not strategy_routing or strategy_routing.get("status") != STATUS_ENTRY_CANDIDATE:
         return None
     direction = str(strategy_routing.get("direction") or "").upper()
@@ -170,8 +177,8 @@ def build_strategy_decision_for_cycle(
 
     market_snapshot = read_json(settings.MARKET_SNAPSHOT_PATH, {}) or {}
     research_signal = read_json(settings.RESEARCH_SIGNAL_PATH, {}) or {}
-    risk = read_json(settings.RISK_STATUS_PATH, {}) or {}
-    data_health = read_json(settings.DATA_HEALTH_PATH, {}) or {}
+    risk = dict(risk or {})
+    data_health = dict(data_health or {})
     market_data = read_json(settings.MARKET_DATA_PATH, {}) or {}
     candles = market_data.get("candles", []) if isinstance(market_data, dict) else []
     # The decision must carry the row on the spec's own symbol AND timeframe —

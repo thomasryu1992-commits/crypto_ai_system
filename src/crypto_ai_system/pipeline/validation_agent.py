@@ -13,7 +13,7 @@ from data_health.health_check import run_data_health_check
 from risk.risk_guard import run_risk_guard
 
 from crypto_ai_system.pipeline.base import Agent
-from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
+from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult, ValidationVerdict
 
 
 class ValidationAgent(Agent):
@@ -27,6 +27,14 @@ class ValidationAgent(Agent):
         health_ok = bool(data_health.get("allow_trading"))
         risk_ok = bool(risk.get("allow_new_position"))
         allow_new_position = health_ok and risk_ok
+
+        # The typed intra-cycle contract: downstream decision builders consume
+        # THIS, not re-reads of the files it was derived from.
+        ctx.verdict = ValidationVerdict(
+            allow_new_position=allow_new_position,
+            data_health=data_health,
+            risk_status=risk,
+        )
 
         outputs = {
             "data_health": data_health,

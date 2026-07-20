@@ -88,8 +88,9 @@ class StrategyRoutingAgent(Agent):
 
     def execute(self, ctx: PipelineContext) -> StageResult:
         if not getattr(settings, "STRATEGY_FACTORY_ROUTING_ENABLED", False):
-            return self.ok(strategy_routing_enabled=False,
-                           strategy_routing={"status": STATUS_DISABLED, "order_candidate_count": 0})
+            disabled = {"status": STATUS_DISABLED, "order_candidate_count": 0}
+            ctx.strategy_routing = disabled
+            return self.ok(strategy_routing_enabled=False, strategy_routing=disabled)
 
         now = ctx.cycle.started_at_utc if ctx.cycle else None
         pool = read_json(settings.ACTIVE_STRATEGY_POOL_PATH, {}) or {}
@@ -101,6 +102,10 @@ class StrategyRoutingAgent(Agent):
         result["shadow_mode"] = True
         result["drives_execution"] = False
         atomic_write_json(settings.STRATEGY_ROUTING_PATH, result)
+
+        # Typed slot for the trading agent (the legacy outputs-merge remains
+        # until P3).
+        ctx.strategy_routing = result
 
         return self.ok(
             strategy_routing_enabled=True,
