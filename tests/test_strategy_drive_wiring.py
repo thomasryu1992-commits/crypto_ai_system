@@ -57,6 +57,9 @@ def _wire_artifacts(tmp_path, monkeypatch, *, pool):
         "RESEARCH_SIGNAL_PATH": ("rs.json", {"trade_permission": {"allow_long": True, "allow_short": True,
                                                                    "allow_new_position": True, "risk_level": "normal"}}),
         "RISK_STATUS_PATH": ("risk.json", {"allow_new_position": True}),
+        # The bridge consumes the validation verdicts (QA fix) — wire them to
+        # tmp so the test is hermetic instead of leaking real repo storage.
+        "DATA_HEALTH_PATH": ("dh.json", {"allow_trading": True}),
         "MARKET_DATA_PATH": ("md.json", {"candles": _candles()}),
     }
     for attr, (name, payload) in files.items():
