@@ -98,7 +98,13 @@ def main(argv: list[str] | None = None) -> int:
             "exit_code": code,
             "halt_reason": halt_reason,
             "healthy": is_healthy(code),
-            "data_is_synthetic": bool(data.outputs.get("data_is_synthetic")) if data else None,
+            # None = unknown (e.g. the data stage errored and never reported);
+            # a bare False would read as "confirmed real data" to monitoring.
+            "data_is_synthetic": (
+                bool(data.outputs["data_is_synthetic"])
+                if data and "data_is_synthetic" in data.outputs
+                else None
+            ),
             "metrics": metrics,
         }
 

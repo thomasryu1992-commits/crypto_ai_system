@@ -37,6 +37,11 @@ def atomic_write_json(path: str | Path, data: Any) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=2, ensure_ascii=False, default=str)
             file.write("\n")
+            # fsync before the rename: on power loss the rename can otherwise
+            # survive while the data blocks don't, leaving an empty/corrupt
+            # "latest" file behind an apparently-successful atomic write.
+            file.flush()
+            os.fsync(file.fileno())
         os.replace(tmp_name, path)
     finally:
         if os.path.exists(tmp_name):

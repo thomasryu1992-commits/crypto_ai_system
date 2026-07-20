@@ -41,12 +41,23 @@ def run_reconciler() -> dict:
 
     order = read_json(ORDER_RESULT_PATH, {})
     paper = read_json(PAPER_STATE_PATH, {})
+    # The legacy fallback compares nothing against a venue, so it must never
+    # stamp RECONCILED on an order that actually reached an exchange — those
+    # are reconciled by the signed-testnet/live reconcilers. Unreachable from
+    # the pipeline today (the trading agent routes external submissions to the
+    # venue reconcilers), but defense-in-depth for any direct caller.
+    notes = [fallback_note]
+    if order.get("external_order_submission_performed"):
+        status = "UNRECONCILED"
+        notes.append("legacy_fallback_cannot_reconcile_external_submission")
+    else:
+        status = "RECONCILED"
     result = {
         "created_at": utc_now_iso(),
-        "status": "RECONCILED",
+        "status": status,
         "order_status": order.get("status"),
         "paper_active": bool(paper.get("active_position")),
-        "notes": [fallback_note],
+        "notes": notes,
         "reconciler_mode": RECONCILER_MODE,
         "live_position_sync_enabled_by_this_module": LIVE_POSITION_SYNC_ENABLED_BY_THIS_MODULE,
         "external_execution_sync_performed": EXTERNAL_EXECUTION_SYNC_PERFORMED,
