@@ -179,6 +179,9 @@ def execute_order_intent(intent: dict) -> dict:
             "filled": False,
         }
 
+    from crypto_ai_system.artifacts import SCHEMA_ORDER_RESULT
+
+    result["schema_version"] = SCHEMA_ORDER_RESULT
     result["order_executor_mode"] = ORDER_EXECUTOR_MODE
     result["live_trading_allowed_by_this_module"] = LIVE_TRADING_ALLOWED_BY_THIS_MODULE
     result["adapter_routing_enabled_by_this_module"] = ADAPTER_ROUTING_ENABLED_BY_THIS_MODULE

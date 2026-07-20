@@ -80,11 +80,14 @@ def submit_live_canary_order(intent: dict[str, Any]) -> dict[str, Any]:
 
 def run_live_canary_reconciliation() -> dict[str, Any]:
     """Reconcile the latest live-canary order result against the live exchange."""
+    from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
     order_result = read_json(ORDER_RESULT_PATH, {})
 
     if not order_result.get("external_order_submission_performed"):
         result = {
             "created_at": utc_now_iso(),
+            "schema_version": SCHEMA_RECONCILIATION,
             "status": "NO_SUBMISSION",
             "mode": "LIVE_CANARY_RECONCILIATION",
             "mismatches": [],
@@ -111,6 +114,7 @@ def run_live_canary_reconciliation() -> dict[str, Any]:
             "error": f"{type(exc).__name__}: {exc}",
         }
 
+    result.setdefault("schema_version", SCHEMA_RECONCILIATION)
     atomic_write_json(RECONCILIATION_PATH, result)
     # Record this canary order as live-promotion evidence: a clean (RECONCILED,
     # zero-mismatch) order counts toward the minimum required before autonomous

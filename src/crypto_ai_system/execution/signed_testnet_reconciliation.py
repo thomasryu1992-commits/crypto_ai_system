@@ -150,11 +150,14 @@ def reconcile_signed_testnet(order_result: dict, adapter: SignedTestnetAdapter) 
 
 def run_signed_testnet_reconciliation() -> dict:
     """Read the latest order result and reconcile it against the testnet exchange."""
+    from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
     order_result = read_json(ORDER_RESULT_PATH, {})
 
     if not order_result.get("external_order_submission_performed"):
         result = {
             "created_at": utc_now_iso(),
+            "schema_version": SCHEMA_RECONCILIATION,
             "status": "NO_SUBMISSION",
             "mode": "SIGNED_TESTNET_RECONCILIATION",
             "mismatches": [],
@@ -180,6 +183,7 @@ def run_signed_testnet_reconciliation() -> dict:
             "error": f"{type(exc).__name__}: {exc}",
         }
 
+    result.setdefault("schema_version", SCHEMA_RECONCILIATION)
     atomic_write_json(RECONCILIATION_PATH, result)
     log_event(
         "signed_testnet_reconciliation",

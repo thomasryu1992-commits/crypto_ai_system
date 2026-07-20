@@ -170,9 +170,12 @@ def run_research_trading_bridge(
         research_signal=research_signal,
         pre_order_risk_gate=pre_order_risk_gate,
     )
+    from crypto_ai_system.artifacts import SCHEMA_TRADE_DECISION
+
     result = {
         "created_at": utc_now_iso(),
         "created_at_utc": policy.get("created_at_utc"),
+        "schema_version": SCHEMA_TRADE_DECISION,
         "trading_bridge_version": TRADING_BRIDGE_VERSION,
         "bridge_mode": BRIDGE_MODE,
         "research": research,

@@ -10,20 +10,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from crypto_ai_system.artifacts import MarketSnapshotView
 from crypto_ai_system.config import AppConfig
 from crypto_ai_system.pipeline.contracts import ValidationVerdict
 
 
-def _f(value: Any) -> float | None:
-    try:
-        return float(value) if value not in {None, ""} else None
-    except (TypeError, ValueError):
-        return None
-
-
 @dataclass(frozen=True)
 class CycleInputs:
-    """Immutable per-cycle inputs shared by every trading step."""
+    """Immutable per-cycle inputs shared by every trading step.
+
+    The market-derived accessors delegate to the typed
+    :class:`~crypto_ai_system.artifacts.MarketSnapshotView` so field names,
+    fallback chains, and defaults live in ONE place instead of being re-derived
+    here. ``snapshot`` stays the raw mapping for output/audit compatibility.
+    """
 
     cfg: AppConfig
     stage: str
@@ -33,6 +33,13 @@ class CycleInputs:
     latest_candle: Mapping[str, Any] | None
     verdict: ValidationVerdict
     routing: Mapping[str, Any] | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_market", MarketSnapshotView.from_mapping(self.snapshot))
+
+    @property
+    def market(self) -> MarketSnapshotView:
+        return self._market  # type: ignore[attr-defined]
 
     @property
     def is_paper(self) -> bool:
@@ -44,12 +51,12 @@ class CycleInputs:
 
     @property
     def last_close(self) -> float | None:
-        return _f(self.snapshot.get("last_close"))
+        return self.market.last_close
 
     @property
     def timeframe(self) -> str:
-        return str(self.snapshot.get("timeframe", "1h"))
+        return self.market.timeframe
 
     @property
     def regime(self) -> str:
-        return str(self.snapshot.get("trend_bias", "unknown"))
+        return self.market.trend_bias

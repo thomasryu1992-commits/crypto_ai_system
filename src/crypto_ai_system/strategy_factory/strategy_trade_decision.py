@@ -133,8 +133,11 @@ def build_strategy_trade_decision(
     else:
         final_decision = "STRATEGY_ENTRY_BLOCKED"
 
+    from crypto_ai_system.artifacts import SCHEMA_TRADE_DECISION
+
     payload: dict[str, Any] = {
         "created_at_utc": now or utc_now_canonical(),
+        "schema_version": SCHEMA_TRADE_DECISION,
         "strategy_trade_decision_version": STRATEGY_TRADE_DECISION_VERSION,
         "source": "strategy_factory_router",
         "symbol": symbol,

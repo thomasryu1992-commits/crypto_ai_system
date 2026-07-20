@@ -550,6 +550,26 @@ gates, S10 retirement, and the train-slice honesty contract untouched. L-B
 (family-level fitness prior) deferred until live data exists to validate
 against.
 
+**2026-07-21 — modularization hardening (artifact schemas + config seeding).**
+The two actionable weaknesses from the modularization review, fixed:
+
+- **Typed artifact views** (`crypto_ai_system.artifacts`): MarketSnapshot /
+  TradeDecision / OrderResult / Reconciliation views with `from_mapping` /
+  `from_file`; every default mirrors the pre-existing consumer semantics
+  (adopting a view never changes behavior) and empty/missing artifacts resolve
+  fail-closed. All writers of the four artifacts stamp `schema_version`.
+  `CycleInputs` market accessors now delegate to the snapshot view — the
+  fallback chains live in ONE place. Adoption is incremental: existing
+  `read_json` call sites untouched; new consumers use views (CLAUDE.md rule).
+- **Config one-way dependency**: `load_config` seeds `data.canonical_symbol`,
+  `data.timeframe`, `data.exchange`, `data.limit`, and
+  `binance_futures.base_url` from the flat `config.settings` constants (which
+  now also accept the AppConfig half's historical env names, e.g.
+  `DEFAULT_LIMIT`). `binance_futures.limit` deliberately NOT seeded — it is
+  the enrichment-data page size, a different concept than the trade-path
+  kline fetch. Root packages declared frozen in CLAUDE.md (new modules go
+  under `src/`); six ghost `.pyc`-only directories removed.
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a
