@@ -96,16 +96,43 @@ class BinanceTestnetAdapter:
         )
         submit = adapter.submit_order(intent)
         submitted = bool(submit.get("submitted"))
-        if submitted:
+        unresolved = False
+        resolution = None
+        if not submitted:
+            from crypto_ai_system.execution.retry_policy import (
+                is_ambiguous_submit,
+                resolve_ambiguous_submit,
+            )
+
+            if is_ambiguous_submit(submit):
+                # A timeout/5xx after the POST left this process may still have
+                # placed the order — only the venue can say. Unresolved counts
+                # as possibly-live: budget + reconciliation, never "nothing".
+                resolution = resolve_ambiguous_submit(
+                    adapter.query_order, str(intent.get("symbol")), str(intent.get("client_order_id"))
+                )
+                if resolution.get("order_exists") is True:
+                    submitted = True
+                elif resolution.get("order_exists") is None:
+                    unresolved = True
+        if submitted or unresolved:
             record_submission()
 
         result["mode"] = "SIGNED_TESTNET_ADAPTER"
         result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
-        result["status"] = "SIGNED_TESTNET_ORDER_SUBMITTED" if submitted else "SIGNED_TESTNET_SUBMIT_FAILED"
+        if submitted:
+            result["status"] = "SIGNED_TESTNET_ORDER_SUBMITTED"
+        elif unresolved:
+            result["status"] = "SIGNED_TESTNET_SUBMIT_UNRESOLVED"
+        else:
+            result["status"] = "SIGNED_TESTNET_SUBMIT_FAILED"
         result["submit_result"] = submit
+        if resolution is not None:
+            result["ambiguous_submit_resolution"] = resolution
+            result["submit_confirmed_by_query"] = submitted
         result["exchange_order_id"] = submit.get("exchange_order_id")
         result["client_order_id"] = submit.get("client_order_id")
-        result["external_order_submission_performed"] = submitted
+        result["external_order_submission_performed"] = submitted or unresolved
         return result
 
 

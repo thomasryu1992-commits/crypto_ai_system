@@ -179,6 +179,8 @@ def test_cross_symbol_decision_prices_at_the_specs_market() -> None:
         research_permission={"allow_new_position": True, "allow_long": True, "allow_short": True},
         pre_order_risk_gate={"approved": True, "status": "APPROVED"},
         attribution={"strategy_entry_evaluation_id": "x"},
+        data_health={"allow_trading": True},
+        risk={"allow_new_position": True},
         symbol="ETHUSDT",
     )
     entry = decision.get("entry") or decision.get("entry_price")
@@ -199,6 +201,8 @@ def test_same_market_decision_keeps_snapshot_price() -> None:
         research_permission={"allow_new_position": True, "allow_long": True, "allow_short": True},
         pre_order_risk_gate={"approved": True, "status": "APPROVED"},
         attribution={"strategy_entry_evaluation_id": "x"},
+        data_health={"allow_trading": True},
+        risk={"allow_new_position": True},
         symbol="BTCUSDT",
     )
     entry = decision.get("entry") or decision.get("entry_price")

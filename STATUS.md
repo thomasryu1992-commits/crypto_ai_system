@@ -419,6 +419,82 @@ direction (§2.2), so range/counter-trend entries also depend on that gate.
 
 ## Maintenance
 
+**2026-07-19 — QA audit fixes (fail-closed hardening).** A full-structure QA
+audit surfaced gaps where uncertainty resolved in the optimistic direction;
+all fixed, no safety default changed, verified with the full suite (847),
+`check_safety_defaults.py`, and a live pipeline cycle:
+
+- **Strategy drive now consumes the validation verdicts.** `data_health.allow_trading`
+  and `risk.allow_new_position` are REQUIRED inputs to `build_strategy_trade_decision`
+  (new block reasons `DATA_HEALTH_DISALLOWS_TRADING` / `RISK_GUARD_DISALLOWS_NEW_POSITION`);
+  the strategy gate also gets the settings-derived loss limits the research bridge passes.
+- **DATA_FRESHNESS gate un-deadened.** `market_snapshot` now computes `is_stale`
+  (same `MAX_STALE_DATA_MINUTES` threshold as data_health), so the PreOrderRiskGate's
+  freshness check has a real input.
+- **Ambiguous submits are resolved, never assumed away.** A timeout/5xx after the
+  POST left the process queries the venue by client order id
+  (`retry_policy.resolve_ambiguous_submit`); unresolved counts as possibly-live
+  (daily budget + reconciliation). Applied to live-strategy entry/close and the
+  signed-testnet port.
+- **Unconfirmed closes re-queried under the SAME client order id.** The live
+  position kernel persists the close id write-ahead; a later fill is realized into
+  the L1 ledger (daily-loss breaker sees it), and only a venue-confirmed dead
+  order allows a fresh close.
+- **Kill switch no longer strands an open live position.** The trading agent
+  settles the open live position (SL/TP/time via the close guard, which exempts
+  reduceOnly closes) BEFORE refusing a blocked live stage.
+- **Risk guard fails closed on unreadable history.** The legacy
+  `paper_trades.json` fallback is gone: an unreadable outcome registry now
+  yields `BLOCK_NEW_POSITION` (`risk_history_unreadable`), never silent zero history.
+- **Drawdown breaker acts on CURRENT drawdown** (unlatches on recovery) with the
+  principled mapping `MAX_DRAWDOWN_PCT / RISK_PER_TRADE` (default -10% / 1% = 10R);
+  historical max is reported separately.
+- **Single-runner lock.** `core/run_lock.py` (OS file lock, dies with the process)
+  stops a scheduled task and a manual run from interleaving `storage/latest/`
+  artifacts; exit code 40 = skipped, lock held.
+- **`check_safety_defaults.py` hardened**: covers all order-path enable flags,
+  asserts guard-rail flags stay True, and FAILS on renamed/deleted flags instead
+  of passing vacuously.
+- **Forming candle dropped at collection** (`drop_forming_candle`): every
+  consumer (snapshot, health, settlement, research) sees only CLOSED bars — no
+  indicator repaint, no SL/TP on partial-bar extremes.
+- Advisory-stage ERRORs (fatal_on_error=False) no longer exit as an error halt.
+
+**2026-07-20 — QA audit follow-up (lower-priority items).** The remaining audit
+findings, fixed and verified (876 tests, 0 warnings, safety guard, live cycle):
+
+- **Decision replay closed.** One persisted trade decision authorizes at most
+  one order intent: the executor stamps `order_intent_consumed_at` and refuses
+  a re-run against the same file (closes the RiskGate-TTL replay window).
+- **Intent input guards.** A malformed direction is rejected (used to map to
+  SELL); a missing notional blocks (used to default to the cap).
+- **Signature scrubbed from exception text** (`retry_policy.scrub_secret_params`)
+  before any error string reaches persisted storage — closes the requests-URL
+  leak that bypassed the structured redaction.
+- **Registry appends are O(1) + fsync'd.** Tail-line validation replaces the
+  full-file re-parse per append (same torn-line fail-closed contract; full
+  validation still on read). `performance_report_registry` (write-only audit)
+  auto-rotates at 10MB to a timestamped archive.
+- **Multibook persists the EXECUTED decision.** The entry walk re-persists the
+  filled entry's decision (not last-attempted), and order/reconciliation
+  outputs describe that same trade.
+- **holding_candles counts distinct candles** (timestamp-deduped), so manual
+  re-runs within one interval no longer accelerate time_exit.
+- **Dual-config unified**: same bool vocabulary in both halves, forgiving
+  numeric env parsing, and `load_config(".")` anchors at the repo root (Task
+  Scheduler without "Start in" no longer breaks).
+- **Data-health thresholds follow TIMEFRAME** (gap interval + staleness derive
+  from the runtime timeframe; 1h defaults unchanged).
+- **Bounded retry on public kline GETs** (3 attempts, backoff; 4xx never
+  retried) — a transient blip no longer costs a full cycle.
+- **`SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE` is load-bearing**: disabling the
+  rail now BLOCKS the guard instead of being ignored.
+- NumPy timedelta deprecation warnings eliminated (3181 → 0) via explicit-unit
+  `pd.Timedelta` construction; ASCII console strings; small dead code removed.
+
+Deliberately deferred (structural, separate effort): splitting the ~600-line
+TradingAgent and making PipelineContext load-bearing (or removing it).
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a

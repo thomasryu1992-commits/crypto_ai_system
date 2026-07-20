@@ -160,3 +160,130 @@ def test_reconciliation_no_submission(monkeypatch, tmp_path):
     monkeypatch.setattr(lse, "RECONCILIATION_PATH", tmp_path / "recon.json", raising=False)
     recon = lse.run_live_strategy_reconciliation()
     assert recon["status"] == "NO_SUBMISSION"
+
+
+# -- settle-first: a refused stage must not strand an open live position ---------
+
+def test_refused_live_stage_still_settles_open_position(monkeypatch):
+    _live_env(monkeypatch, LIVE_STRATEGY_MANUAL_KILL_SWITCH=True)
+    import crypto_ai_system.execution.live_position_kernel as kernel
+
+    monkeypatch.setattr(kernel, "has_open_live_position", lambda cfg=None: True)
+    settled = {"n": 0}
+
+    def fake_settle(candle, **kw):
+        settled["n"] += 1
+        return {"status": "CLOSED", "close_reason": "stop_loss"}
+
+    monkeypatch.setattr(kernel, "settle_open_live_position", fake_settle)
+    monkeypatch.setattr(trading_agent, "read_json", lambda p, d=None: {})
+    monkeypatch.setattr(trading_agent, "_latest_candle", lambda: {"high": 1.0, "low": 0.0})
+
+    from crypto_ai_system.pipeline.contracts import PipelineContext, StageStatus
+
+    result = trading_agent.TradingAgent().execute(PipelineContext())
+    assert result.status is StageStatus.BLOCKED  # new entries stay refused
+    assert settled["n"] == 1  # ...but the open position was still settled
+    assert result.outputs["live_settlement_on_refusal"]["status"] == "CLOSED"
+
+
+def test_refused_live_stage_without_position_just_blocks(monkeypatch):
+    _live_env(monkeypatch, LIVE_STRATEGY_MANUAL_KILL_SWITCH=True)
+    import crypto_ai_system.execution.live_position_kernel as kernel
+
+    monkeypatch.setattr(kernel, "has_open_live_position", lambda cfg=None: False)
+    monkeypatch.setattr(
+        kernel, "settle_open_live_position",
+        lambda *a, **k: pytest.fail("no position -> no settle attempt"),
+    )
+
+    from crypto_ai_system.pipeline.contracts import PipelineContext, StageStatus
+
+    result = trading_agent.TradingAgent().execute(PipelineContext())
+    assert result.status is StageStatus.BLOCKED
+
+
+# -- ambiguous submit: never conclude "nothing happened" without asking the venue -
+
+def _guard_ready(monkeypatch):
+    monkeypatch.setattr(
+        lse, "evaluate_live_order_final_guard",
+        lambda intent, **kw: {"status": "READY", "approved": True, "blocks": [], "repairs": []},
+    )
+
+
+def test_ambiguous_submit_confirmed_by_query_counts_as_submitted(monkeypatch):
+    _guard_ready(monkeypatch)
+    recorded = {"n": 0}
+    monkeypatch.setattr(lse, "record_submission", lambda: recorded.__setitem__("n", recorded["n"] + 1))
+
+    def fake_transport(method, url, params, headers, timeout):
+        if method == "POST":
+            raise TimeoutError("read timed out")  # ambiguous: POST left the process
+        return 200, {"orderId": 9, "status": "FILLED", "executedQty": "0.001", "avgPrice": "60000"}
+
+    monkeypatch.setattr(
+        lse, "_strategy_adapter",
+        lambda: LiveCanaryAdapter("k", "s", base_url="https://fapi.binance.com", transport=fake_transport),
+    )
+    result = lse.submit_live_strategy_order(_intent())
+    assert result["external_order_submission_performed"] is True
+    assert result["submit_confirmed_by_query"] is True
+    assert recorded["n"] == 1  # the order that reached the venue consumed budget
+
+
+def test_unresolved_ambiguous_submit_counts_budget_and_reconciles(monkeypatch):
+    _guard_ready(monkeypatch)
+    recorded = {"n": 0}
+    monkeypatch.setattr(lse, "record_submission", lambda: recorded.__setitem__("n", recorded["n"] + 1))
+
+    def fake_transport(method, url, params, headers, timeout):
+        raise TimeoutError("read timed out")  # both POST and the resolving GET fail
+
+    monkeypatch.setattr(
+        lse, "_strategy_adapter",
+        lambda: LiveCanaryAdapter("k", "s", base_url="https://fapi.binance.com", transport=fake_transport),
+    )
+    result = lse.submit_live_strategy_order(_intent())
+    assert result["status"] == "LIVE_STRATEGY_SUBMIT_UNRESOLVED"
+    # Possibly-live at the venue: budget consumed, handed to reconciliation.
+    assert result["external_order_submission_performed"] is True
+    assert recorded["n"] == 1
+
+
+def test_definitively_rejected_submit_consumes_nothing(monkeypatch):
+    _guard_ready(monkeypatch)
+    recorded = {"n": 0}
+    monkeypatch.setattr(lse, "record_submission", lambda: recorded.__setitem__("n", recorded["n"] + 1))
+
+    def fake_transport(method, url, params, headers, timeout):
+        return 400, {"code": -1102, "msg": "Mandatory parameter missing"}
+
+    monkeypatch.setattr(
+        lse, "_strategy_adapter",
+        lambda: LiveCanaryAdapter("k", "s", base_url="https://fapi.binance.com", transport=fake_transport),
+    )
+    result = lse.submit_live_strategy_order(_intent())
+    assert result["status"] == "LIVE_STRATEGY_SUBMIT_FAILED"
+    assert result["external_order_submission_performed"] is False
+    assert recorded["n"] == 0
+
+
+def test_ambiguous_submit_proven_absent_is_a_clean_failure(monkeypatch):
+    _guard_ready(monkeypatch)
+    recorded = {"n": 0}
+    monkeypatch.setattr(lse, "record_submission", lambda: recorded.__setitem__("n", recorded["n"] + 1))
+
+    def fake_transport(method, url, params, headers, timeout):
+        if method == "POST":
+            raise TimeoutError("read timed out")
+        return 400, {"code": -2013, "msg": "Order does not exist."}
+
+    monkeypatch.setattr(
+        lse, "_strategy_adapter",
+        lambda: LiveCanaryAdapter("k", "s", base_url="https://fapi.binance.com", transport=fake_transport),
+    )
+    result = lse.submit_live_strategy_order(_intent())
+    assert result["status"] == "LIVE_STRATEGY_SUBMIT_FAILED"
+    assert result["external_order_submission_performed"] is False
+    assert recorded["n"] == 0

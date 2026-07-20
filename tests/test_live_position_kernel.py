@@ -163,6 +163,103 @@ def test_unconfirmed_fill_keeps_position_open(cfg):
     assert kernel.has_open_live_position(cfg)
 
 
+# -- pending close: unconfirmed closes are re-queried, never re-raced ----------
+
+def test_unconfirmed_close_persists_pending_id_then_settles_on_requery(cfg):
+    _open(cfg)  # LONG 0.001 @ 60000, SL 59000
+    submit, query, submitted = _fake_close(fill_price=0.0, order_status="NEW")
+    first = kernel.settle_open_live_position(
+        {"high": 60100.0, "low": 58900.0}, last_close=59000.0, cfg=cfg,
+        submit_close=submit, query_order=query,
+    )
+    assert first["status"] == "CLOSE_UNCONFIRMED"
+    pos = kernel.load_open_live_position(cfg)
+    assert pos["close_client_order_id"]  # write-ahead id survives the cycle
+    assert pos["close_reason_pending"] == "stop_loss"
+
+    # Next cycle: the SAME id is queried FIRST; it turns out the close filled.
+    def filled_query(symbol, client_order_id):
+        assert client_order_id == pos["close_client_order_id"]
+        return {"ok": True, "response": {"status": "FILLED", "avgPrice": "58990.0",
+                                          "executedQty": "0.001", "orderId": 333}}
+
+    second = kernel.settle_open_live_position(
+        {"high": 59100.0, "low": 58800.0}, last_close=58900.0, cfg=cfg,
+        submit_close=lambda i: pytest.fail("must NOT submit a second close"),
+        query_order=filled_query,
+    )
+    assert second["status"] == "CLOSED"
+    assert second["close_reason"] == "stop_loss"
+    assert second["realized_pnl_usdt"] == pytest.approx(-1.01)
+    assert not kernel.has_open_live_position(cfg)
+    # The late fill still reached the L1 ledger the daily-loss breaker reads.
+    from crypto_ai_system.execution.live_pnl_ledger import live_daily_realized_pnl_usdt
+    assert live_daily_realized_pnl_usdt() == pytest.approx(-1.01)
+
+
+def test_pending_close_dead_at_venue_allows_fresh_close(cfg):
+    _open(cfg)
+    submit, query, _ = _fake_close(fill_price=0.0, order_status="NEW")
+    kernel.settle_open_live_position(
+        {"high": 60100.0, "low": 58900.0}, last_close=59000.0, cfg=cfg,
+        submit_close=submit, query_order=query,
+    )
+    assert kernel.load_open_live_position(cfg)["close_client_order_id"]
+
+    calls = {"n": 0}
+
+    def sequenced_query(symbol, client_order_id):
+        calls["n"] += 1
+        if calls["n"] == 1:  # pending id: venue says it was cancelled
+            return {"ok": True, "response": {"status": "CANCELED"}}
+        return {"ok": True, "response": {"status": "FILLED", "avgPrice": "58990.0",
+                                          "executedQty": "0.001", "orderId": 444}}
+
+    fresh_submit, _, fresh_submitted = _fake_close(fill_price=58990.0)
+    settlement = kernel.settle_open_live_position(
+        {"high": 59100.0, "low": 58800.0}, last_close=58900.0, cfg=cfg,
+        submit_close=fresh_submit, query_order=sequenced_query,
+    )
+    assert settlement["status"] == "CLOSED"
+    assert fresh_submitted["n"] == 1  # a fresh close was allowed after the dead id
+
+
+def test_pending_close_query_failure_never_double_submits(cfg):
+    _open(cfg)
+    submit, query, _ = _fake_close(fill_price=0.0, order_status="NEW")
+    kernel.settle_open_live_position(
+        {"high": 60100.0, "low": 58900.0}, last_close=59000.0, cfg=cfg,
+        submit_close=submit, query_order=query,
+    )
+
+    settlement = kernel.settle_open_live_position(
+        {"high": 59100.0, "low": 58800.0}, last_close=58900.0, cfg=cfg,
+        submit_close=lambda i: pytest.fail("query failed: a second close must not race"),
+        query_order=lambda s, c: {"ok": False, "error": {"code": -1000, "msg": "unknown"}},
+    )
+    assert settlement["status"] == "CLOSE_UNCONFIRMED"
+    assert kernel.has_open_live_position(cfg)
+
+
+def test_close_retry_reuses_the_same_client_order_id(cfg):
+    _open(cfg)
+    seen_ids: list[str] = []
+
+    def unconfirmed_submit(intent):
+        seen_ids.append(intent["client_order_id"])
+        return {"external_order_submission_performed": True,
+                "client_order_id": intent["client_order_id"], "exchange_order_id": None,
+                "status": "LIVE_CLOSE_ORDER_SUBMITTED"}
+
+    kernel.settle_open_live_position(
+        {"high": 60100.0, "low": 58900.0}, last_close=59000.0, cfg=cfg,
+        submit_close=unconfirmed_submit,
+        query_order=lambda s, c: {"ok": True, "response": {"status": "NEW"}},
+    )
+    pending = kernel.load_open_live_position(cfg)["close_client_order_id"]
+    assert pending == seen_ids[0]  # the write-ahead id is the submitted id
+
+
 # -- close guard exemptions -----------------------------------------------------
 
 def _close_intent():

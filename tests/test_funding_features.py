@@ -81,7 +81,7 @@ def test_funding_cache_roundtrip(tmp_path) -> None:
             self.fetches += 1
             end = pd.Timestamp.now(tz="UTC").floor("h")
             return pd.DataFrame([
-                {"timestamp": str(end - pd.Timedelta(hours=8 * (records - 1 - i))),
+                {"timestamp": str(end - pd.Timedelta(8 * (records - 1 - i), unit="h")),
                  "funding_rate": 0.0001}
                 for i in range(records)
             ])

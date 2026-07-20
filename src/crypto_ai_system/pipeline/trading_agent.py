@@ -112,14 +112,14 @@ def resolve_execution_stage() -> tuple[str | None, str | None]:
     if _live_requested():
         # The legacy live flags never route anywhere; the only live path is the
         # explicit LIVE_STRATEGY_* set below.
-        return None, "legacy live trading flags are not a live path — refusing (fail-closed)"
+        return None, "legacy live trading flags are not a live path - refusing (fail-closed)"
     if _live_strategy_requested():
         reason = _live_strategy_block_reason()
         if reason:
             return None, reason
         return "live", None
     if _testnet_requested() and not _confirmation_present():
-        return None, "testnet order flag enabled without confirmation phrase — refusing"
+        return None, "testnet order flag enabled without confirmation phrase - refusing"
     if _testnet_requested() and _confirmation_present():
         return "signed_testnet", None
     return "paper", None
@@ -250,6 +250,10 @@ class TradingAgent(Agent):
                 "opened": opened,
                 "book_refusal": refusal,
                 "filled": bool(order.get("filled")),
+                # The post-executor on-disk decision (carries the consumption
+                # marker) so the walk can re-persist the EXECUTED entry's
+                # decision at the end instead of last-writer-wins.
+                "decision": read_json(TRADE_DECISION_PATH, {}),
             })
 
         strategy_drive = None
@@ -325,11 +329,53 @@ class TradingAgent(Agent):
             )
             return None
 
+    def _settle_live_before_refusal(self) -> dict | None:
+        """Settle the open live position even when the live stage is refused.
+
+        A kill switch / cleared config blocks NEW entries, but must never
+        abandon an already-open live position: SL/TP/time exits keep being
+        evaluated and the reduceOnly close goes through the narrow close guard
+        (which exempts closes from the kill switch — risk reduction). Any
+        failure leaves the position OPEN (fail-open-position) and logs loudly.
+        """
+        if not _live_strategy_requested():
+            return None
+        try:
+            from crypto_ai_system.execution.live_position_kernel import (
+                has_open_live_position,
+                settle_open_live_position,
+            )
+
+            cfg = load_config(".")
+            if not has_open_live_position(cfg):
+                return None
+            snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
+            return settle_open_live_position(
+                _latest_candle(),
+                last_close=_f(snapshot.get("last_close")),
+                timeframe=str(snapshot.get("timeframe", "1h")),
+                regime=str(snapshot.get("trend_bias", "unknown")),
+                cfg=cfg,
+            )
+        except Exception as exc:  # noqa: BLE001 - never turn a refusal into a crash
+            log_event(
+                "live_settle_on_refused_stage_failed",
+                {"error": repr(exc)},
+                severity="ERROR",
+            )
+            return None
+
     def execute(self, ctx: PipelineContext) -> StageResult:
         # Fail-closed stage routing. The executor's final guard is the last
         # gate before anything is signed.
         execution_stage, block_reason = resolve_execution_stage()
         if block_reason:
+            # Settle-first: the refusal must not strand an open live position.
+            settlement = self._settle_live_before_refusal()
+            if settlement is not None:
+                return self.blocked(
+                    [block_reason], fatal=True, live_settlement_on_refusal=settlement
+                )
             return self.blocked([block_reason], fatal=True)
 
         allow_new_position = bool(ctx.get("allow_new_position", False))
@@ -445,9 +491,21 @@ class TradingAgent(Agent):
             multibook_entries, strategy_drive = self._run_multibook_entries(
                 ctx, cfg, cycle_id, execution_stage, trade_decision, open_positions,
             )
-            last = multibook_entries[-1] if multibook_entries else {}
-            order = last.get("order") or {}
-            reconciliation = last.get("reconciliation") or {}
+            # The representative outcome of the walk is the entry that actually
+            # FILLED (first fill wins), not whatever was attempted last — the
+            # persisted decision, order, and reconciliation must all describe
+            # the same executed trade. Falls back to the last attempt when
+            # nothing filled.
+            representative = next(
+                (e for e in multibook_entries if e.get("filled")),
+                multibook_entries[-1] if multibook_entries else {},
+            )
+            order = representative.get("order") or {}
+            reconciliation = representative.get("reconciliation") or {}
+            executed_decision = representative.get("decision")
+            if isinstance(executed_decision, dict) and executed_decision:
+                atomic_write_json(TRADE_DECISION_PATH, executed_decision)
+                trade_decision = executed_decision
             externally_submitted = False
         else:
             drive_eligible = (

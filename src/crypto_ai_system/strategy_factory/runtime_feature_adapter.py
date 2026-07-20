@@ -162,7 +162,7 @@ def drop_forming_bar(
     now_ts = pd.Timestamp.now(tz="UTC") if now is None else pd.to_datetime(now, utc=True, errors="coerce")
     if pd.isna(now_ts):
         return rows
-    if last_open + pd.Timedelta(minutes=minutes) > now_ts:
+    if last_open + pd.Timedelta(minutes, unit="min") > now_ts:
         return rows[:-1]
     return rows
 

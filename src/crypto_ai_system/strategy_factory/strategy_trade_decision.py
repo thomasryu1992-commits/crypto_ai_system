@@ -33,6 +33,8 @@ BLOCK_NO_ATR = "STRATEGY_NO_ATR"
 BLOCK_DIRECTION_NOT_PERMITTED = "RESEARCH_PERMISSION_DISALLOWS_STRATEGY_DIRECTION"
 BLOCK_NEW_POSITION_DISALLOWED = "RESEARCH_PERMISSION_DISALLOWS_NEW_POSITION"
 BLOCK_RISK_GATE = "PRE_ORDER_RISK_GATE_NOT_APPROVED"
+BLOCK_DATA_HEALTH = "DATA_HEALTH_DISALLOWS_TRADING"
+BLOCK_RISK_GUARD = "RISK_GUARD_DISALLOWS_NEW_POSITION"
 
 
 def _f(value: Any) -> float | None:
@@ -58,6 +60,8 @@ def build_strategy_trade_decision(
     research_permission: Mapping[str, Any],
     pre_order_risk_gate: Mapping[str, Any],
     attribution: Mapping[str, Any],
+    data_health: Mapping[str, Any],
+    risk: Mapping[str, Any],
     symbol: str = "BTCUSDT",
     notional_usdt: float = 20.0,
     execution_stage: str = "paper",
@@ -91,6 +95,15 @@ def build_strategy_trade_decision(
     atr = _f(feature_row.get("atr"))
     if atr is None or atr <= 0:
         reasons.append(BLOCK_NO_ATR)
+
+    # The validation stage's verdicts gate the strategy path exactly like the
+    # research path (trading_decision_agent blocks on the same two booleans).
+    # These are REQUIRED inputs so a strategy entry can never be assembled
+    # without consulting them — a missing/empty verdict fails closed.
+    if not data_health.get("allow_trading", False):
+        reasons.append(BLOCK_DATA_HEALTH)
+    if not risk.get("allow_new_position", False):
+        reasons.append(BLOCK_RISK_GUARD)
 
     # Research permission gates the strategy's direction (§2.2).
     if not research_permission.get("allow_new_position"):
@@ -138,6 +151,8 @@ def build_strategy_trade_decision(
         "allow_new_position": bool(research_permission.get("allow_new_position")),
         "allow_long": bool(research_permission.get("allow_long")),
         "allow_short": bool(research_permission.get("allow_short")),
+        "data_health_allow_trading": bool(data_health.get("allow_trading", False)),
+        "risk_guard_allow_new_position": bool(risk.get("allow_new_position", False)),
         "allow_order_intent": allow_order_intent,
         "pre_order_risk_gate_required": True,
         "pre_order_risk_gate_approved": gate_approved,

@@ -129,11 +129,11 @@ def test_router_without_feature_rows_keeps_single_row_behavior() -> None:
 
 def test_drop_forming_bar_drops_only_the_unfinished_last_bar() -> None:
     candles = _candles(10, "1D")
-    now = str(pd.to_datetime(candles[-1]["timestamp"]) + pd.Timedelta(hours=5))
+    now = str(pd.to_datetime(candles[-1]["timestamp"]) + pd.Timedelta(5, unit="h"))
     kept = drop_forming_bar(candles, "1d", now=now)
     assert len(kept) == 9, "the 5h-old daily bar is still forming and must be dropped"
 
-    now_closed = str(pd.to_datetime(candles[-1]["timestamp"]) + pd.Timedelta(days=1, minutes=1))
+    now_closed = str(pd.to_datetime(candles[-1]["timestamp"]) + pd.Timedelta(1441, unit="min"))
     assert len(drop_forming_bar(candles, "1d", now=now_closed)) == 10
 
 
@@ -155,7 +155,7 @@ def test_runtime_row_for_other_timeframe_uses_injected_history() -> None:
     row = build_runtime_feature_row_for_timeframe(
         "1d", _candles(50, "1h"), base_timeframe="1h",
         history_loader=lambda tf, bars: daily,
-        now=str(pd.to_datetime(daily[-1]["timestamp"]) + pd.Timedelta(days=2)),
+        now=str(pd.to_datetime(daily[-1]["timestamp"]) + pd.Timedelta(2, unit="D")),
     )
     assert row["timestamp"] == daily[-1]["timestamp"]
 
@@ -165,7 +165,7 @@ def test_runtime_row_drops_the_forming_bar_from_history() -> None:
     row = build_runtime_feature_row_for_timeframe(
         "1d", [], base_timeframe="1h",
         history_loader=lambda tf, bars: daily,
-        now=str(pd.to_datetime(daily[-1]["timestamp"]) + pd.Timedelta(hours=3)),
+        now=str(pd.to_datetime(daily[-1]["timestamp"]) + pd.Timedelta(3, unit="h")),
     )
     assert row["timestamp"] == daily[-2]["timestamp"], (
         "a half-formed daily bar must never be evaluated"

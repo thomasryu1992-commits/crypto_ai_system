@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, Literal
 
@@ -66,6 +67,22 @@ def _combine_first_ordered(df: pd.DataFrame, columns: list[str]) -> pd.Series:
     for col in columns[1:]:
         combined = combined.combine_first(df[col])
     return combined
+
+
+_TIMEDELTA_SPEC = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([A-Za-z]+)\s*$")
+
+
+def _timedelta_from_spec(spec: str) -> pd.Timedelta:
+    """Parse a "3D"/"12h"-style config spec with an explicit unit.
+
+    The string form ``pd.Timedelta("3D")`` goes through NumPy's deprecated
+    'generic' timedelta unit and will raise on a future NumPy; the
+    (value, unit=...) form does not.
+    """
+    match = _TIMEDELTA_SPEC.match(str(spec))
+    if not match:
+        raise ValueError(f"unsupported timedelta spec: {spec!r}")
+    return pd.Timedelta(float(match.group(1)), unit=match.group(2))
 
 
 def _cleanup_merge_suffixes(df: pd.DataFrame) -> pd.DataFrame:
@@ -170,7 +187,7 @@ def _asof_merge_feature_group(
             rename_map[col] = f'{group_name}_{col}'
     right = right.rename(columns=rename_map)
 
-    tol = pd.Timedelta(tolerance) if tolerance else None
+    tol = _timedelta_from_spec(tolerance) if tolerance else None
     merged = pd.merge_asof(left, right.sort_values('_ts'), on='_ts', direction='backward', tolerance=tol)
     return _cleanup_merge_suffixes(merged)
 

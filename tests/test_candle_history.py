@@ -64,7 +64,7 @@ def test_history_is_contiguous_deduped_and_oldest_first() -> None:
     assert ts.is_monotonic_increasing
     assert not ts.duplicated().any()
     gaps = ts.diff().dropna().unique()
-    assert list(gaps) == [pd.Timedelta(hours=1)], "paging must not tear the series"
+    assert list(gaps) == [pd.Timedelta(1, unit="h")], "paging must not tear the series"
 
 
 def test_history_returns_the_most_recent_bars() -> None:
@@ -106,7 +106,7 @@ def test_history_empty_response_yields_empty_frame() -> None:
 def _fresh_rows(n: int) -> list[dict]:
     end = pd.Timestamp.now(tz="UTC").floor("h")
     return [
-        {"timestamp": str(end - pd.Timedelta(hours=n - 1 - i)), "open": 1.0, "high": 1.0,
+        {"timestamp": str(end - pd.Timedelta(n - 1 - i, unit="h")), "open": 1.0, "high": 1.0,
          "low": 1.0, "close": 1.0, "volume": 1.0}
         for i in range(n)
     ]
@@ -148,7 +148,7 @@ def test_cache_is_refetched_when_too_shallow(tmp_path) -> None:
 
 def test_cache_is_refetched_when_stale(tmp_path) -> None:
     stale = _fresh_rows(500)
-    old = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=3)
+    old = pd.Timestamp.now(tz="UTC") - pd.Timedelta(3, unit="D")
     stale[-1] = {**stale[-1], "timestamp": str(old)}
     _write(tmp_path, stale)
     client = _CountingClient()

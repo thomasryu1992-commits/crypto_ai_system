@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from statistics import mean
 
-from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH
+from config.settings import MARKET_DATA_PATH, MARKET_SNAPSHOT_PATH, MAX_STALE_DATA_MINUTES
 from core.json_io import atomic_write_json, read_json
-from core.time_utils import utc_now_iso
+from core.time_utils import parse_time, utc_now, utc_now_iso
 from core.event_log import log_event
 
 
@@ -45,6 +45,17 @@ def build_market_snapshot() -> dict:
     elif ma20 and ma50 and last_close < ma20 < ma50:
         trend_bias = "bearish"
 
+    # Freshness by the same threshold data_health uses. The PreOrderRiskGate's
+    # DATA_FRESHNESS check reads this snapshot's is_stale via the bridges — an
+    # unparseable timestamp counts as stale (fail-closed), never as fresh.
+    last_time = parse_time(last.get("timestamp"))
+    if last_time is None:
+        is_stale = True
+        last_candle_age_minutes = None
+    else:
+        last_candle_age_minutes = (utc_now() - last_time).total_seconds() / 60
+        is_stale = last_candle_age_minutes > MAX_STALE_DATA_MINUTES
+
     snapshot = {
         "created_at": utc_now_iso(),
         "symbol": data.get("symbol", "BTCUSDT"),
@@ -53,6 +64,8 @@ def build_market_snapshot() -> dict:
         "data_quality": data.get("data_quality", "unknown"),
         "is_synthetic": bool(data.get("is_synthetic", False)),
         "is_fallback": bool(data.get("is_fallback", False)),
+        "is_stale": is_stale,
+        "last_candle_age_minutes": last_candle_age_minutes,
         "last_candle_time": last.get("timestamp"),
         "last_close": last_close,
         "change_24h_pct": change_24h * 100,

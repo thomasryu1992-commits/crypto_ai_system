@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+import re
+from typing import Any, Callable, Mapping
+
+# Binance: "Order does not exist" — the only venue answer that PROVES an
+# ambiguous submit never reached the book.
+ORDER_NOT_FOUND_CODES = {-2013}
+
+_SIGNATURE_PARAM = re.compile(r"(signature=)[0-9a-fA-F]+")
+
+
+def scrub_secret_params(text: str) -> str:
+    """Remove credential-derived query params from free text.
+
+    A requests ConnectionError/MaxRetryError message embeds the full request
+    URL including the HMAC ``signature`` query param. Any exception text that
+    gets persisted (order results, logs) must pass through here first — the
+    structured ``request`` field is already redacted, but exception strings
+    bypassed that layer.
+    """
+    return _SIGNATURE_PARAM.sub(r"\1***redacted***", text)
+
 
 def classify_exchange_error(status_code: int | None = None, error_name: str | None = None) -> dict:
     if status_code == 429:
@@ -26,3 +47,48 @@ def classify_exchange_error(status_code: int | None = None, error_name: str | No
             "reason": "exchange_server_error",
         }
     return {"state": "UNKNOWN", "retry": False, "action": "MANUAL_REVIEW", "reason": "unknown_error"}
+
+
+def is_ambiguous_submit(submit: Mapping[str, Any]) -> bool:
+    """True when a failed submit may still have reached the venue.
+
+    A definitive venue rejection (4xx classification REJECTED) is the only
+    failure that proves nothing happened; a timeout / 5xx / rate-limit /
+    unclassified failure after the POST left this process is ambiguous and must
+    be resolved by querying the client order id — never assumed away.
+    """
+    if submit.get("submitted"):
+        return False
+    classification = submit.get("classification") or {}
+    return classification.get("state") != "REJECTED"
+
+
+def resolve_ambiguous_submit(
+    query_order: Callable[[str, str], dict],
+    symbol: str,
+    client_order_id: str,
+) -> dict[str, Any]:
+    """Query the venue by client order id to settle an ambiguous submit.
+
+    Returns ``order_exists``: True (it reached the book — treat as submitted),
+    False (venue says the order does not exist — genuinely not submitted), or
+    None (the query itself failed — still unresolved; the caller must account
+    for the order as possibly-live, never as "nothing happened").
+    """
+    try:
+        query = query_order(symbol, client_order_id)
+    except Exception as exc:  # noqa: BLE001 - resolution must never raise into the submit path
+        return {"order_exists": None, "error": f"{type(exc).__name__}", "query_result": None}
+    if not isinstance(query, dict):
+        return {"order_exists": None, "query_result": None}
+    if query.get("ok"):
+        response = query.get("response") if isinstance(query.get("response"), dict) else {}
+        return {
+            "order_exists": True,
+            "order_status": response.get("status"),
+            "query_result": query,
+        }
+    error = query.get("error") if isinstance(query.get("error"), dict) else {}
+    if error.get("code") in ORDER_NOT_FOUND_CODES:
+        return {"order_exists": False, "query_result": query}
+    return {"order_exists": None, "query_result": query}

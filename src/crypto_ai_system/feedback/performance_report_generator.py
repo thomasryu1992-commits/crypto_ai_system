@@ -345,10 +345,22 @@ def build_performance_report_registry_record(report: Mapping[str, Any]) -> dict[
     return record
 
 
+#: This registry is a write-only audit trail — every consumer reads the
+#: separately persisted latest record, so an oversized file can be archived to
+#: a timestamped sibling without changing any runtime input.
+PERFORMANCE_REPORT_REGISTRY_MAX_BYTES = 10 * 1024 * 1024
+
+
 def persist_performance_report(cfg: AppConfig, report: Mapping[str, Any]) -> dict[str, Any]:
     payload = dict(report or {})
     atomic_write_json(_latest_path(cfg, "performance_report.json"), payload)
     registry_record = build_performance_report_registry_record(payload)
+    from crypto_ai_system.registry.base_registry import rotate_registry_if_large
+
+    rotate_registry_if_large(
+        registry_path(cfg, PERFORMANCE_REPORT_REGISTRY_NAME),
+        max_bytes=PERFORMANCE_REPORT_REGISTRY_MAX_BYTES,
+    )
     persisted = append_registry_record(
         registry_path(cfg, PERFORMANCE_REPORT_REGISTRY_NAME),
         registry_record,

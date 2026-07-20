@@ -26,7 +26,7 @@ import time
 from typing import Any, Callable
 from urllib.parse import urlencode, urlparse
 
-from crypto_ai_system.execution.retry_policy import classify_exchange_error
+from crypto_ai_system.execution.retry_policy import classify_exchange_error, scrub_secret_params
 
 # Only these hosts may ever be signed against for a live canary order. Testnet is
 # not here by design (the testnet adapter owns that host, and vice versa).
@@ -119,7 +119,9 @@ class LiveCanaryAdapter:
             return {
                 "ok": False,
                 "http_status": None,
-                "error": f"{type(exc).__name__}: {exc}",
+                # Exception text can embed the request URL (incl. the signature
+                # query param) — scrub before it reaches persisted storage.
+                "error": scrub_secret_params(f"{type(exc).__name__}: {exc}"),
                 "classification": classify_exchange_error(error_name=type(exc).__name__),
                 "request": _redact(signed),
             }

@@ -64,6 +64,16 @@ def test_guard_ready_when_all_satisfied(enabled):
     assert result["approved"] is True
 
 
+def test_guard_blocks_when_key_scope_rail_disabled(enabled, monkeypatch):
+    # The scope rail flag is load-bearing in the BLOCKING direction: turning it
+    # off must block, never relax the key-scope section (QA fix — it used to be
+    # defined but never consulted).
+    monkeypatch.setattr(settings, "SIGNED_TESTNET_REQUIRE_TESTNET_KEY_SCOPE", False, raising=False)
+    result = guard.evaluate_signed_testnet_final_guard(_ready_intent())
+    assert result["status"] == "BLOCKED"
+    assert any("REQUIRE_TESTNET_KEY_SCOPE" in b for b in result["blocks"])
+
+
 def test_guard_blocks_over_notional_cap(enabled):
     intent = _ready_intent()
     intent["order_notional_usdt"] = 10.0  # cap is 5

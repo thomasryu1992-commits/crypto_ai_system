@@ -88,7 +88,3 @@ class Pipeline:
             trade_executed=bool(ctx.get("trade_executed", False)),
             cycle_id=ctx.cycle.cycle_id if ctx.cycle else None,
         )
-
-
-def run_pipeline_once() -> PipelineRun:
-    return Pipeline().run_once()

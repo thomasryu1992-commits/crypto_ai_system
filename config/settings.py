@@ -111,13 +111,24 @@ TELEGRAM_BOT_TOKEN = env_str("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = env_str("TELEGRAM_CHAT_ID", "")
 
 # Data health
-MAX_STALE_DATA_MINUTES = env_int("MAX_STALE_DATA_MINUTES", 180)
+# The gap/staleness thresholds follow the runtime TIMEFRAME unless explicitly
+# overridden — a fixed 60-minute assumption made P1D block permanently
+# (every daily gap > 90min) and left PT15M's gap check toothless.
+_TIMEFRAME_MINUTES = {
+    "PT1M": 1, "PT3M": 3, "PT5M": 5, "PT15M": 15, "PT30M": 30,
+    "PT1H": 60, "PT2H": 120, "PT4H": 240, "PT6H": 360, "PT8H": 480, "PT12H": 720,
+    "P1D": 1440,
+}
+TIMEFRAME_MINUTES = _TIMEFRAME_MINUTES.get(TIMEFRAME.upper().strip(), 60)
+# Staleness tolerates ~3 intervals (collection lag + one missed run), floored at
+# the historical 180-minute default so the 1h behavior is unchanged.
+MAX_STALE_DATA_MINUTES = env_int("MAX_STALE_DATA_MINUTES", max(180, 3 * TIMEFRAME_MINUTES))
 # One kline call regardless of size (venue max 1500). 500 1h candles is what the
 # 1d higher-timeframe EMA needs to warm up (~10 daily bars); dropping below that
 # leaves htf_1d_* NaN and any strategy referencing it unable to fire.
 CANDLE_FETCH_LIMIT = env_int("CANDLE_FETCH_LIMIT", 500)
 MIN_CANDLE_COUNT = env_int("MIN_CANDLE_COUNT", 50)
-EXPECTED_CANDLE_INTERVAL_MINUTES = env_int("EXPECTED_CANDLE_INTERVAL_MINUTES", 60)
+EXPECTED_CANDLE_INTERVAL_MINUTES = env_int("EXPECTED_CANDLE_INTERVAL_MINUTES", TIMEFRAME_MINUTES)
 MAX_ALLOWED_CANDLE_GAP_MULTIPLE = env_float("MAX_ALLOWED_CANDLE_GAP_MULTIPLE", 1.5)
 BLOCK_SYNTHETIC_DATA_FOR_TRADING = env_bool("BLOCK_SYNTHETIC_DATA_FOR_TRADING", True)
 BLOCK_FALLBACK_DATA_FOR_TRADING = env_bool("BLOCK_FALLBACK_DATA_FOR_TRADING", True)

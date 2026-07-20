@@ -44,9 +44,10 @@ def main(argv: list[str] | None = None) -> int:
 
     import config.settings as settings
     from core.json_io import append_jsonl, atomic_write_json
+    from core.run_lock import PipelineAlreadyRunning, pipeline_run_lock
     from core.time_utils import utc_now_iso
     from crypto_ai_system.pipeline import Pipeline
-    from crypto_ai_system.pipeline.exit_codes import exit_code_for, is_healthy
+    from crypto_ai_system.pipeline.exit_codes import EXIT_ALREADY_RUNNING, exit_code_for, is_healthy
     from crypto_ai_system.scheduler.loop import run_scheduler_loop
 
     parser = argparse.ArgumentParser(description="Run the pipeline on a schedule.")
@@ -60,7 +61,23 @@ def main(argv: list[str] | None = None) -> int:
     metrics_log = settings.LATEST_DIR / "scheduler_metrics.jsonl"
 
     def run_cycle() -> dict:
-        run = Pipeline().run_once()
+        try:
+            with pipeline_run_lock():
+                run = Pipeline().run_once()
+        except PipelineAlreadyRunning as exc:
+            # An overlapping manual run holds storage/latest — skip this cycle
+            # rather than interleave two runs' artifacts.
+            return {
+                "cycle_id": None,
+                "stages": {},
+                "trade_executed": False,
+                "halted": False,
+                "exit_code": EXIT_ALREADY_RUNNING,
+                "halt_reason": str(exc),
+                "healthy": False,
+                "data_is_synthetic": None,
+                "metrics": {},
+            }
         code, halt_reason = exit_code_for(run)
         stages = {r.stage: r.status.value for r in run.results}
         data = run.by_stage("data")
@@ -100,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             "halted": r.get("halted"),
             "exit_code": r.get("exit_code"),
             "halt_reason": r.get("halt_reason"),
-            "healthy": r.get("healthy", not record["ok"] is False),
+            "healthy": r.get("healthy", record["ok"] is not False),
             "data_is_synthetic": r.get("data_is_synthetic"),
             **(r.get("metrics") or {}),
         }

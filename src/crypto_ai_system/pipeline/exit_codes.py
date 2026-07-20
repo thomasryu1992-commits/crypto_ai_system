@@ -9,6 +9,7 @@ to a documented exit code plus a human halt reason.
     10 halted by a safety policy (fatal BLOCK)
     20 data / research / validation error
     30 trading / execution error
+    40 skipped: another run already holds the pipeline lock
     50 feedback / storage / registry error
 """
 
@@ -21,20 +22,30 @@ EXIT_NO_TRADE = 2
 EXIT_SAFETY_BLOCK = 10
 EXIT_UPSTREAM_ERROR = 20
 EXIT_TRADING_ERROR = 30
+EXIT_ALREADY_RUNNING = 40
 EXIT_FEEDBACK_ERROR = 50
 
-# Codes that mean "the cycle did NOT complete healthily".
-UNHEALTHY_CODES = frozenset({EXIT_SAFETY_BLOCK, EXIT_UPSTREAM_ERROR, EXIT_TRADING_ERROR, EXIT_FEEDBACK_ERROR})
+# Codes that mean "the cycle did NOT complete healthily". A lock-skip counts:
+# repeated skips mean a hung run is holding the lock and cycles are being lost.
+UNHEALTHY_CODES = frozenset(
+    {EXIT_SAFETY_BLOCK, EXIT_UPSTREAM_ERROR, EXIT_TRADING_ERROR, EXIT_ALREADY_RUNNING, EXIT_FEEDBACK_ERROR}
+)
 
 
 def exit_code_for(run: PipelineRun) -> tuple[int, str | None]:
     """Return ``(exit_code, halt_reason)`` for a completed run."""
     for result in run.results:
         if result.status is StageStatus.ERROR:
+            if result.stage == "feedback":
+                # Feedback/storage errors are categorized even though feedback
+                # never halts the trade path.
+                return EXIT_FEEDBACK_ERROR, result.summary()
+            if not result.fatal:
+                # Advisory stage (fatal_on_error=False): the trade path ran
+                # normally, so the cycle must not report as an error halt.
+                continue
             if result.stage == "trading":
                 return EXIT_TRADING_ERROR, result.summary()
-            if result.stage == "feedback":
-                return EXIT_FEEDBACK_ERROR, result.summary()
             return EXIT_UPSTREAM_ERROR, result.summary()
         if result.status is StageStatus.BLOCKED and result.fatal:
             return EXIT_SAFETY_BLOCK, result.summary()

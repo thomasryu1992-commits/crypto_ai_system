@@ -53,6 +53,8 @@ def _build(**over):
         research_permission=over.get("research_permission", _perm()),
         pre_order_risk_gate=over.get("pre_order_risk_gate", _gate()),
         attribution=over.get("attribution", _attr()),
+        data_health=over.get("data_health", {"allow_trading": True}),
+        risk=over.get("risk", {"allow_new_position": True}),
         now=NOW,
     )
     return build_strategy_trade_decision(**kwargs)
@@ -108,6 +110,26 @@ def test_new_position_disallowed_blocked():
     assert std.BLOCK_NEW_POSITION_DISALLOWED in d["block_reasons"]
 
 
+def test_data_health_disallows_trading_blocked():
+    d = _build(data_health={"allow_trading": False})
+    assert d["allow_order_intent"] is False
+    assert std.BLOCK_DATA_HEALTH in d["block_reasons"]
+
+
+def test_risk_guard_disallows_new_position_blocked():
+    d = _build(risk={"allow_new_position": False})
+    assert d["allow_order_intent"] is False
+    assert std.BLOCK_RISK_GUARD in d["block_reasons"]
+
+
+def test_empty_validation_verdicts_fail_closed():
+    # A missing/empty verdict must block, never default to allowed.
+    d = _build(data_health={}, risk={})
+    assert d["allow_order_intent"] is False
+    assert std.BLOCK_DATA_HEALTH in d["block_reasons"]
+    assert std.BLOCK_RISK_GUARD in d["block_reasons"]
+
+
 def test_risk_gate_not_approved_blocked():
     d = _build(pre_order_risk_gate=_gate(approved=False))
     assert d["allow_order_intent"] is False
@@ -147,7 +169,8 @@ def test_carries_paper_engine_lineage_ids():
     d = build_strategy_trade_decision(
         router_result=_candidate(), primary_spec=_spec(), feature_row={"close": 100.0, "atr": 2.0},
         market_snapshot={"last_close": 100.0}, research_permission=_perm(), pre_order_risk_gate=_gate(),
-        attribution=_attr(), research_signal_id="rs_1", profile_id="paper_1",
+        attribution=_attr(), data_health={"allow_trading": True}, risk={"allow_new_position": True},
+        research_signal_id="rs_1", profile_id="paper_1",
         data_snapshot_id="ds_1", feature_snapshot_id="fs_1", now=NOW,
     )
     assert d["decision_id"] == "strategy_entry_evaluation_x"  # the strategy's eval id

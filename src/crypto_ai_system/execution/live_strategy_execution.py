@@ -28,7 +28,29 @@ from crypto_ai_system.execution.live_order_final_guard import (
     evaluate_live_order_final_guard,
     record_submission,
 )
+from crypto_ai_system.execution.retry_policy import is_ambiguous_submit, resolve_ambiguous_submit
 from crypto_ai_system.execution.signed_testnet_reconciliation import reconcile_signed_testnet
+
+
+def _resolve_submit(adapter: LiveCanaryAdapter, intent: dict[str, Any], submit: dict[str, Any]) -> tuple[bool, bool, dict | None]:
+    """(submitted, unresolved, resolution) for a submit result.
+
+    An ambiguous failure (timeout / 5xx / rate-limit after the POST left this
+    process) is resolved by querying the client order id. ``unresolved`` means
+    even the query failed: the order may be live on the venue, so the caller
+    must account for it (daily budget + reconciliation), never assume it away.
+    """
+    submitted = bool(submit.get("submitted"))
+    if submitted or not is_ambiguous_submit(submit):
+        return submitted, False, None
+    resolution = resolve_ambiguous_submit(
+        adapter.query_order, str(intent.get("symbol")), str(intent.get("client_order_id"))
+    )
+    if resolution.get("order_exists") is True:
+        return True, False, resolution
+    if resolution.get("order_exists") is False:
+        return False, False, resolution
+    return False, True, resolution
 
 
 def _strategy_adapter() -> LiveCanaryAdapter:
@@ -70,20 +92,33 @@ def submit_live_strategy_order(
 
     adapter = _strategy_adapter()
     submit = adapter.submit_order(intent)
-    submitted = bool(submit.get("submitted"))
-    if submitted:
+    submitted, unresolved, resolution = _resolve_submit(adapter, intent, submit)
+    # An unresolved-ambiguous submit may be live on the venue: it consumes the
+    # daily budget and is handed to reconciliation exactly like a confirmed one
+    # (the position kernel only opens on a RECONCILED fill, so nothing is
+    # fabricated if it turns out the order never existed).
+    if submitted or unresolved:
         record_submission()
 
     result["mode"] = "LIVE_STRATEGY_ADAPTER"
     result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
-    result["status"] = "LIVE_STRATEGY_ORDER_SUBMITTED" if submitted else "LIVE_STRATEGY_SUBMIT_FAILED"
+    if submitted:
+        result["status"] = "LIVE_STRATEGY_ORDER_SUBMITTED"
+    elif unresolved:
+        result["status"] = "LIVE_STRATEGY_SUBMIT_UNRESOLVED"
+    else:
+        result["status"] = "LIVE_STRATEGY_SUBMIT_FAILED"
     result["submit_result"] = submit
+    if resolution is not None:
+        result["ambiguous_submit_resolution"] = resolution
+        result["submit_confirmed_by_query"] = submitted
     result["exchange_order_id"] = submit.get("exchange_order_id")
     result["client_order_id"] = submit.get("client_order_id")
-    result["external_order_submission_performed"] = submitted
+    result["external_order_submission_performed"] = submitted or unresolved
     log_event(
         "live_strategy_order_attempted",
         {"status": result["status"], "state": result["state"], "client_order_id": submit.get("client_order_id")},
+        severity="WARNING" if unresolved else "INFO",
     )
     return result
 
@@ -114,15 +149,26 @@ def submit_live_close_order(intent: dict[str, Any]) -> dict[str, Any]:
 
     adapter = _strategy_adapter()
     submit = adapter.submit_order(intent)
-    submitted = bool(submit.get("submitted"))
+    submitted, unresolved, resolution = _resolve_submit(adapter, intent, submit)
 
     result["mode"] = "LIVE_STRATEGY_CLOSE_ADAPTER"
     result["state"] = "SUBMITTED" if submitted else "UNKNOWN"
-    result["status"] = "LIVE_CLOSE_ORDER_SUBMITTED" if submitted else "LIVE_CLOSE_SUBMIT_FAILED"
+    if submitted:
+        result["status"] = "LIVE_CLOSE_ORDER_SUBMITTED"
+    elif unresolved:
+        result["status"] = "LIVE_CLOSE_SUBMIT_UNRESOLVED"
+    else:
+        result["status"] = "LIVE_CLOSE_SUBMIT_FAILED"
     result["submit_result"] = submit
+    if resolution is not None:
+        result["ambiguous_submit_resolution"] = resolution
+        result["submit_confirmed_by_query"] = submitted
     result["exchange_order_id"] = submit.get("exchange_order_id")
     result["client_order_id"] = submit.get("client_order_id")
-    result["external_order_submission_performed"] = submitted
+    # An unresolved close may be live at the venue: report it as performed so the
+    # kernel keeps the SAME client order id pending instead of racing a second
+    # reduceOnly close against a fill it cannot see yet.
+    result["external_order_submission_performed"] = submitted or unresolved
     log_event(
         "live_close_order_attempted",
         {"status": result["status"], "client_order_id": submit.get("client_order_id")},
