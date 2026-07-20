@@ -112,6 +112,7 @@ class _Ctx:
     def __init__(self, routing):
         self._d = {"strategy_routing": routing}
         self.cycle = None
+        self.verdict = None  # -> ValidationVerdict.fail_closed() in the agent
 
     def get(self, key, default=None):
         return self._d.get(key, default)
@@ -144,7 +145,7 @@ def _wire_fake_execution(monkeypatch, cfg):
                 "expected_order_intent": (state["decision"] or {}),
                 "simulated_fill": {"fill_status": "FILLED"}}
 
-    def fake_builder(routing, *, execution_stage, open_positions, cycle_id, now):
+    def fake_builder(routing, *, execution_stage, open_positions, data_health, risk, cycle_id, now):
         return {"allow_order_intent": True,
                 "strategy_id": routing.get("primary_strategy_id"),
                 "direction": routing.get("direction", "LONG")}

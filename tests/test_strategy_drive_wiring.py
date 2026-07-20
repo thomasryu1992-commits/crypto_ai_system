@@ -70,20 +70,27 @@ def _wire_artifacts(tmp_path, monkeypatch, *, pool):
 
 # -- bridge -------------------------------------------------------------------
 
+# P2: the validation verdicts are required inputs to the builder.
+_VERDICTS = {"data_health": {"allow_trading": True}, "risk": {"allow_new_position": True}}
+
+
 def test_bridge_none_without_candidate(tmp_path, monkeypatch):
     _wire_artifacts(tmp_path, monkeypatch, pool=empty_pool())
-    assert build_strategy_decision_for_cycle({"status": "NO_ENTRY"}, cycle_id="c1", now=NOW) is None
+    assert build_strategy_decision_for_cycle(
+        {"status": "NO_ENTRY"}, cycle_id="c1", now=NOW, **_VERDICTS) is None
 
 
 def test_bridge_none_unknown_primary(tmp_path, monkeypatch):
     _wire_artifacts(tmp_path, monkeypatch, pool=empty_pool())
-    assert build_strategy_decision_for_cycle(_candidate("S999"), cycle_id="c1", now=NOW) is None
+    assert build_strategy_decision_for_cycle(
+        _candidate("S999"), cycle_id="c1", now=NOW, **_VERDICTS) is None
 
 
 def test_bridge_assembles_decision_with_attribution(tmp_path, monkeypatch):
     pool, _ = add_champion(empty_pool(), _spec_dict("S004"), 0.7, now=NOW)
     _wire_artifacts(tmp_path, monkeypatch, pool=pool)
-    decision = build_strategy_decision_for_cycle(_candidate("S004"), cycle_id="cycle_1", now=NOW)
+    decision = build_strategy_decision_for_cycle(
+        _candidate("S004"), cycle_id="cycle_1", now=NOW, **_VERDICTS)
     assert decision is not None
     assert decision["direction"] == "LONG"
     assert decision["strategy_id"] == "S004"
@@ -99,7 +106,8 @@ def test_bridge_enforces_risk_gate(tmp_path, monkeypatch):
     # not approve -> the decision is assembled but order intent is refused.
     pool, _ = add_champion(empty_pool(), _spec_dict("S004"), 0.7, now=NOW)
     _wire_artifacts(tmp_path, monkeypatch, pool=pool)
-    decision = build_strategy_decision_for_cycle(_candidate("S004"), cycle_id="cycle_1", now=NOW)
+    decision = build_strategy_decision_for_cycle(
+        _candidate("S004"), cycle_id="cycle_1", now=NOW, **_VERDICTS)
     assert decision["allow_order_intent"] is False
     assert std.BLOCK_RISK_GATE in decision["block_reasons"]
 

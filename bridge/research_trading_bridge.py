@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from config.settings import (
     DAILY_MAX_LOSS_R,
-    DATA_HEALTH_PATH,
     MARKET_SNAPSHOT_PATH,
     MAX_CONSECUTIVE_LOSSES,
     RESEARCH_DECISION_PATH,
     RESEARCH_SIGNAL_PATH,
-    RISK_STATUS_PATH,
     TRADE_DECISION_PATH,
     TRADING_CYCLE_PATH,
 )
@@ -136,11 +136,24 @@ def _evaluate_pre_order_gate(
     return gate
 
 
-def run_research_trading_bridge(execution_stage: str = "paper", *, open_positions: int | None = None) -> dict:
+def run_research_trading_bridge(
+    execution_stage: str = "paper",
+    *,
+    open_positions: int | None = None,
+    data_health: Mapping[str, Any],
+    risk: Mapping[str, Any],
+) -> dict:
+    """Build and persist this cycle's research trade decision.
+
+    ``data_health`` and ``risk`` are the validation stage's verdicts and are
+    REQUIRED — the bridge no longer re-reads them from disk, so an entry path
+    cannot be wired without deciding which verdict it consumes (P2). Standalone
+    callers load theirs explicitly via ``ValidationVerdict.from_latest_files()``.
+    """
     research = read_json(RESEARCH_DECISION_PATH, {})
     trading = read_json(TRADING_CYCLE_PATH, {})
-    data_health = read_json(DATA_HEALTH_PATH, {})
-    risk = read_json(RISK_STATUS_PATH, {})
+    data_health = dict(data_health or {})
+    risk = dict(risk or {})
     market_snapshot = read_json(MARKET_SNAPSHOT_PATH, {})
     research_signal = read_json(RESEARCH_SIGNAL_PATH, {})
 
@@ -210,7 +223,12 @@ def run_research_trading_bridge(execution_stage: str = "paper", *, open_position
 
 
 def main() -> None:
-    result = run_research_trading_bridge()
+    from crypto_ai_system.pipeline.contracts import ValidationVerdict
+
+    verdict = ValidationVerdict.from_latest_files()
+    result = run_research_trading_bridge(
+        data_health=verdict.data_health, risk=verdict.risk_status
+    )
     print(f"Trade Decision: {result['final_decision']} allow_order_intent={result['allow_order_intent']}")
 
 

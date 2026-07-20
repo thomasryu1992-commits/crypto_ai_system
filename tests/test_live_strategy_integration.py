@@ -133,6 +133,7 @@ def test_full_live_chain_reaches_ready(tmp_path, monkeypatch, live_env):
     # 1) Routed candidate -> live trade decision through the live gate.
     decision = build_strategy_decision_for_cycle(
         _candidate("S010"), execution_stage="live", cycle_id="cycle_live", now=NOW,
+        data_health={"allow_trading": True}, risk={"allow_new_position": True},
     )
     assert decision is not None
     assert decision["allow_order_intent"] is True, decision.get("block_reasons")
@@ -168,6 +169,7 @@ def test_same_chain_fully_blocked_on_defaults(tmp_path, monkeypatch):
 
     decision = build_strategy_decision_for_cycle(
         _candidate("S010"), execution_stage="live", cycle_id="cycle_live", now=NOW,
+        data_health={"allow_trading": True}, risk={"allow_new_position": True},
     )
     assert decision is not None
     assert decision["allow_order_intent"] is False

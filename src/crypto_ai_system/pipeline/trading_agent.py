@@ -45,7 +45,7 @@ from crypto_ai_system.execution.signed_testnet_reconciliation import (
 from crypto_ai_system.trading.trading_cycle import run_trading_cycle
 
 from crypto_ai_system.pipeline.base import Agent
-from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult
+from crypto_ai_system.pipeline.contracts import PipelineContext, StageResult, ValidationVerdict
 
 
 def _latest_candle() -> dict | None:
@@ -149,6 +149,11 @@ class TradingAgent(Agent):
                 severity="WARNING",
             )
 
+    @staticmethod
+    def _verdict(ctx: PipelineContext) -> ValidationVerdict:
+        """This cycle's validation verdict; an unwired context fails closed."""
+        return ctx.verdict or ValidationVerdict.fail_closed()
+
     def _maybe_strategy_decision(self, ctx: PipelineContext, execution_stage: str, open_positions: int):
         """Build a strategy-driven trade decision from this cycle's router result.
 
@@ -162,10 +167,12 @@ class TradingAgent(Agent):
                 build_strategy_decision_for_cycle,
             )
 
+            verdict = self._verdict(ctx)
             cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
             now = ctx.cycle.started_at_utc if ctx.cycle else None
             return build_strategy_decision_for_cycle(
                 routing, execution_stage=execution_stage, open_positions=open_positions,
+                data_health=verdict.data_health, risk=verdict.risk_status,
                 cycle_id=cycle_id, now=now,
             )
         except Exception:  # noqa: BLE001 - never let the drive path break research
@@ -193,10 +200,12 @@ class TradingAgent(Agent):
                 "direction": candidate.get("direction"),
                 "symbol": candidate.get("symbol"),
             }
+            verdict = self._verdict(ctx)
             cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
             now = ctx.cycle.started_at_utc if ctx.cycle else None
             return build_strategy_decision_for_cycle(
                 candidate_routing, execution_stage=execution_stage, open_positions=open_positions,
+                data_health=verdict.data_health, risk=verdict.risk_status,
                 cycle_id=cycle_id, now=now,
             )
         except Exception:  # noqa: BLE001 - never let the drive path break research
@@ -378,7 +387,8 @@ class TradingAgent(Agent):
                 )
             return self.blocked([block_reason], fatal=True)
 
-        allow_new_position = bool(ctx.get("allow_new_position", False))
+        verdict = self._verdict(ctx)
+        allow_new_position = verdict.allow_new_position
 
         cfg = load_config(".")
         cycle_id = ctx.cycle.cycle_id if ctx.cycle else None
@@ -473,7 +483,10 @@ class TradingAgent(Agent):
             open_positions = 1 if (is_paper and has_open_position(cfg)) else 0
 
         trading = run_trading_cycle(allow_new_position=allow_new_position)
-        trade_decision = run_research_trading_bridge(execution_stage=execution_stage, open_positions=open_positions)
+        trade_decision = run_research_trading_bridge(
+            execution_stage=execution_stage, open_positions=open_positions,
+            data_health=verdict.data_health, risk=verdict.risk_status,
+        )
 
         # Strategy-factory drive (paper or live, opt-in): when a routed candidate
         # exists this cycle, replace the research decision with a strategy-driven

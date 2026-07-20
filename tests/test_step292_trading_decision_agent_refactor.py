@@ -166,13 +166,12 @@ def test_step292_run_bridge_writes_decision_pipeline_record(tmp_path: Path, monk
     monkeypatch.setattr(bridge, "load_config", lambda _root: AppConfig(root=tmp_path, settings={"storage": {"registry_dir": "storage/registries"}}))
     monkeypatch.setattr(bridge, "RESEARCH_DECISION_PATH", research_path)
     monkeypatch.setattr(bridge, "TRADING_CYCLE_PATH", trading_path)
-    monkeypatch.setattr(bridge, "DATA_HEALTH_PATH", health_path)
-    monkeypatch.setattr(bridge, "RISK_STATUS_PATH", risk_path)
     monkeypatch.setattr(bridge, "MARKET_SNAPSHOT_PATH", market_path)
     monkeypatch.setattr(bridge, "RESEARCH_SIGNAL_PATH", signal_path)
     monkeypatch.setattr(bridge, "TRADE_DECISION_PATH", trade_decision_path)
 
-    result = bridge.run_research_trading_bridge()
+    # P2: the validation verdicts are required inputs, not file re-reads.
+    result = bridge.run_research_trading_bridge(data_health=_health(), risk=_risk())
     registry_path = registry_dir / "decision_pipeline_registry.jsonl"
     rows = [json.loads(line) for line in registry_path.read_text(encoding="utf-8").splitlines()]
 
