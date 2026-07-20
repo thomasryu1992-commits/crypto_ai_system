@@ -76,6 +76,7 @@ from crypto_ai_system.pipeline.trading_steps.stage_router import (  # noqa: E402
     resolve_execution_stage,
 )
 from crypto_ai_system.pipeline.trading_steps.context import CycleInputs  # noqa: E402
+from crypto_ai_system.pipeline.trading_steps.lifecycle import derive_lifecycle  # noqa: E402
 
 
 class TradingAgent(Agent):
@@ -515,32 +516,14 @@ class TradingAgent(Agent):
             else:
                 reconciliation = run_reconciler()
 
-        # Derive real order lifecycle state — a non-empty result dict is NOT a
-        # trade (a REJECTED/NO_ORDER result is also a dict). A trade counts only
-        # when the executor actually filled (paper) or submitted (testnet).
-        # Multibook aggregates across this cycle's entry attempts.
+        # Derive real order lifecycle state (pure, see trading_steps.lifecycle).
         order = order if isinstance(order, dict) else {}
-        order_status = order.get("status")
-        if multibook:
-            orders = [e.get("order") or {} for e in multibook_entries]
-            order_filled = any(bool(o.get("filled")) for o in orders)
-            order_intent_created = any(
-                bool(o.get("intent", {}).get("order_intent_created")) or bool(o.get("order_intent_id"))
-                for o in orders
-            )
-            order_submitted = False  # multibook is paper-only; nothing external
-            trade_executed = order_filled
-        else:
-            order_filled = bool(order.get("filled"))
-            order_intent_created = bool(order.get("intent", {}).get("order_intent_created")) or bool(
-                order.get("order_intent_id")
-            )
-            order_submitted = bool(order.get("external_order_submission_performed")) or (
-                order_status in {"SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED"}
-            )
-            trade_executed = order_filled or order_status in {
-                "SIGNED_TESTNET_ORDER_SUBMITTED", "LIVE_STRATEGY_ORDER_SUBMITTED",
-            }
+        lifecycle = derive_lifecycle(order, multibook_entries, multibook=multibook)
+        order_status = lifecycle.order_status
+        order_intent_created = lifecycle.order_intent_created
+        order_submitted = lifecycle.order_submitted
+        order_filled = lifecycle.order_filled
+        trade_executed = lifecycle.trade_executed
 
         # 2b. The signal wanted a trade and did not get one — shadow it, whatever
         #     stopped it. Recording keys off what actually happened (no trade),
