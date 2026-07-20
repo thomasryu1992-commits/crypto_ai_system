@@ -197,11 +197,14 @@ def build_active_research_signal(
         "timeframe": timeframe,
         "data_source": snapshot.get("source_type") or snapshot.get("source"),
         "data_quality_status": "OK" if snapshot.get("is_synthetic") is not True else "SYNTHETIC",
-        # Data-health flags the PreOrderRiskGate reads.
+        # Data-health flags the PreOrderRiskGate reads. Staleness comes from
+        # the snapshot's real candle-age check (QA fix) — these used to be
+        # hardcoded False, which left the gate's signal-side freshness input
+        # permanently dead.
         "synthetic_used": bool(snapshot.get("is_synthetic")),
         "fallback_used": bool(snapshot.get("is_fallback")),
-        "stale": False,
-        "data_stale": False,
+        "stale": bool(snapshot.get("is_stale", False)),
+        "data_stale": bool(snapshot.get("is_stale", False)),
         "optional_data_health": optional_data_health,
         "stale_optional_data": bool(stale_optional),
         "missing_optional_data_neutral": bool(missing_neutral),

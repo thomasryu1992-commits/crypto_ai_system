@@ -21,6 +21,13 @@ class ResearchAgent(Agent):
 
     def execute(self, ctx: PipelineContext) -> StageResult:
         research = run_research_cycle()
+        if not research:
+            # Check BEFORE emitting the signal: a failed research cycle must
+            # not leave a fresher signal artifact on disk than the decision
+            # that blocked (the halt skips trading either way, but the
+            # artifacts should agree).
+            return self.blocked(["research cycle not produced"], fatal=True)
+
         # Emit a ResearchSignal v2 (lineage ids + hashes + trade_permission) from
         # the active data BEFORE the decision engine reads it, so the decision and
         # the real PreOrderRiskGate share one cycle's signal (E-2).
@@ -28,9 +35,7 @@ class ResearchAgent(Agent):
         signal = run_active_research_signal(cycle_id=cycle_id)
         decision = run_research_decision()
 
-        if not research or not decision:
-            return self.blocked(
-                ["research cycle or decision not produced"], fatal=True
-            )
+        if not decision:
+            return self.blocked(["research decision not produced"], fatal=True)
 
         return self.ok(research=research, research_signal=signal, research_decision=decision)

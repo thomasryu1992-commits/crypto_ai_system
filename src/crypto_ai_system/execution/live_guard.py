@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
 
+# Single env-parsing source (QA fix): this module used to carry its own
+# _env_bool/_env_float/_env_str copies — a third config resolution path whose
+# vocabulary could drift from the canonical one.
+from config.settings import env_bool as _env_bool
+from config.settings import env_float as _env_float
+from config.settings import env_str as _env_str
 from core.json_io import atomic_write_json
 from core.time_utils import utc_now_iso
 from core.event_log import log_event
@@ -34,28 +39,6 @@ def _get_nested(mapping: Mapping[str, Any], dotted_path: str, default: Any = Non
             return default
         value = value[part]
     return value
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None or str(raw).strip() == "":
-        return default
-    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None or str(raw).strip() == "":
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
-
-
-def _env_str(name: str, default: str = "") -> str:
-    raw = os.getenv(name)
-    return default if raw is None else str(raw).strip()
 
 
 def _live_secret_metadata(settings: Mapping[str, Any]) -> dict[str, Any]:

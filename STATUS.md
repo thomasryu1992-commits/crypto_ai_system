@@ -510,6 +510,30 @@ done per `docs/architecture/design_trading_agent_split_and_context.md`:
   `execute()` is a sequencer; behavior byte-identical (same outputs keys,
   file-write order, log events, fail-closed semantics).
 
+**2026-07-20 — QA audit closeout (remaining minor items).** The last open
+info/minor findings, fixed and verified (897 tests, safety guard, live cycle):
+
+- `atomic_write_json` fsyncs before `os.replace` (power loss can no longer
+  leave an empty "latest" file behind an apparently-atomic write).
+- The reconciler's legacy fallback refuses to stamp RECONCILED on an
+  externally-submitted order (`UNRECONCILED` + loud note) — unreachable from
+  the pipeline, guarded anyway.
+- `live_guard` uses the canonical `config.settings` env helpers instead of its
+  own private copies (the third config resolution path is gone).
+- The research signal's `stale`/`data_stale` come from the snapshot's REAL
+  candle-age check (were hardcoded False — the gate's signal-side freshness
+  input is now live too).
+- A failed research cycle no longer emits a signal artifact (artifacts agree
+  with the blocked decision); the scheduler reports `data_is_synthetic: null`
+  (unknown) when the data stage errored instead of a false "real data".
+
+Deliberately NOT changed, with rationale: the outcome-registry full read per
+append stays (few rows/day; validation-on-read is what arms the risk guard's
+fail-closed check); RiskGate intent-hash binding is superseded by the
+decision-consumption guard (one decision -> at most one intent); the pre-lean
+files under gitignored `storage/` are operator data on this machine and are
+not touched by code changes.
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a
