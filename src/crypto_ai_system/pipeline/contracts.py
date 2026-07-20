@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
 
 
 class StageStatus(str, Enum):
@@ -71,13 +71,62 @@ class CycleEnvelope:
     stage: str = "paper"
 
 
+@dataclass(frozen=True)
+class ValidationVerdict:
+    """The validation stage's complete verdict for ONE cycle.
+
+    This is the REQUIRED input to every decision builder: an entry path that
+    does not receive a verdict cannot be written (TypeError at call time),
+    which is the structural fix for the audit's gate-bypass class. A missing
+    verdict resolves to :meth:`fail_closed`, never to "allowed".
+    """
+
+    allow_new_position: bool
+    data_health: Mapping[str, Any]
+    risk_status: Mapping[str, Any]
+
+    @classmethod
+    def fail_closed(cls) -> "ValidationVerdict":
+        """The verdict an unwired caller gets: everything blocked."""
+        return cls(allow_new_position=False, data_health={}, risk_status={})
+
+    @classmethod
+    def from_latest_files(cls) -> "ValidationVerdict":
+        """EXPLICIT file-based loader for standalone entry points.
+
+        Module ``__main__``s and operator scripts run outside a pipeline cycle
+        and must name their verdict source — this is that name. Missing or
+        empty files fail closed through the same booleans the validation agent
+        uses.
+        """
+        from config.settings import DATA_HEALTH_PATH, RISK_STATUS_PATH
+        from core.json_io import read_json
+
+        data_health = read_json(DATA_HEALTH_PATH, {}) or {}
+        risk_status = read_json(RISK_STATUS_PATH, {}) or {}
+        return cls(
+            allow_new_position=bool(data_health.get("allow_trading"))
+            and bool(risk_status.get("allow_new_position")),
+            data_health=data_health,
+            risk_status=risk_status,
+        )
+
+
 @dataclass
 class PipelineContext:
-    """Mutable state threaded through the agents within one cycle."""
+    """Mutable state threaded through the agents within one cycle.
+
+    Typed slots are the load-bearing intra-cycle contract: ``verdict`` is set
+    by the validation agent, ``strategy_routing`` by the routing agent. The
+    legacy ``data`` dict (outputs merged into a shared namespace) remains only
+    until the P3 migration removes it.
+    """
 
     cycle: CycleEnvelope | None = None
     results: dict[str, StageResult] = field(default_factory=dict)
     data: dict[str, Any] = field(default_factory=dict)
+    verdict: ValidationVerdict | None = None
+    strategy_routing: dict[str, Any] | None = None
 
     def record(self, result: StageResult) -> None:
         self.results[result.stage] = result

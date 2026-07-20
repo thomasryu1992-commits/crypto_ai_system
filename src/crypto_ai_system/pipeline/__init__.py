@@ -13,6 +13,7 @@ from crypto_ai_system.pipeline.contracts import (
     PipelineRun,
     StageResult,
     StageStatus,
+    ValidationVerdict,
 )
 from crypto_ai_system.pipeline.orchestrator import Pipeline
 
@@ -23,4 +24,5 @@ __all__ = [
     "PipelineRun",
     "StageResult",
     "StageStatus",
+    "ValidationVerdict",
 ]
