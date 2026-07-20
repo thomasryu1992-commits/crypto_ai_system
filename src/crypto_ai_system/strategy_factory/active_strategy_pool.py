@@ -165,13 +165,28 @@ def add_champion(
     min_improvement: float = DEFAULT_MIN_IMPROVEMENT,
     now: str | None = None,
     robustness: dict | None = None,
+    live_stats: dict | None = None,
 ) -> tuple[dict, dict]:
     """Try to add a champion spec to the paper pool.
 
     Returns ``(new_pool, decision)``. The pool is unchanged when the champion is
     rejected (already active, or the pool is full and the champion is not clearly
     better than the weakest occupant).
+
+    ``live_stats`` (``strategy_id -> (n, live_expectancy)`` from the S8
+    registry) turns real paper results into replacement pressure (L-A1): at
+    the full-pool comparison, occupants are ranked by their comparison-time
+    shrunk live-blended score instead of the frozen admission score — a
+    live-refuted incumbent sinks toward its real record, a live-confirmed one
+    hardens. ``champion_score`` on the entry is never rewritten (audit
+    anchor), the challenger has no live history so its side is unchanged, and
+    ``live_stats=None``/empty is byte-identical to the pre-L-A1 behavior.
     """
+    from crypto_ai_system.strategy_factory.live_evidence import (
+        resolve_pseudo_trades,
+        sls_for_entry,
+    )
+
     now = now or utc_now_canonical()
     strategy_id = spec["strategy_id"]
     rule_hash = spec["strategy_rule_hash"]
@@ -191,21 +206,38 @@ def add_champion(
         return new_pool, {"action": ACTION_ADDED, "strategy_id": strategy_id,
                           "occupied_after": len(occupying) + 1, "cap": cap}
 
-    # Pool full: only displace the weakest occupant if clearly beaten.
-    weakest = min(occupying, key=lambda e: e["champion_score"] if e.get("champion_score") is not None else -math.inf)
-    weakest_score = weakest.get("champion_score")
+    # Pool full: only displace the weakest occupant if clearly beaten. The
+    # weakest is judged by comparison-time SLS (== champion_score when no live
+    # evidence exists), so real results reorder survivors without ever
+    # touching the admission gates.
+    pseudo_trades = resolve_pseudo_trades()
+
+    def _comparison_score(entry: dict) -> float:
+        score = sls_for_entry(entry, live_stats, pseudo_trades=pseudo_trades)["score"]
+        return score if score is not None else -math.inf
+
+    weakest = min(occupying, key=_comparison_score)
+    weakest_sls = sls_for_entry(weakest, live_stats, pseudo_trades=pseudo_trades)
+    weakest_score = weakest_sls["score"]
+    sls_audit = {
+        "weakest_live_n": weakest_sls["live_n"],
+        "weakest_live_expectancy": weakest_sls["live_expectancy"],
+        "weakest_frozen_score": weakest.get("champion_score"),
+        "sls_pseudo_trades": pseudo_trades,
+    }
     if champion_score is None or weakest_score is None or (champion_score - weakest_score) < min_improvement:
         return pool, {"action": ACTION_REJECTED_POOL_FULL, "strategy_id": strategy_id,
                       "weakest_strategy_id": weakest.get("strategy_id"),
                       "weakest_score": weakest_score, "champion_score": champion_score,
-                      "min_improvement": min_improvement,
+                      "min_improvement": min_improvement, **sls_audit,
                       "reason": "pool full and champion not sufficiently better than the weakest occupant"}
 
     displaced_pool, _ = set_status(pool, weakest["strategy_id"], StrategyStatus.SUSPENDED, now=now)
     new_pool = {**displaced_pool, "active_strategies": _entries(displaced_pool) + [_make_entry(spec, champion_score, generation_id, now, robustness)]}
     return new_pool, {"action": ACTION_REPLACED, "strategy_id": strategy_id,
                       "displaced_strategy_id": weakest["strategy_id"],
-                      "displaced_score": weakest_score, "champion_score": champion_score, "cap": cap}
+                      "displaced_score": weakest_score, "champion_score": champion_score,
+                      "cap": cap, **sls_audit}
 
 
 # -- persistence --------------------------------------------------------------

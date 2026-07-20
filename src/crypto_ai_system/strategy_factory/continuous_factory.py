@@ -58,6 +58,7 @@ def run_factory_cycle(
     templates: Sequence = DEFAULT_TEMPLATE_ORDER,
     symbol: str = "BTCUSDT",
     now: str | None = None,
+    live_stats: dict | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run one generation cycle. Returns ``(new_state, cycle_report)``.
 
@@ -105,6 +106,9 @@ def run_factory_cycle(
                 pool, spec, champion.get("champion_score"),
                 generation_id=generation_id, cap=cap, now=now,
                 robustness=champion_robustness,
+                # L-A1: real paper results reorder the full-pool comparison
+                # (no-op while the S8 registry is thin).
+                live_stats=live_stats,
             )
 
     new_state = {

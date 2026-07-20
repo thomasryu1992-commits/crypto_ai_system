@@ -144,20 +144,44 @@ def main(argv: list[str] | None = None) -> int:
         return mean / ((var ** 0.5) / (n ** 0.5))
 
     # Adopted champions seed the initial population (proven parents to breed
-    # from); they earn no other privilege — same fitness, same gates.
+    # from); they earn no other privilege — same fitness, same gates. L-A2:
+    # seeds are ordered by their shrunk live-blended score (best first, so the
+    # population-budget truncation keeps the live-best) and carry weight 1+w
+    # for the first breeding round. With no live data w=0 everywhere: original
+    # order-agnostic equal-ticket behavior.
+    from crypto_ai_system.strategy_factory.live_evidence import (
+        load_live_stats,
+        resolve_pseudo_trades,
+        sls_for_entry,
+    )
+
+    live_stats = load_live_stats(str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH))
+    pseudo_trades = resolve_pseudo_trades()
     seed_rule_sets = []
+    seed_weights = []
     if not args.no_seed_champions:
+        scored_seeds = []
         for entry in occupying_entries(load_pool(str(settings.ACTIVE_STRATEGY_POOL_PATH))):
             rule_set = spec_to_rule_set(entry.get("strategy_spec") or {})
-            if rule_set is not None:
-                seed_rule_sets.append(rule_set)
+            if rule_set is None:
+                continue
+            sls = sls_for_entry(entry, live_stats, pseudo_trades=pseudo_trades)
+            sort_key = sls["score"] if sls["score"] is not None else float("-inf")
+            weight = 1.0 + (sls["live_n"] / (sls["live_n"] + pseudo_trades))
+            scored_seeds.append((sort_key, weight, rule_set))
+        scored_seeds.sort(key=lambda item: item[0], reverse=True)
+        seed_rule_sets = [item[2] for item in scored_seeds]
+        seed_weights = [item[1] for item in scored_seeds]
         if seed_rule_sets:
-            print(f"seeding {len(seed_rule_sets)} pool champions into the initial population")
+            live_seeded = sum(1 for w in seed_weights if w > 1.0)
+            print(f"seeding {len(seed_rule_sets)} pool champions into the initial population"
+                  + (f" ({live_seeded} carrying live evidence)" if live_seeded else ""))
 
     mined = mine_rule_sets(
         train, fitness=fitness, seed=args.seed,
         population=args.population, generations=args.generations, top_n=args.top,
         seed_population=seed_rule_sets,
+        seed_weights=seed_weights if seed_weights else None,
     )
     print(f"searched {mined['search_evaluations']} candidates "
           f"(condition pool {mined['condition_pool_size']}) -> {len(mined['survivors'])} distinct families")
@@ -227,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         pool, decision = add_champion(
             pool, spec_dict, champion_score, generation_id=generation_id,
             cap=args.cap, robustness=robustness or None,
+            live_stats=live_stats,
         )
         print(f"    -> pool: {decision.get('action')}")
         if decision.get("action") in {"ADDED", "REPLACED"}:

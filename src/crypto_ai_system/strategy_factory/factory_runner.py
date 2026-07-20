@@ -91,12 +91,19 @@ def run_generation(
     state = {"generation_seq": counters["generation_seq"], "strategy_seq": counters["strategy_seq"], "pool": pool}
     seed = base_seed + counters["generation_seq"]
 
+    # L-A1: real paper results (S8 registry) as replacement pressure. Loaded
+    # here at the IO boundary; run_factory_cycle stays pure.
+    import config.settings as settings
+    from crypto_ai_system.strategy_factory.live_evidence import load_live_stats
+
+    live_stats = load_live_stats(str(settings.STRATEGY_ATTRIBUTED_OUTCOME_REGISTRY_PATH))
+
     cycle_kwargs: dict[str, Any] = {"symbol": symbol}
     if templates is not None:
         cycle_kwargs["templates"] = templates
     new_state, report = run_factory_cycle(
         state, frame, seed=seed, cost=cost, gate=gate, champion_weights=champion_weights,
-        cap=cap, max_per_family=max_per_family, now=now, **cycle_kwargs,
+        cap=cap, max_per_family=max_per_family, now=now, live_stats=live_stats, **cycle_kwargs,
     )
 
     save_pool(pool_file, new_state["pool"])

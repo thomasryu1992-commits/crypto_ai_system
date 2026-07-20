@@ -8,8 +8,12 @@ REM current member via cross-symbol score comparison. Logs to
 REM storage\logs\strategy_factory.log.
 cd /d "%~dp0.."
 if not exist "storage\logs" mkdir "storage\logs"
+REM Cap 25 (2026-07-20, was 15): the pool sat full at 15, so every new champion
+REM could only displace an incumbent. Room to GROW lets the enlarged pool feed
+REM multibook with more candidates; position risk is still bounded by the book
+REM caps (5 open / 3 same-direction / 2 entries per cycle), not the pool size.
 for %%S in (BTCUSDT ETHUSDT BNBUSDT DOGEUSDT SOLUSDT) do (
-  py run_strategy_factory.py --symbol %%S --history 2200 --interval 1d --cycles 2 --cap 15 ^
+  py run_strategy_factory.py --symbol %%S --history 2200 --interval 1d --cycles 2 --cap 25 ^
     --min-trades 100 --min-expectancy 0.1 --min-profit-factor 1.15 ^
     --min-wf-pass 0.7 --max-drawdown 10.0 --min-stability 0.3 >> "storage\logs\strategy_factory.log" 2>&1
 )
@@ -21,6 +25,6 @@ REM logged so any mined champion's search is reproducible.
 set MINER_SEED=%RANDOM%
 echo [miner] seed %MINER_SEED% >> "storage\logs\strategy_factory.log"
 for %%S in (BTCUSDT ETHUSDT BNBUSDT DOGEUSDT SOLUSDT) do (
-  py run_rule_miner.py --symbol %%S --history 2200 --interval 1d ^
+  py run_rule_miner.py --symbol %%S --history 2200 --interval 1d --cap 25 ^
     --seed %MINER_SEED% >> "storage\logs\strategy_factory.log" 2>&1
 )
