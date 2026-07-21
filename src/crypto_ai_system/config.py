@@ -104,14 +104,22 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     fallback_profiles = _load_fallback_profiles(root)
     settings['fallback_data_profiles'] = fallback_profiles
 
+    # Single source of truth (same rule as the trading/safety seeding below):
+    # symbol, timeframe, exchange, and fetch limit are resolved ONCE by the
+    # flat config.settings constants — which already accept both halves' env
+    # names (SYMBOL/DEFAULT_CANONICAL_SYMBOL, TIMEFRAME/DEFAULT_TIMEFRAME,
+    # CANDLE_FETCH_LIMIT/DEFAULT_LIMIT) — so a yaml value or a second env read
+    # cannot silently diverge the two config halves.
+    from config import settings as _flat
+
     data = settings.setdefault('data', {})
     data['fallback_profile'] = os.getenv('FALLBACK_DATA_PROFILE', data.get('fallback_profile', fallback_profiles.get('default_profile', 'price_data_research')))
     data['fallback_profiles_path'] = fallback_profiles.get('path')
-    data['exchange'] = os.getenv('DEFAULT_EXCHANGE', data.get('exchange', 'extended'))
-    data['canonical_symbol'] = os.getenv('DEFAULT_CANONICAL_SYMBOL', data.get('canonical_symbol', 'BTC-PERP'))
+    data['exchange'] = _flat.DEFAULT_EXCHANGE
+    data['canonical_symbol'] = _flat.SYMBOL
     data['exchange_market'] = os.getenv('DEFAULT_EXCHANGE_MARKET', data.get('exchange_market', 'BTC-USD'))
-    data['timeframe'] = os.getenv('DEFAULT_TIMEFRAME', data.get('timeframe', 'PT1H'))
-    data['limit'] = _to_int(os.getenv('DEFAULT_LIMIT', data.get('limit', 500)), 500)
+    data['timeframe'] = _flat.TIMEFRAME
+    data['limit'] = _flat.CANDLE_FETCH_LIMIT
     data['allow_sample_fallback'] = _to_bool(os.getenv('ALLOW_SAMPLE_FALLBACK', data.get('allow_sample_fallback', True)))
 
     extended = settings.setdefault('extended', {})
@@ -133,7 +141,11 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
 
     binance_futures = additional.setdefault('binance_futures', {})
     binance_futures['enabled'] = _to_bool(os.getenv('BINANCE_FUTURES_PUBLIC_ENABLED', binance_futures.get('enabled', True)))
-    binance_futures['base_url'] = os.getenv('BINANCE_FUTURES_PUBLIC_BASE_URL', binance_futures.get('base_url', 'https://fapi.binance.com'))
+    # Seeded from the flat constant (same env, same default) — one resolution.
+    # NOTE: binance_futures.limit below is NOT seeded from CANDLE_FETCH_LIMIT:
+    # it is the enrichment-data page size, a different concept than the
+    # trade-path kline fetch.
+    binance_futures['base_url'] = _flat.BINANCE_FUTURES_PUBLIC_BASE_URL
     binance_futures['symbol'] = os.getenv('BINANCE_FUTURES_SYMBOL', binance_futures.get('symbol', 'BTCUSDT'))
     binance_futures['pair'] = os.getenv('BINANCE_FUTURES_PAIR', binance_futures.get('pair', binance_futures.get('symbol', 'BTCUSDT')))
     binance_futures['period'] = os.getenv('BINANCE_FUTURES_PERIOD', binance_futures.get('period', '1h'))
@@ -163,12 +175,10 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     # directly by decision_engine / signal_engine. Seed the AppConfig side from
     # those resolved constants so a settings.yaml value cannot silently diverge
     # from the flat half and split the pipeline's gate semantics.
-    from config import settings as _flat_settings
-
     trading_cfg = settings.setdefault('trading', {})
-    trading_cfg['use_research_signal_gate'] = bool(_flat_settings.USE_RESEARCH_SIGNAL_GATE)
-    trading_cfg['risk_level_reduced_position_multiplier'] = float(_flat_settings.RISK_LEVEL_REDUCED_POSITION_MULTIPLIER)
-    trading_cfg['risk_level_blocked_position_multiplier'] = float(_flat_settings.RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER)
+    trading_cfg['use_research_signal_gate'] = bool(_flat.USE_RESEARCH_SIGNAL_GATE)
+    trading_cfg['risk_level_reduced_position_multiplier'] = float(_flat.RISK_LEVEL_REDUCED_POSITION_MULTIPLIER)
+    trading_cfg['risk_level_blocked_position_multiplier'] = float(_flat.RISK_LEVEL_BLOCKED_POSITION_MULTIPLIER)
 
     backtest = settings.setdefault('backtest', {})
     backtest['maker_fee_bps'] = _to_float(os.getenv('MAKER_FEE_BPS', backtest.get('maker_fee_bps', 0)), 0.0)
@@ -179,7 +189,7 @@ def load_config(project_root: str | Path | None = None) -> AppConfig:
     # flags are the ones scripts/check_safety_defaults.py guards in CI, so mirror
     # them here rather than re-resolving env against a possibly-drifting yaml.
     safety = settings.setdefault('safety', {})
-    safety['live_trading_enabled'] = bool(_flat_settings.LIVE_TRADING_ENABLED)
-    safety['testnet_signed_order_enabled'] = bool(_flat_settings.TESTNET_SIGNED_ORDER_ENABLED)
+    safety['live_trading_enabled'] = bool(_flat.LIVE_TRADING_ENABLED)
+    safety['testnet_signed_order_enabled'] = bool(_flat.TESTNET_SIGNED_ORDER_ENABLED)
 
     return AppConfig(root=root, settings=settings)

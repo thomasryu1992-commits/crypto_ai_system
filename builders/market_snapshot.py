@@ -56,8 +56,11 @@ def build_market_snapshot() -> dict:
         last_candle_age_minutes = (utc_now() - last_time).total_seconds() / 60
         is_stale = last_candle_age_minutes > MAX_STALE_DATA_MINUTES
 
+    from crypto_ai_system.artifacts import SCHEMA_MARKET_SNAPSHOT
+
     snapshot = {
         "created_at": utc_now_iso(),
+        "schema_version": SCHEMA_MARKET_SNAPSHOT,
         "symbol": data.get("symbol", "BTCUSDT"),
         "timeframe": data.get("timeframe", "1h"),
         "source_type": data.get("source_type", data.get("source", "unknown")),

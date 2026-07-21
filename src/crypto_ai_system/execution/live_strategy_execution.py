@@ -187,8 +187,11 @@ def run_live_strategy_reconciliation() -> dict[str, Any]:
     order_result = read_json(ORDER_RESULT_PATH, {})
 
     if not order_result.get("external_order_submission_performed"):
+        from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
         result = {
             "created_at": utc_now_iso(),
+            "schema_version": SCHEMA_RECONCILIATION,
             "status": "NO_SUBMISSION",
             "mode": "LIVE_STRATEGY_RECONCILIATION",
             "mismatches": [],
@@ -210,6 +213,9 @@ def run_live_strategy_reconciliation() -> dict[str, Any]:
             "error": f"{type(exc).__name__}: {exc}",
         }
 
+    from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
+    result.setdefault("schema_version", SCHEMA_RECONCILIATION)
     atomic_write_json(RECONCILIATION_PATH, result)
     log_event(
         "live_strategy_reconciliation",

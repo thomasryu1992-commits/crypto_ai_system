@@ -29,6 +29,9 @@ def run_reconciler() -> dict:
         paper_record_path = latest / "paper_execution_record.json"
         if paper_record_path.exists():
             result = reconcile_latest_paper_execution(cfg=cfg)
+            from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
+            result.setdefault("schema_version", SCHEMA_RECONCILIATION)
             atomic_write_json(RECONCILIATION_PATH, result)
             log_event("reconciliation_completed", {"status": result.get("status"), "step295": True})
             return result
@@ -46,6 +49,8 @@ def run_reconciler() -> dict:
     # are reconciled by the signed-testnet/live reconcilers. Unreachable from
     # the pipeline today (the trading agent routes external submissions to the
     # venue reconcilers), but defense-in-depth for any direct caller.
+    from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
     notes = [fallback_note]
     if order.get("external_order_submission_performed"):
         status = "UNRECONCILED"
@@ -54,6 +59,7 @@ def run_reconciler() -> dict:
         status = "RECONCILED"
     result = {
         "created_at": utc_now_iso(),
+        "schema_version": SCHEMA_RECONCILIATION,
         "status": status,
         "order_status": order.get("status"),
         "paper_active": bool(paper.get("active_position")),
@@ -71,8 +77,11 @@ def run_reconciler() -> dict:
 
 def reconcile_execution_state() -> dict:
     """Compatibility wrapper: live execution is intentionally disabled in Step158."""
+    from crypto_ai_system.artifacts import SCHEMA_RECONCILIATION
+
     result = {
         "created_at": utc_now_iso(),
+        "schema_version": SCHEMA_RECONCILIATION,
         "status": "NO_LIVE_EXECUTION",
         "mode": "SAFE_COMPATIBILITY_RECONCILE",
         "notes": ["live execution remains blocked; use shadow/order logs only"],

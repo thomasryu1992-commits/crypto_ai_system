@@ -65,7 +65,15 @@ Two config systems, both load-bearing:
 
 Root packages `core/`, `config/`, `collectors/`, `builders/`, `risk/`, `bridge/`,
 `data_health/` are kept and imported by name (not under `src/`). Do not "fix" this
-into `src/` casually — many import sites depend on it.
+into `src/` casually — many import sites depend on it. **These root packages are
+frozen: new modules go under `src/crypto_ai_system/`** (exception: a direct
+sibling utility of `core/` may live there for consistency, e.g. `run_lock.py`).
+
+The `storage/latest/` JSON files are the inter-module API. Core artifacts
+(market snapshot, trade decision, order result, reconciliation) have typed
+views in `crypto_ai_system.artifacts` — writers stamp `schema_version`, and new
+consumers should read through the views instead of hand-rolling
+`read_json(...).get(...)` fallback chains.
 
 ## Non-negotiable safety rules
 
