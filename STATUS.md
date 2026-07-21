@@ -570,6 +570,41 @@ The two actionable weaknesses from the modularization review, fixed:
   kline fetch. Root packages declared frozen in CLAUDE.md (new modules go
   under `src/`); six ghost `.pyc`-only directories removed.
 
+**2026-07-21 — independent trade events, outcome tagging, correlated-book
+guard (PR #51).** Follow-up to PR #50: inspecting the paper history showed 61
+closed outcomes were really ~5 independent trades (the 15-min scheduler
+re-enters the same setup every cycle — two strategies each re-closed the same
+setup 29 times in one day), the regime/direction report groups were all
+"unknown", and the same research signal was opening two same-direction books
+at the same price.
+
+- **Sample gates count independent events now.** `independent_trade_events`
+  (`outcome_analytics_v2`) clusters closed outcomes by `result_R` + compatible
+  direction within a 2h merge gap; every ambiguity (legacy rows without
+  direction, unparseable timestamps) merges rather than splits, so the count
+  only errs toward FEWER events. Entry price is deliberately NOT in the
+  signature — re-entries land at slightly different prices each cycle and
+  splitting on price would recount one setup. `live_candidate_eligible`, the
+  per-signal `MIN_SIGNAL_SAMPLE_SIZE` exclusion, and the new
+  `INSUFFICIENT_INDEPENDENT_TRADE_EVENTS` /
+  `ALL_SIGNALS_BELOW_MIN_INDEPENDENT_EVENTS` blockers all use event counts.
+- **Outcome registry rows carry regime / direction / strategy_id / book_id /
+  entry_price / close_reason** — the analytics record always had them, but the
+  registry builder dropped them, which is why `summary_by_regime` and
+  `summary_by_direction` only ever said "unknown".
+- **Correlated-book guard**: `MULTIBOOK_MAX_SAME_SIGNAL_DIRECTION` (default 1)
+  refuses a second same-direction book off the SAME research signal
+  (`MAX_SAME_SIGNAL_DIRECTION`) — one exposure, not diversity. Verified in
+  production: the duplicate S1699 book was refused while S1735 opened.
+- **The aggregate verdict flipped to `live_candidate_eligible: false`
+  (intended).** Every signal sits at 1–2 independent events; the prior "42
+  wins / 1 loss, eligible" was repeat-counting. Eligibility returns as
+  independent events accumulate across market regimes — this is the Gate 0
+  reading note from PR #50 enforced by the report itself.
+- Verified per `/verify`: compileall, 933 tests, one clean pipeline cycle,
+  safety guard OK. No safety default changed; the one trade-path behavior
+  change (stricter multibook refusal) is env-overridable.
+
 **2026-07-21 — low-sample signals excluded from live-candidate eligibility (PR #50).**
 A research signal with a single closed trade counted toward the aggregate
 expectancy/win-rate behind `live_candidate_eligible` on equal footing with one
