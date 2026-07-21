@@ -96,6 +96,16 @@ BINANCE_PUBLIC_BASE_URL = env_str("BINANCE_PUBLIC_BASE_URL", "https://api.binanc
 REAL_MARKET_DATA_ENABLED = env_bool(["REAL_MARKET_DATA_ENABLED", "USE_REAL_MARKET_DATA"], True)
 BINANCE_FUTURES_PUBLIC_BASE_URL = env_str("BINANCE_FUTURES_PUBLIC_BASE_URL", "https://fapi.binance.com")
 
+# Extended (USDC venue) read-only basis probe — design V4. Public GET only, no
+# credentials, no order authority; best-effort in the data agent so a venue
+# outage never costs a cycle. Default on: the V3 basis guard's threshold needs
+# measured data before any Extended order authority exists.
+EXTENDED_BASIS_PROBE_ENABLED = env_bool("EXTENDED_BASIS_PROBE_ENABLED", True)
+EXTENDED_BASIS_PROBE_SYMBOLS = env_str("EXTENDED_BASIS_PROBE_SYMBOLS", "BTC,ETH,BNB,DOGE,SOL")
+EXTENDED_MAINNET_PUBLIC_BASE_URL = env_str(
+    "EXTENDED_MAINNET_PUBLIC_BASE_URL", "https://api.starknet.extended.exchange/api/v1"
+)
+
 # Spreadsheet-first storage
 SPREADSHEET_ENABLED = env_bool(["SPREADSHEET_ENABLED", "GOOGLE_SHEETS_ENABLED", "ENABLE_GOOGLE_SHEETS"], False)
 SPREADSHEET_PROVIDER = env_str("SPREADSHEET_PROVIDER", "local_csv")  # local_csv | google_sheets
