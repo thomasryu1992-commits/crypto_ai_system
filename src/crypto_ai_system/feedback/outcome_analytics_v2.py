@@ -220,6 +220,8 @@ class OutcomeAnalyticsRecord:
     close_reason: str
     regime: str
     direction: str
+    strategy_id: str
+    book_id: str
     entry_price: float
     stop_loss: float
     take_profit: float
@@ -327,6 +329,8 @@ def analyze_paper_reconciliation_outcome(
         close_reason=close_reason,
         regime=_text(ctx.get("regime") or ctx.get("market_regime") or "unknown"),
         direction=direction,
+        strategy_id=_text(intent.get("strategy_id")),
+        book_id=_text(ctx.get("book_id")),
         entry_price=_entry_price(rec),
         stop_loss=_float(intent.get("stop_loss"), 0.0),
         take_profit=_float(intent.get("take_profit"), 0.0),
@@ -393,6 +397,100 @@ def summarize_outcomes(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+#: Re-entries of the same setup in consecutive scheduler cycles land minutes
+#: apart; genuinely new setups at the same R multiple arrive hours later. Two
+#: hours cleanly separates the two on the 15-minute cadence.
+TRADE_EVENT_MERGE_GAP_MINUTES = 120
+
+
+def _parse_created_at(value: Any):
+    from datetime import datetime, timezone
+
+    text = _text(value)
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def independent_trade_events(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    merge_gap_minutes: float = TRADE_EVENT_MERGE_GAP_MINUTES,
+) -> list[dict[str, Any]]:
+    """Cluster closed outcomes into independent trade events.
+
+    The scheduler re-enters the same strategy setup every cycle, so raw
+    closed-outcome counts overstate the independent sample. Rows with the same
+    ``result_R`` (a strategy's R multiple is its rule's fingerprint) and a
+    compatible direction within ``merge_gap_minutes`` of the cluster's last
+    member are ONE event. A missing direction (legacy rows) is a wildcard and
+    an unparseable timestamp merges rather than splits — every ambiguity
+    resolves toward FEWER events, the stricter direction for sample gates.
+    Entry price is deliberately NOT in the signature: re-entries land at
+    slightly different prices each cycle, and splitting on price would count
+    one repeated setup many times.
+    """
+    closed = [dict(r) for r in records if isinstance(r, Mapping) and r.get("outcome_closed") is True]
+    closed.sort(key=lambda r: _text(r.get("created_at_utc")))
+    events: list[dict[str, Any]] = []
+    by_result: dict[float, list[int]] = {}
+    for row in closed:
+        r_key = round(_float(row.get("result_R"), 0.0), 6)
+        direction = _text(row.get("direction")).upper()
+        created = _parse_created_at(row.get("created_at_utc"))
+        merged = False
+        for event_index in reversed(by_result.get(r_key, [])):
+            event = events[event_index]
+            direction_compatible = (
+                not direction or not event["direction"] or event["direction"] == direction
+            )
+            if not direction_compatible:
+                continue
+            previous = event.get("_last_dt")
+            within_gap = (
+                created is None
+                or previous is None
+                or (created - previous).total_seconds() <= merge_gap_minutes * 60.0
+            )
+            if not within_gap:
+                continue
+            event["outcome_ids"].append(_text(row.get("outcome_id")))
+            event["count"] += 1
+            event["last_created_at_utc"] = _text(row.get("created_at_utc"))
+            if created is not None:
+                event["_last_dt"] = created
+            if direction and not event["direction"]:
+                event["direction"] = direction
+            merged = True
+            break
+        if merged:
+            continue
+        events.append({
+            "direction": direction,
+            "result_R": r_key,
+            "outcome_ids": [_text(row.get("outcome_id"))],
+            "count": 1,
+            "first_created_at_utc": _text(row.get("created_at_utc")),
+            "last_created_at_utc": _text(row.get("created_at_utc")),
+            "_last_dt": created,
+        })
+        by_result.setdefault(r_key, []).append(len(events) - 1)
+    for event in events:
+        event.pop("_last_dt", None)
+    return events
+
+
+def count_independent_trade_events(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    merge_gap_minutes: float = TRADE_EVENT_MERGE_GAP_MINUTES,
+) -> int:
+    return len(independent_trade_events(records, merge_gap_minutes=merge_gap_minutes))
+
+
 def build_outcome_feedback_registry_record(outcome: Mapping[str, Any]) -> dict[str, Any]:
     payload = dict(outcome or {})
     chain_payload = {
@@ -419,6 +517,16 @@ def build_outcome_feedback_registry_record(outcome: Mapping[str, Any]) -> dict[s
         "reconciliation_id": payload.get("reconciliation_id"),
         "status": payload.get("status"),
         "outcome_closed": payload.get("outcome_closed"),
+        # Grouping/dedupe keys: the performance report groups registry rows by
+        # regime/direction and clusters re-entries into independent trade
+        # events — without these here every group is "unknown" and every row
+        # counts as its own sample.
+        "regime": payload.get("regime"),
+        "direction": payload.get("direction"),
+        "strategy_id": payload.get("strategy_id"),
+        "book_id": payload.get("book_id"),
+        "entry_price": payload.get("entry_price"),
+        "close_reason": payload.get("close_reason"),
         "result_R": payload.get("result_R"),
         "pnl": payload.get("pnl"),
         "expectancy": payload.get("expectancy"),

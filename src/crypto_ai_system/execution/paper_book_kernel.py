@@ -43,6 +43,7 @@ DEFAULT_BOOK_ID = "default"
 REFUSED_BOOK_ALREADY_OPEN = "BOOK_ALREADY_OPEN"
 REFUSED_MAX_OPEN_BOOKS = "MAX_OPEN_BOOKS"
 REFUSED_MAX_SAME_DIRECTION = "MAX_SAME_DIRECTION"
+REFUSED_MAX_SAME_SIGNAL_DIRECTION = "MAX_SAME_SIGNAL_DIRECTION"
 REFUSED_NOT_A_FILL = "NOT_A_FILL"
 
 
@@ -54,12 +55,13 @@ def multibook_enabled(enabled: bool | None = None) -> bool:
     return bool(getattr(settings, "MULTIBOOK_PAPER_ENABLED", False))
 
 
-def _caps() -> tuple[int, int]:
+def _caps() -> tuple[int, int, int]:
     import config.settings as settings
 
     return (
         int(getattr(settings, "MULTIBOOK_MAX_OPEN_BOOKS", 5)),
         int(getattr(settings, "MULTIBOOK_MAX_SAME_DIRECTION", 3)),
+        int(getattr(settings, "MULTIBOOK_MAX_SAME_SIGNAL_DIRECTION", 1)),
     )
 
 
@@ -129,10 +131,15 @@ def multibook_report(cfg: AppConfig | None = None, *, enabled: bool | None = Non
         return None
     books = open_books(cfg)
     directions: dict[str, int] = {}
+    signal_directions: dict[str, int] = {}
     for pos in books.values():
         d = str(pos.get("direction") or "?")
         directions[d] = directions.get(d, 0) + 1
-    max_books, max_same_direction = _caps()
+        signal_id = pos.get("research_signal_id")
+        if signal_id:
+            key = f"{signal_id}:{d}"
+            signal_directions[key] = signal_directions.get(key, 0) + 1
+    max_books, max_same_direction, max_same_signal_direction = _caps()
     return {
         "enabled": True,
         "open_books": sorted(books),
@@ -140,6 +147,8 @@ def multibook_report(cfg: AppConfig | None = None, *, enabled: bool | None = Non
         "max_open_books": max_books,
         "same_direction_counts": directions,
         "max_same_direction": max_same_direction,
+        "same_signal_direction_counts": signal_directions,
+        "max_same_signal_direction": max_same_signal_direction,
         "remaining_capacity": max(0, max_books - len(books)),
         "at_capacity": len(books) >= max_books,
     }
@@ -176,13 +185,24 @@ def open_in_book(
 
     if book_id in currently_open:
         return None, REFUSED_BOOK_ALREADY_OPEN
-    max_books, max_same_direction = _caps()
+    max_books, max_same_direction, max_same_signal_direction = _caps()
     if len(currently_open) >= max_books:
         return None, REFUSED_MAX_OPEN_BOOKS
     same_direction = sum(1 for pos in currently_open.values()
                          if pos.get("direction") == position["direction"])
     if same_direction >= max_same_direction:
         return None, REFUSED_MAX_SAME_DIRECTION
+    # Same signal + same direction = the same setup entered twice at the same
+    # price; a second book adds exposure, not information.
+    signal_id = position.get("research_signal_id")
+    if signal_id:
+        same_signal_direction = sum(
+            1 for pos in currently_open.values()
+            if pos.get("direction") == position["direction"]
+            and pos.get("research_signal_id") == signal_id
+        )
+        if same_signal_direction >= max_same_signal_direction:
+            return None, REFUSED_MAX_SAME_SIGNAL_DIRECTION
 
     position["book_id"] = book_id
     books[book_id] = position

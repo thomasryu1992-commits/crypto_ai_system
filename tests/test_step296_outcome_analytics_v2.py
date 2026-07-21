@@ -195,3 +195,77 @@ def test_step296_summarizes_multiple_outcomes() -> None:
     assert summary["breakeven_count"] == 1
     assert summary["expectancy"] == 0.16666667
     assert summary["max_drawdown"] == 0.5
+
+
+def _event_row(result_r: float, created_at: str, *, direction: str = "LONG", entry_price: float = 100.0) -> dict:
+    return {
+        "outcome_closed": True,
+        "outcome_id": f"out_{result_r}_{created_at}",
+        "result_R": result_r,
+        "created_at_utc": created_at,
+        "direction": direction,
+        "entry_price": entry_price,
+    }
+
+
+def test_independent_trade_events_collapses_consecutive_cycle_reentries() -> None:
+    from crypto_ai_system.feedback.outcome_analytics_v2 import independent_trade_events
+
+    # The same setup re-closed every 15 minutes is ONE event, not four.
+    rows = [
+        _event_row(2.5, "2026-07-21T02:27:29Z"),
+        _event_row(2.5, "2026-07-21T02:42:29Z"),
+        _event_row(2.5, "2026-07-21T02:57:29Z"),
+        _event_row(2.5, "2026-07-21T03:12:29Z"),
+    ]
+    events = independent_trade_events(rows)
+    assert len(events) == 1
+    assert events[0]["count"] == 4
+
+
+def test_independent_trade_events_keeps_distinct_setups_apart() -> None:
+    from crypto_ai_system.feedback.outcome_analytics_v2 import independent_trade_events
+
+    # Interleaved distinct setups (different R / direction / entry) stay separate.
+    rows = [
+        _event_row(2.5, "2026-07-21T02:27:29Z"),
+        _event_row(1.9, "2026-07-21T02:27:30Z"),
+        _event_row(2.5, "2026-07-21T02:42:29Z"),
+        _event_row(1.9, "2026-07-21T02:42:30Z"),
+        _event_row(2.5, "2026-07-21T02:57:31Z", direction="SHORT"),
+    ]
+    events = independent_trade_events(rows)
+    assert len(events) == 3
+
+
+def test_independent_trade_events_splits_on_time_gap() -> None:
+    from crypto_ai_system.feedback.outcome_analytics_v2 import independent_trade_events
+
+    # Same signature but hours apart = a genuinely new occurrence of the setup.
+    rows = [
+        _event_row(2.5, "2026-07-18T02:00:00Z"),
+        _event_row(2.5, "2026-07-20T02:00:00Z"),
+    ]
+    events = independent_trade_events(rows)
+    assert len(events) == 2
+
+
+def test_independent_trade_events_ignores_open_rows() -> None:
+    from crypto_ai_system.feedback.outcome_analytics_v2 import independent_trade_events
+
+    row = _event_row(2.5, "2026-07-21T02:27:29Z")
+    row["outcome_closed"] = False
+    assert independent_trade_events([row]) == []
+
+
+def test_outcome_registry_record_carries_grouping_fields() -> None:
+    outcome = analyze_paper_reconciliation_outcome(
+        _reconciliation(),
+        outcome_context={"result_R": 1.5, "regime": "bullish", "book_id": "S9999"},
+    )
+    record = build_outcome_feedback_registry_record(outcome)
+    assert record["regime"] == "bullish"
+    assert record["direction"] == "LONG"
+    assert record["book_id"] == "S9999"
+    assert record["entry_price"] == outcome["entry_price"]
+    assert record["close_reason"] == outcome["close_reason"]
