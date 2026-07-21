@@ -26,3 +26,7 @@ storage/tmp/
 dist/
 *.log
 .pytest_tmp/
+
+# Claude Code: skills under .claude/skills/ are shared project knowledge and are
+# tracked; the local permission allowlist is per-machine and is not.
+.claude/settings.local.json
