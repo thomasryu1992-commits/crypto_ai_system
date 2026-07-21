@@ -6,7 +6,12 @@ from typing import Any, Iterable, Mapping
 
 from core.json_io import atomic_write_json
 from crypto_ai_system.config import AppConfig, load_config
-from crypto_ai_system.feedback.outcome_analytics_v2 import OUTCOME_FEEDBACK_REGISTRY_NAME, summarize_outcomes
+from crypto_ai_system.feedback.outcome_analytics_v2 import (
+    OUTCOME_FEEDBACK_REGISTRY_NAME,
+    TRADE_EVENT_MERGE_GAP_MINUTES,
+    count_independent_trade_events,
+    summarize_outcomes,
+)
 from crypto_ai_system.registry.base_registry import append_registry_record, load_registry_records, registry_path
 from crypto_ai_system.utils.audit import sha256_json, stable_id, utc_now_canonical
 
@@ -114,19 +119,18 @@ def _summaries_by(rows: list[Mapping[str, Any]], key: str) -> dict[str, dict[str
     return {name: summarize_outcomes(values) for name, values in sorted(groups.items())}
 
 
-def _closed_count_by_signal(rows: list[Mapping[str, Any]]) -> dict[str, int]:
-    counts: dict[str, int] = {}
+def _event_count_by_signal(rows: list[Mapping[str, Any]]) -> dict[str, int]:
+    """Independent trade events per signal — NOT raw closed rows.
+
+    The scheduler re-enters the same setup every cycle, so a signal's closed
+    count inflates with uptime; sample-size gates must count independent
+    events or a single repeated setup qualifies itself."""
+    groups: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
         if row.get("outcome_closed") is not True:
             continue
-        key = _group_key(row, "research_signal_id")
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def _low_sample_signal_ids(rows: list[Mapping[str, Any]], min_signal_sample_size: int) -> set[str]:
-    counts = _closed_count_by_signal(rows)
-    return {signal_id for signal_id, count in counts.items() if count < min_signal_sample_size}
+        groups.setdefault(_group_key(row, "research_signal_id"), []).append(row)
+    return {name: count_independent_trade_events(values) for name, values in groups.items()}
 
 
 def _r_distribution(rows: list[Mapping[str, Any]]) -> dict[str, int]:
@@ -166,7 +170,13 @@ def _failure_modes(rows: list[Mapping[str, Any]], summary: Mapping[str, Any]) ->
     return modes
 
 
-def _status_and_recommendation(rows: list[Mapping[str, Any]], summary: Mapping[str, Any], *, min_sample_size: int) -> tuple[str, str, list[str]]:
+def _status_and_recommendation(
+    rows: list[Mapping[str, Any]],
+    summary: Mapping[str, Any],
+    *,
+    min_sample_size: int,
+    independent_event_count: int | None = None,
+) -> tuple[str, str, list[str]]:
     blockers: list[str] = []
     if not rows:
         return STATUS_PERFORMANCE_REPORT_BLOCKED_NO_OUTCOMES, RECOMMEND_EXPAND_TEST_COVERAGE, ["NO_OUTCOME_RECORDS"]
@@ -179,6 +189,11 @@ def _status_and_recommendation(rows: list[Mapping[str, Any]], summary: Mapping[s
         blockers.append("RECONCILIATION_MISMATCH_PRESENT")
     if closed_count < min_sample_size:
         blockers.append("INSUFFICIENT_CLOSED_OUTCOME_SAMPLE")
+        return STATUS_PERFORMANCE_REPORT_REVIEW_ONLY_INSUFFICIENT_SAMPLE, RECOMMEND_REPEAT_IN_PAPER, blockers
+    # The closed count inflates with scheduler uptime (the same setup re-enters
+    # every cycle), so the sample gate also requires enough INDEPENDENT events.
+    if independent_event_count is not None and independent_event_count < min_sample_size:
+        blockers.append("INSUFFICIENT_INDEPENDENT_TRADE_EVENTS")
         return STATUS_PERFORMANCE_REPORT_REVIEW_ONLY_INSUFFICIENT_SAMPLE, RECOMMEND_REPEAT_IN_PAPER, blockers
 
     expectancy = _float(summary.get("expectancy"), 0.0)
@@ -207,6 +222,8 @@ class PerformanceReport:
     average_R: float
     max_drawdown: float
     r_distribution: dict[str, int]
+    independent_trade_event_count: int
+    trade_event_merge_gap_minutes: float
     min_signal_sample_size: int
     excluded_low_sample_signal_ids: list[str]
     excluded_low_sample_outcome_count: int
@@ -253,23 +270,41 @@ def build_performance_report(
     min_signal_sample_size: int = 3,
 ) -> dict[str, Any]:
     rows = _filter_outcomes(outcomes, profile_id=profile_id, research_signal_id=research_signal_id)
-    # Signals that haven't closed enough trades yet are excluded from the
-    # aggregate stats that drive live-candidate eligibility, so a single
-    # one-off trade can't swing the decision. summary_by_signal below still
-    # reports every signal, unfiltered, for visibility. This only applies when
-    # blending multiple signals into one "mixed" report — a report already
-    # scoped to a single research_signal_id is gated by min_sample_size alone,
-    # not this per-signal threshold, or it would always exclude itself.
+    # Signals without enough INDEPENDENT trade events (consecutive-cycle
+    # re-entries of one setup collapse into a single event) are excluded from
+    # the aggregate stats that drive live-candidate eligibility, so a single
+    # one-off trade — or one setup repeated by the scheduler — can't swing the
+    # decision. summary_by_signal below still reports every signal, unfiltered,
+    # for visibility. This only applies when blending multiple signals into one
+    # "mixed" report — a report already scoped to a single research_signal_id
+    # is gated by min_sample_size alone, or it would always exclude itself.
     distinct_signal_ids = {_group_key(row, "research_signal_id") for row in rows}
+    signal_event_counts = _event_count_by_signal(rows)
     if research_signal_id is not None or len(distinct_signal_ids) <= 1:
         low_sample_signal_ids: set[str] = set()
     else:
-        low_sample_signal_ids = _low_sample_signal_ids(rows, min_signal_sample_size)
+        low_sample_signal_ids = {
+            signal_id for signal_id, count in signal_event_counts.items() if count < min_signal_sample_size
+        }
     eligible_rows = [row for row in rows if _group_key(row, "research_signal_id") not in low_sample_signal_ids]
     excluded_rows = [row for row in rows if _group_key(row, "research_signal_id") in low_sample_signal_ids]
     summary = summarize_outcomes(eligible_rows)
-    status, recommendation, blockers = _status_and_recommendation(eligible_rows, summary, min_sample_size=min_sample_size)
-    failure_modes = sorted(dict.fromkeys([*blockers, *_failure_modes(eligible_rows, summary)]))
+    independent_event_count = count_independent_trade_events(eligible_rows)
+    if rows and not eligible_rows:
+        # Outcomes exist but every signal fell below the independent-event
+        # threshold — that is "not enough sample yet", not "no records".
+        status = STATUS_PERFORMANCE_REPORT_REVIEW_ONLY_INSUFFICIENT_SAMPLE
+        recommendation = RECOMMEND_REPEAT_IN_PAPER
+        blockers = ["ALL_SIGNALS_BELOW_MIN_INDEPENDENT_EVENTS"]
+        failure_modes = list(blockers)
+    else:
+        status, recommendation, blockers = _status_and_recommendation(
+            eligible_rows,
+            summary,
+            min_sample_size=min_sample_size,
+            independent_event_count=independent_event_count,
+        )
+        failure_modes = sorted(dict.fromkeys([*blockers, *_failure_modes(eligible_rows, summary)]))
     source_ids = [_text(row.get("outcome_id")) for row in rows if _text(row.get("outcome_id"))]
     source_hashes = [_text(row.get("outcome_record_sha256")) for row in rows if _text(row.get("outcome_record_sha256"))]
     created_values = sorted(_text(row.get("created_at_utc")) for row in rows if _text(row.get("created_at_utc")))
@@ -294,6 +329,7 @@ def build_performance_report(
         and recommendation == RECOMMEND_CREATE_CANDIDATE_PROFILE_DRAFT
         and not failure_modes
         and len(eligible_rows) >= min_sample_size
+        and independent_event_count >= min_sample_size
     )
 
     report = PerformanceReport(
@@ -316,6 +352,8 @@ def build_performance_report(
         average_R=_float(summary.get("average_R"), 0.0),
         max_drawdown=_float(summary.get("max_drawdown"), 0.0),
         r_distribution=_r_distribution(eligible_rows),
+        independent_trade_event_count=independent_event_count,
+        trade_event_merge_gap_minutes=float(TRADE_EVENT_MERGE_GAP_MINUTES),
         min_signal_sample_size=min_signal_sample_size,
         excluded_low_sample_signal_ids=sorted(low_sample_signal_ids),
         excluded_low_sample_outcome_count=len(excluded_rows),
@@ -330,7 +368,11 @@ def build_performance_report(
         reconciliation_mismatch_count=int(summary.get("reconciliation_mismatch_count", 0) or 0),
         summary_by_profile=_summaries_by(rows, "profile_id"),
         summary_by_signal={
-            signal_id: {**row_summary, "sufficient_sample": signal_id not in low_sample_signal_ids}
+            signal_id: {
+                **row_summary,
+                "independent_event_count": signal_event_counts.get(signal_id, 0),
+                "sufficient_sample": signal_id not in low_sample_signal_ids,
+            }
             for signal_id, row_summary in _summaries_by(rows, "research_signal_id").items()
         },
         summary_by_regime=_summaries_by(rows, "regime"),
@@ -365,6 +407,8 @@ def build_performance_report_registry_record(report: Mapping[str, Any]) -> dict[
         "average_R": payload.get("average_R"),
         "max_drawdown": payload.get("max_drawdown"),
         "r_distribution": payload.get("r_distribution"),
+        "independent_trade_event_count": payload.get("independent_trade_event_count"),
+        "trade_event_merge_gap_minutes": payload.get("trade_event_merge_gap_minutes"),
         "min_signal_sample_size": payload.get("min_signal_sample_size"),
         "excluded_low_sample_signal_ids": payload.get("excluded_low_sample_signal_ids"),
         "excluded_low_sample_outcome_count": payload.get("excluded_low_sample_outcome_count"),

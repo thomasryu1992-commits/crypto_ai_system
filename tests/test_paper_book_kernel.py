@@ -39,26 +39,28 @@ def _intent(direction: str = "LONG", strategy_id: str | None = "S271"):
     return intent
 
 
-def _execution(direction: str = "LONG", strategy_id: str | None = "S271", execution_id: str = "e1"):
+def _execution(direction: str = "LONG", strategy_id: str | None = "S271", execution_id: str = "e1", signal_id: str | None = None):
+    # Distinct signal per execution by default: each book models an INDEPENDENT
+    # setup. Pass an explicit signal_id to model correlated same-signal entries.
     return {
         "execution_id": execution_id,
         "order_intent_id": f"oi_{execution_id}",
         "decision_id": "d1",
         "risk_gate_id": "rg1",
-        "research_signal_id": "rs1",
+        "research_signal_id": signal_id or f"rs_{execution_id}",
         "simulated_fill": {"avg_fill_price": 100.0, "filled_quantity": 0.1, "fill_status": "FILLED"},
         "expected_order_intent": _intent(direction, strategy_id),
     }
 
 
-def _reconciliation(execution_id: str = "e1"):
+def _reconciliation(execution_id: str = "e1", signal_id: str | None = None):
     return {
         "reconciliation_id": f"r_{execution_id}",
         "execution_id": execution_id,
         "order_intent_id": f"oi_{execution_id}",
         "decision_id": "d1",
         "risk_gate_id": "rg1",
-        "research_signal_id": "rs1",
+        "research_signal_id": signal_id or f"rs_{execution_id}",
         "profile_id": "p1",
         "reconciled": True,
         "reconciliation_mismatch": False,
@@ -68,9 +70,9 @@ def _reconciliation(execution_id: str = "e1"):
     }
 
 
-def _open(cfg, direction="LONG", strategy_id="S271", execution_id="e1", enabled=True):
+def _open(cfg, direction="LONG", strategy_id="S271", execution_id="e1", enabled=True, signal_id=None):
     return books.open_in_book(
-        _execution(direction, strategy_id, execution_id), _reconciliation(execution_id),
+        _execution(direction, strategy_id, execution_id, signal_id), _reconciliation(execution_id, signal_id),
         cycle_id="cyc1", cfg=cfg, enabled=enabled,
     )
 
@@ -151,6 +153,23 @@ def test_same_direction_cap(tmp_path):
     # the other direction is still allowed
     pos, refusal = _open(cfg, "SHORT", "S4", "e4")
     assert refusal is None and pos["book_id"] == "S4"
+
+
+def test_same_signal_same_direction_is_one_exposure(tmp_path):
+    cfg = _cfg(tmp_path)
+    # First book from the signal opens normally.
+    pos, refusal = _open(cfg, "LONG", "S1735", "e1", signal_id="rs_shared")
+    assert refusal is None and pos["book_id"] == "S1735"
+    # A second same-direction book off the SAME signal is the same setup
+    # entered twice at the same price — refused as correlated exposure.
+    pos, refusal = _open(cfg, "LONG", "S1699", "e2", signal_id="rs_shared")
+    assert pos is None and refusal == books.REFUSED_MAX_SAME_SIGNAL_DIRECTION
+    # The opposite direction off the same signal is a different bet: allowed.
+    pos, refusal = _open(cfg, "SHORT", "S1800", "e3", signal_id="rs_shared")
+    assert refusal is None and pos["book_id"] == "S1800"
+    # Same direction off a DIFFERENT signal is independent: allowed.
+    pos, refusal = _open(cfg, "LONG", "S1900", "e4", signal_id="rs_other")
+    assert refusal is None and pos["book_id"] == "S1900"
 
 
 def test_books_settle_independently_with_attribution(tmp_path):

@@ -172,3 +172,64 @@ def test_step297_run_latest_reads_outcome_feedback_registry(tmp_path: Path) -> N
     assert report["status"] == STATUS_PERFORMANCE_REPORT_RECORDED
     assert report["recommendation"] == RECOMMEND_CREATE_CANDIDATE_PROFILE_DRAFT
     assert (tmp_path / "storage" / "registries" / "performance_report_registry.jsonl").exists()
+
+
+def _plain_row(signal_id: str, result_r: float, created_at: str, *, entry_price: float = 100.0) -> dict:
+    return {
+        "outcome_closed": True,
+        "outcome_id": f"out_{signal_id}_{result_r}_{created_at}",
+        "research_signal_id": signal_id,
+        "profile_id": "paper_default_v1",
+        "result_R": result_r,
+        "expectancy": result_r,
+        "created_at_utc": created_at,
+        "direction": "LONG",
+        "entry_price": entry_price,
+    }
+
+
+def test_step297_repeated_setup_is_insufficient_independent_events() -> None:
+    # 4 closed rows, but all the same setup re-entered every 15 minutes:
+    # closed_count passes min_sample_size, the independent-event gate must not.
+    rows = [
+        _plain_row("sig_a", 2.5, "2026-07-21T02:27:29Z"),
+        _plain_row("sig_a", 2.5, "2026-07-21T02:42:29Z"),
+        _plain_row("sig_a", 2.5, "2026-07-21T02:57:29Z"),
+        _plain_row("sig_a", 2.5, "2026-07-21T03:12:29Z"),
+    ]
+    report = build_performance_report(rows, min_sample_size=3)
+    assert report["independent_trade_event_count"] == 1
+    assert report["status"] == STATUS_PERFORMANCE_REPORT_REVIEW_ONLY_INSUFFICIENT_SAMPLE
+    assert "INSUFFICIENT_INDEPENDENT_TRADE_EVENTS" in report["blockers"]
+    assert report["live_candidate_eligible"] is False
+
+
+def test_step297_all_signals_low_sample_reports_insufficient_not_no_outcomes() -> None:
+    # Two signals, each one repeated setup -> both excluded. The report must
+    # say "insufficient sample", not "no outcome records".
+    rows = [
+        _plain_row("sig_a", 2.5, "2026-07-21T02:27:29Z"),
+        _plain_row("sig_a", 2.5, "2026-07-21T02:42:29Z"),
+        _plain_row("sig_b", 1.9, "2026-07-21T02:27:30Z", entry_price=200.0),
+        _plain_row("sig_b", 1.9, "2026-07-21T02:42:30Z", entry_price=200.0),
+    ]
+    report = build_performance_report(rows, min_sample_size=3, min_signal_sample_size=3)
+    assert report["blockers"] == ["ALL_SIGNALS_BELOW_MIN_INDEPENDENT_EVENTS"]
+    assert report["status"] == STATUS_PERFORMANCE_REPORT_REVIEW_ONLY_INSUFFICIENT_SAMPLE
+    assert report["live_candidate_eligible"] is False
+    for signal_summary in report["summary_by_signal"].values():
+        assert signal_summary["independent_event_count"] == 1
+        assert signal_summary["sufficient_sample"] is False
+
+
+def test_step297_distinct_events_stay_eligible() -> None:
+    # Genuinely distinct setups (different R, different days) keep eligibility.
+    rows = [
+        _plain_row("sig_a", 2.0, "2026-07-18T02:00:00Z"),
+        _plain_row("sig_a", 1.5, "2026-07-19T02:00:00Z", entry_price=110.0),
+        _plain_row("sig_a", 0.5, "2026-07-20T02:00:00Z", entry_price=120.0),
+    ]
+    report = build_performance_report(rows, min_sample_size=3)
+    assert report["independent_trade_event_count"] == 3
+    assert report["status"] == "PERFORMANCE_REPORT_RECORDED"
+    assert report["live_candidate_eligible"] is True
