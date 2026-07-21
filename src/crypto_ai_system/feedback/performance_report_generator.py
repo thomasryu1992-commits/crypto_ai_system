@@ -114,6 +114,21 @@ def _summaries_by(rows: list[Mapping[str, Any]], key: str) -> dict[str, dict[str
     return {name: summarize_outcomes(values) for name, values in sorted(groups.items())}
 
 
+def _closed_count_by_signal(rows: list[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        if row.get("outcome_closed") is not True:
+            continue
+        key = _group_key(row, "research_signal_id")
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _low_sample_signal_ids(rows: list[Mapping[str, Any]], min_signal_sample_size: int) -> set[str]:
+    counts = _closed_count_by_signal(rows)
+    return {signal_id for signal_id, count in counts.items() if count < min_signal_sample_size}
+
+
 def _r_distribution(rows: list[Mapping[str, Any]]) -> dict[str, int]:
     closed = [r for r in rows if r.get("outcome_closed") is True]
     values = [_float(r.get("result_R"), 0.0) for r in closed]
@@ -192,6 +207,9 @@ class PerformanceReport:
     average_R: float
     max_drawdown: float
     r_distribution: dict[str, int]
+    min_signal_sample_size: int
+    excluded_low_sample_signal_ids: list[str]
+    excluded_low_sample_outcome_count: int
     average_slippage: float
     average_latency_ms: float
     rejection_rate: float
@@ -232,17 +250,32 @@ def build_performance_report(
     profile_id: str | None = None,
     research_signal_id: str | None = None,
     min_sample_size: int = 3,
+    min_signal_sample_size: int = 3,
 ) -> dict[str, Any]:
     rows = _filter_outcomes(outcomes, profile_id=profile_id, research_signal_id=research_signal_id)
-    summary = summarize_outcomes(rows)
-    status, recommendation, blockers = _status_and_recommendation(rows, summary, min_sample_size=min_sample_size)
-    failure_modes = sorted(dict.fromkeys([*blockers, *_failure_modes(rows, summary)]))
+    # Signals that haven't closed enough trades yet are excluded from the
+    # aggregate stats that drive live-candidate eligibility, so a single
+    # one-off trade can't swing the decision. summary_by_signal below still
+    # reports every signal, unfiltered, for visibility. This only applies when
+    # blending multiple signals into one "mixed" report — a report already
+    # scoped to a single research_signal_id is gated by min_sample_size alone,
+    # not this per-signal threshold, or it would always exclude itself.
+    distinct_signal_ids = {_group_key(row, "research_signal_id") for row in rows}
+    if research_signal_id is not None or len(distinct_signal_ids) <= 1:
+        low_sample_signal_ids: set[str] = set()
+    else:
+        low_sample_signal_ids = _low_sample_signal_ids(rows, min_signal_sample_size)
+    eligible_rows = [row for row in rows if _group_key(row, "research_signal_id") not in low_sample_signal_ids]
+    excluded_rows = [row for row in rows if _group_key(row, "research_signal_id") in low_sample_signal_ids]
+    summary = summarize_outcomes(eligible_rows)
+    status, recommendation, blockers = _status_and_recommendation(eligible_rows, summary, min_sample_size=min_sample_size)
+    failure_modes = sorted(dict.fromkeys([*blockers, *_failure_modes(eligible_rows, summary)]))
     source_ids = [_text(row.get("outcome_id")) for row in rows if _text(row.get("outcome_id"))]
     source_hashes = [_text(row.get("outcome_record_sha256")) for row in rows if _text(row.get("outcome_record_sha256"))]
     created_values = sorted(_text(row.get("created_at_utc")) for row in rows if _text(row.get("created_at_utc")))
     profile_values = sorted({_text(row.get("profile_id")) for row in rows if _text(row.get("profile_id"))})
     signal_values = sorted({_text(row.get("research_signal_id")) for row in rows if _text(row.get("research_signal_id"))})
-    paper_live_values = [row.get("paper_live_gap") for row in rows if row.get("paper_live_gap") not in {None, "", "not_applicable"}]
+    paper_live_values = [row.get("paper_live_gap") for row in eligible_rows if row.get("paper_live_gap") not in {None, "", "not_applicable"}]
     if paper_live_values:
         paper_live_gap: str | float = round(sum(_float(v, 0.0) for v in paper_live_values) / len(paper_live_values), 8)
     else:
@@ -260,7 +293,7 @@ def build_performance_report(
         status == STATUS_PERFORMANCE_REPORT_RECORDED
         and recommendation == RECOMMEND_CREATE_CANDIDATE_PROFILE_DRAFT
         and not failure_modes
-        and len(rows) >= min_sample_size
+        and len(eligible_rows) >= min_sample_size
     )
 
     report = PerformanceReport(
@@ -282,7 +315,10 @@ def build_performance_report(
         win_loss_ratio=_float(summary.get("win_loss_ratio"), 0.0),
         average_R=_float(summary.get("average_R"), 0.0),
         max_drawdown=_float(summary.get("max_drawdown"), 0.0),
-        r_distribution=_r_distribution(rows),
+        r_distribution=_r_distribution(eligible_rows),
+        min_signal_sample_size=min_signal_sample_size,
+        excluded_low_sample_signal_ids=sorted(low_sample_signal_ids),
+        excluded_low_sample_outcome_count=len(excluded_rows),
         average_slippage=_float(summary.get("average_slippage"), 0.0),
         average_latency_ms=_float(summary.get("average_latency_ms"), 0.0),
         rejection_rate=_float(summary.get("rejection_rate"), 0.0),
@@ -293,7 +329,10 @@ def build_performance_report(
         manual_override_count=int(summary.get("manual_override_count", 0) or 0),
         reconciliation_mismatch_count=int(summary.get("reconciliation_mismatch_count", 0) or 0),
         summary_by_profile=_summaries_by(rows, "profile_id"),
-        summary_by_signal=_summaries_by(rows, "research_signal_id"),
+        summary_by_signal={
+            signal_id: {**row_summary, "sufficient_sample": signal_id not in low_sample_signal_ids}
+            for signal_id, row_summary in _summaries_by(rows, "research_signal_id").items()
+        },
         summary_by_regime=_summaries_by(rows, "regime"),
         summary_by_direction=_summaries_by(rows, "direction"),
         failure_modes=failure_modes,
@@ -326,6 +365,9 @@ def build_performance_report_registry_record(report: Mapping[str, Any]) -> dict[
         "average_R": payload.get("average_R"),
         "max_drawdown": payload.get("max_drawdown"),
         "r_distribution": payload.get("r_distribution"),
+        "min_signal_sample_size": payload.get("min_signal_sample_size"),
+        "excluded_low_sample_signal_ids": payload.get("excluded_low_sample_signal_ids"),
+        "excluded_low_sample_outcome_count": payload.get("excluded_low_sample_outcome_count"),
         "reconciliation_mismatch_count": payload.get("reconciliation_mismatch_count"),
         "failure_modes": payload.get("failure_modes"),
         "blockers": payload.get("blockers"),
@@ -383,6 +425,7 @@ def generate_and_persist_performance_report(
     profile_id: str | None = None,
     research_signal_id: str | None = None,
     min_sample_size: int = 3,
+    min_signal_sample_size: int = 3,
 ) -> dict[str, Any]:
     cfg = cfg or load_config(".")
     report = build_performance_report(
@@ -390,6 +433,7 @@ def generate_and_persist_performance_report(
         profile_id=profile_id,
         research_signal_id=research_signal_id,
         min_sample_size=min_sample_size,
+        min_signal_sample_size=min_signal_sample_size,
     )
     registry_record = persist_performance_report(cfg, report)
     report["performance_report_registry_record_id"] = registry_record.get("performance_report_registry_record_id")
@@ -404,8 +448,13 @@ def run_performance_report_latest(
     profile_id: str | None = None,
     research_signal_id: str | None = None,
     min_sample_size: int = 3,
+    min_signal_sample_size: int | None = None,
 ) -> dict[str, Any]:
     cfg = cfg or load_config(".")
+    if min_signal_sample_size is None:
+        import config.settings as settings
+
+        min_signal_sample_size = getattr(settings, "MIN_SIGNAL_SAMPLE_SIZE", 3)
     rows = _registry_rows(cfg)
     return generate_and_persist_performance_report(
         rows,
@@ -413,4 +462,5 @@ def run_performance_report_latest(
         profile_id=profile_id,
         research_signal_id=research_signal_id,
         min_sample_size=min_sample_size,
+        min_signal_sample_size=min_signal_sample_size,
     )

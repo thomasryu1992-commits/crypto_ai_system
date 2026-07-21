@@ -168,6 +168,11 @@ MAX_CONSECUTIVE_LOSSES = env_int("MAX_CONSECUTIVE_LOSSES", 3)
 # over-conservative gate becomes measurable. Observational only — it opens no
 # position and touches no order path, so it defaults on.
 COUNTERFACTUAL_TRACKING_ENABLED = env_bool("COUNTERFACTUAL_TRACKING_ENABLED", True)
+# A signal with fewer closed outcomes than this is excluded from the
+# aggregate performance report used for live-candidate eligibility — a single
+# lucky/unlucky trade on a rarely-fired signal shouldn't swing the candidate
+# decision. It still shows up in summary_by_signal for visibility.
+MIN_SIGNAL_SAMPLE_SIZE = env_int("MIN_SIGNAL_SAMPLE_SIZE", 3)
 MAX_DRAWDOWN_PCT = env_float("MAX_DRAWDOWN_PCT", -10.0)
 
 # ATR / execution safety

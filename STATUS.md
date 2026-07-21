@@ -570,6 +570,32 @@ The two actionable weaknesses from the modularization review, fixed:
   kline fetch. Root packages declared frozen in CLAUDE.md (new modules go
   under `src/`); six ghost `.pyc`-only directories removed.
 
+**2026-07-21 — low-sample signals excluded from live-candidate eligibility (PR #50).**
+A research signal with a single closed trade counted toward the aggregate
+expectancy/win-rate behind `live_candidate_eligible` on equal footing with one
+that had closed dozens, so a lone lucky (or unlucky) outcome could swing the
+candidate decision.
+
+- `build_performance_report` drops signals below `MIN_SIGNAL_SAMPLE_SIZE`
+  (`config/settings.py`, default 3, env-overridable) from the rows feeding the
+  aggregate stats, `status`/`recommendation`, `r_distribution`, and
+  `live_candidate_eligible`. Visibility is preserved rather than reduced:
+  `summary_by_signal` still reports EVERY signal, each annotated with
+  `sufficient_sample`, and the report + registry record carry
+  `min_signal_sample_size`, `excluded_low_sample_signal_ids`, and
+  `excluded_low_sample_outcome_count`.
+- The filter applies only when blending multiple signals into one "mixed"
+  report — a report already scoped to a single `research_signal_id` stays gated
+  by `min_sample_size` alone, or it would always exclude itself.
+- Verified on live paper history (44 closed outcomes): the three single-sample
+  signals drop out, leaving +2.27R expectancy over the six signals with >=3
+  closed trades. Full suite 924, safety guard OK, one clean pipeline cycle.
+- Reading note for Gate 0: `closed_count` is NOT a count of independent
+  samples. The 15-min scheduler re-enters the same strategy family (S1735 /
+  S1699) at near-identical price and time across cycles, so a raw count
+  overstates confidence — judge a sustained window by how many distinct market
+  regimes it survived, not by how many cycles ran.
+
 **2026-07-16 — lean-debt cleanup (PR #19, merged to `main`).** An audit-driven
 sweep of the post-refactor codebase. No safety default changed, no order path
 enabled; verified each step with the full suite, `check_safety_defaults.py`, and a
