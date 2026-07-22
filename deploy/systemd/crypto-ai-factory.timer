@@ -1,0 +1,13 @@
+# Mirrors the Windows CryptoAISystemStrategyFactory task: one generation / day.
+# 20:00 UTC = quiet hours in Asia (05:00 KST / 04:00 SGT) and clear of the
+# 15-minute pipeline firings' top-of-hour clustering.
+[Unit]
+Description=Crypto AI System - strategy factory daily
+
+[Timer]
+OnCalendar=*-*-* 20:00:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

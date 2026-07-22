@@ -1,0 +1,23 @@
+# One strategy-factory generation pass (5 symbols + rule miner). Fired daily
+# by crypto-ai-factory.timer. Long-running by design (backtests).
+[Unit]
+Description=Crypto AI System - daily strategy factory generation
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=crypto
+WorkingDirectory=/opt/crypto_ai_system
+Environment=PYTHONUTF8=1
+Environment=TZ=UTC
+ExecStart=/opt/crypto_ai_system/deploy/run_factory_once.sh
+StandardOutput=append:/opt/crypto_ai_system/storage/logs/strategy_factory.log
+StandardError=append:/opt/crypto_ai_system/storage/logs/strategy_factory.log
+TimeoutStartSec=7200
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
