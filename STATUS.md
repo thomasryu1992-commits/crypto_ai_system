@@ -1,5 +1,16 @@
 # Crypto AI System — Status
 
+> **FROZEN (2026-07-22): ported into Thomas Agent.** This system's functionality now
+> runs inside the AI_Agent governance runtime (`thomas_agent` repo,
+> `runtime/mvp_runtime/crypto/`, PRs #92–#101, contract
+> `docs/runtime-contracts/CRYPTO_PIPELINE_V0.1.md`). The accumulated evidence was
+> imported with provenance (batch `crypto_import_df6de6108cb7ff225b7c`: 114 outcomes,
+> 53 counterfactuals, 41 strategies; active pool re-established by explicit operator
+> decision), and the Windows scheduled tasks were removed the same day. **Single-runner
+> rule: do not run schedulers against this repo's storage after the freeze tag**
+> `archive/ported-to-thomas-agent-2026-07-22`. Live/testnet order paths were
+> deliberately NOT ported and remain a separate explicit decision.
+
 _Single source of truth for current state. Historical phase/step reports live in `docs/history/`._
 
 ## Architecture
