@@ -1,0 +1,13 @@
+# Mirrors the Windows CryptoAISystemPaperScheduler task: one cycle / 15 min.
+[Unit]
+Description=Crypto AI System - paper pipeline every 15 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00
+# If the box was down when a firing was due, run once at boot instead of
+# silently skipping to the next quarter hour.
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,4 @@
+# Server-side files must stay LF even when edited on the Windows dev machine —
+# CRLF in a shebang line or a systemd unit breaks them silently on Linux.
+*.sh text eol=lf
+deploy/systemd/* text eol=lf

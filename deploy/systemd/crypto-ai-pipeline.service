@@ -1,0 +1,25 @@
+# One paper trading cycle. Fired by crypto-ai-pipeline.timer every 15 minutes;
+# core/run_lock.py guarantees a slow cycle and the next firing never overlap.
+[Unit]
+Description=Crypto AI System - one paper pipeline cycle
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=crypto
+WorkingDirectory=/opt/crypto_ai_system
+Environment=PYTHONUTF8=1
+Environment=TZ=UTC
+ExecStart=/opt/crypto_ai_system/.venv/bin/python run_scheduler.py --once
+StandardOutput=append:/opt/crypto_ai_system/storage/logs/scheduler.log
+StandardError=append:/opt/crypto_ai_system/storage/logs/scheduler.log
+# A hung cycle must not pile up behind the lock forever.
+TimeoutStartSec=600
+
+# Read-only paper pipeline: no inbound ports, no privileged syscalls.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
